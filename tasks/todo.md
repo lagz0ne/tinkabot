@@ -59,10 +59,11 @@ Assumption:
 
 RED:
 - Use `triage-three` to pressure-test Go substrate and Browser Edge bootstrap before writing code.
-- Write failing tests for Go contract consumption, browser credential lease bootstrap shape, artifact gateway manifest serving shape, revoked/expired credential denial, and no raw NATS credential exposure to generated content.
+- Write failing tests for Go contract consumption, lease denial before credential descriptor creation, Browser Edge credential/content split, canonical `browser.command_intent` bridging, artifact gateway manifest policy, revocation denial, and no raw NATS credential exposure to generated content.
 
 GREEN:
-- Add the smallest Go substrate/browser-edge bootstrap boundary that can consume shared contracts, model scoped credential lease issuance/revocation, and expose artifact/manifest bootstrap shapes without live browser UI.
+- Add a pure/fakeable Go substrate-edge boundary that consumes shared contracts, models scoped worker credential descriptors, denies revoked/expired/stale leases, and validates artifact gateway policy shape.
+- Add a trusted Browser Edge bootstrap boundary that consumes sanitized bootstrap context, withholds raw authority from generated content, and emits canonical `browser.command_intent`.
 - Keep Go substrate authority, Browser Edge credential lifecycle, and generated-content access separate.
 
 VERIFY:
@@ -83,6 +84,8 @@ Evidence gathered:
 - Build: `bun run build` -> SDK ESM, CommonJS, and declarations emitted.
 - Layer docs: `bun run validate:layers` -> `Layer validation passed: docs/matched-abstraction`; `bun run test:layers` -> `Ran 10 tests ... OK`.
 - Orchestrator fix: generated worktrees now live as direct siblings of the repo root so relative local file dependencies resolve like the primary checkout.
+- Next-slice triage-three: confirmed risks are schema-only Go proof, frontend-local intent drift, raw authority leakage to generated content, and unproven artifact gateway policy.
+- Substrate Edge Bootstrap task doc: `docs/matched-abstraction/task/substrate-edge-bootstrap.md`; diagram `https://diashort.apps.quickable.co/d/8e1c7e86`.
 
 ## Current Verification Commands
 
@@ -131,6 +134,7 @@ Historical details live in matched-abstraction docs and git history. Do not expa
 - Endgame contract authority task: `docs/matched-abstraction/task/endgame-contract-authority.md`.
 - Managed auth subjects task: `docs/matched-abstraction/task/managed-auth-subjects.md`.
 - Command acceptance task: `docs/matched-abstraction/task/command-acceptance.md`.
+- Substrate edge bootstrap task: `docs/matched-abstraction/task/substrate-edge-bootstrap.md`.
 - Codex endgame orchestration plan: `docs/matched-abstraction/plan/codex-endgame-orchestration.md`.
 - Codex endgame orchestrator task: `docs/matched-abstraction/task/codex-endgame-orchestrator.md`.
 
