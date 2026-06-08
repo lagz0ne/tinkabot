@@ -1,6 +1,8 @@
 ---
 layer: approach
 topic: go-substrate
+status: sealed
+sealed_at: 2026-06-08
 references:
   - ./endgame-app.md
 ---
@@ -14,6 +16,18 @@ Diagram: https://diashort.apps.quickable.co/d/4a99eb1d
 The Go substrate is the server-side authority layer for Tinkabot's managed NATS platform. It embeds and manages NATS as the default substrate, owns live NATS lifecycle, NATS-auth-shaped enforcement, durable NATS stores, activation ledgers, artifact gateway substrate, process boundaries, execution attribution, and the later Docker/sandbox enforcement path.
 
 Go is not a schema sidecar and not only a policy mirror. TypeScript may provide SDK contracts and browser-facing helpers, but Go owns the substrate surfaces that become operationally real.
+
+## Seal
+
+This Approach is sealed for the `go-substrate-core` milestone and downstream Go substrate planning. Plan and Task layers may refine decomposition, handoff shape, implementation details, and verification evidence, but they may not reopen these Approach decisions without explicitly unsealing this document:
+
+- Go embeds and manages NATS as the default substrate.
+- HA and scale use NATS-native clustering, JetStream replica/quorum, route/gateway/leaf, queue/consumer, WebSocket, and observability semantics.
+- NATS auth vocabulary remains the enforcement authority.
+- Browser, script, activation, materializer, artifact gateway, and control-plane surfaces remain separate authority envelopes.
+- Scripts remain mediated through a facade and process protocol, not ambient NATS.
+- Generated browser content receives no credentials, subjects, tokens, publish APIs, or subscribe APIs.
+- Go substrate failures remain typed at their owning Go boundary with provenance and attribution.
 
 ## Scope
 

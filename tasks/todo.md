@@ -41,6 +41,7 @@ Progress Tinkabot through the Endgame Plan by completing verified milestones.
 
 - Endgame Approach is the current top-level app authority: `docs/matched-abstraction/approach/endgame-app.md`.
 - Endgame Plan is the current decomposition authority: `docs/matched-abstraction/plan/endgame-app.md`.
+- Go Substrate Approach is sealed for `go-substrate-core` and downstream Go substrate planning: `docs/matched-abstraction/approach/go-substrate.md`.
 - The product loop is source/artifact -> materialized projection -> browser intent -> durable backend acceptance -> activation -> script execution -> attributed event/projection update.
 - Go owns substrate authority: embedded NATS lifecycle, NATS-native HA/scale posture, auth, process lifecycle, Docker/sandboxing direction, connection policy, activation ledger, artifact gateway, execution attribution.
 - Vite owns the trusted browser shell. Generated browser content remains a receiver and intent emitter.
@@ -97,6 +98,7 @@ Evidence gathered:
 - Substrate Edge typecheck: `bun run typecheck` -> SDK plus orchestrator typecheck passed.
 - Substrate Edge build/package: `bun run build` -> SDK bundles emitted; `bun run pack:dry` -> `tinkabot-0.1.0.tgz`, 6 files.
 - Go substrate matched-abstraction docs: `docs/matched-abstraction/approach/go-substrate.md`, `docs/matched-abstraction/plan/go-substrate.md`, `docs/matched-abstraction/task/go-substrate-core.md`; diagram `https://diashort.apps.quickable.co/d/4a99eb1d`.
+- Go substrate Approach seal: embedded NATS ownership, NATS-native HA/scale, NATS auth vocabulary, separated authority envelopes, mediated scripts, generated-content denial, and typed substrate failures are locked unless Approach is explicitly reopened.
 
 ## Current Verification Commands
 
@@ -124,6 +126,7 @@ Evidence gathered:
 - Managed auth compilation denies raw/advanced imports and non-request-reply exposure by default, requires `allow_responses.expiresMs` when response authority is present, distinguishes revoked from expired leases, and requires exported subjects to match declared exposure subjects.
 - Command acceptance requires command ids, claims statuses atomically before activation handoff is returned, resolves duplicate command ids without second activation, binds command session/capability context to the active lease, rejects stale revisions, exhausted chain budgets, and revoked/expired capability contexts, and emits `activation.intent` with `source.kind = "command_acceptance"` only for accepted first-seen commands.
 - Substrate edge bootstrap stays pure/fakeable: Go derives scoped worker credential descriptors and artifact gateway policy from canonical contracts; Browser Edge splits worker-only credentials from content-safe context and emits only canonical `browser.command_intent` outward.
+- Go substrate Approach is sealed for `go-substrate-core`; downstream Plan/Task work may refine decomposition and verification, but cannot redefine embedded NATS ownership, HA/scale authority, auth vocabulary, authority envelopes, mediated scripts, generated-content denial, or typed substrate failures.
 - Go substrate embeds and manages NATS by default; HA/scale posture uses NATS-provided clustering, JetStream replica/quorum, route/gateway/leaf, WebSocket, queue/consumer, and observability semantics rather than bespoke substrate replication or routing.
 - Go substrate core must exist before activation/script/materializer implementation consumes substrate behavior; TypeScript runtime work is regression evidence, not substrate authority.
 - Activation-source router must sit between Go substrate core and script-materializer-loop so reactive triggers do not get invented inside script execution.
