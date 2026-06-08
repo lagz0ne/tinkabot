@@ -21,8 +21,8 @@ Progress Tinkabot through the Endgame Plan by completing verified milestones.
 
 1. DONE: `endgame-contract-authority`: neutral schemas, fixtures, TS/Zod target, Go validation target, and parity command.
 2. DONE: `managed-auth-subjects`: identity/capability provenance, subject taxonomy, NATS auth compilation fixtures, lease/revocation/expiration proof, advanced capability denial, bounded responses, and export/exposure pairing.
-3. NEXT: `command-acceptance`: durable intent acceptance, idempotency, stale-revision denial, status materialization, activation handoff.
-4. `substrate-edge-bootstrap`: Go substrate boundary plus Browser Edge credential/artifact bootstrap over shared contracts.
+3. DONE: `command-acceptance`: durable intent acceptance, atomic idempotency, required command ids, capability context binding, stale-revision denial, capability lease denial, status materialization, activation handoff.
+4. NEXT: `substrate-edge-bootstrap`: Go substrate boundary plus Browser Edge credential/artifact bootstrap over shared contracts.
 5. `script-materializer-loop`: mediated script execution, accepted effects, materialized projections/artifacts, cleanup.
 6. `release-spine`: centralized ops evidence manifest with outside-in real NATS proof and inside-out ownership proof.
 
@@ -51,24 +51,38 @@ Progress Tinkabot through the Endgame Plan by completing verified milestones.
 
 ## Next Slice
 
-Task layer next: `command-acceptance`.
+Task layer next: `substrate-edge-bootstrap`.
+
+Assumption:
+- Go substrate and Browser Edge consume the existing contract/auth/command packet instead of inventing new identity, credential, artifact, or status shapes.
+- This slice bootstraps substrate/browser-edge boundaries only. It must not implement full script execution, materialization, schedule activation, or frontend rendering.
 
 RED:
-- Use `triage-three` to pressure-test command acceptance before writing code.
-- Write failing tests for schema-valid browser command intent acceptance, duplicate command idempotency, stale revision denial, revoked/expired capability denial, raw-authority rejection, status materialization, and activation handoff shape.
+- Use `triage-three` to pressure-test Go substrate and Browser Edge bootstrap before writing code.
+- Write failing tests for Go contract consumption, browser credential lease bootstrap shape, artifact gateway manifest serving shape, revoked/expired credential denial, and no raw NATS credential exposure to generated content.
 
 GREEN:
-- Add the smallest command acceptance contract consumer that validates command intent, checks capability/revision context, records a durable acceptance status shape, and emits an activation handoff packet without executing scripts.
-- Keep browser intent schema validity separate from backend acceptance authority.
+- Add the smallest Go substrate/browser-edge bootstrap boundary that can consume shared contracts, model scoped credential lease issuance/revocation, and expose artifact/manifest bootstrap shapes without live browser UI.
+- Keep Go substrate authority, Browser Edge credential lifecycle, and generated-content access separate.
 
 VERIFY:
 - `bun run schema:parity`
-- command-acceptance targeted tests once created
+- substrate/browser-edge targeted tests once created
 - `bun run test`
 - `bun run typecheck`
 - `bun run validate:layers`
 - `bun run test:layers`
-- no-slop scan over command-acceptance docs, fixtures, and code
+- no-slop scan over substrate/browser-edge docs, fixtures, and code
+
+Evidence gathered:
+- Orchestrated command-acceptance worker patch was applied to the primary checkout after the first generated worktree failed full verification due dependency path placement.
+- Targeted command acceptance: `bun test packages/sdk/tests/endgame-contract/command-acceptance.test.ts` -> `9 pass`, `0 fail`, `53 expect() calls`.
+- Contract/schema parity: `bun run schema:parity` -> endgame contract tests `17 pass`, `0 fail`; Go contract package `ok`.
+- Full tests: `bun run test` -> `48 pass`, `0 fail`, `317 expect() calls`.
+- Typecheck: `bun run typecheck` -> SDK plus orchestrator typecheck passed.
+- Build: `bun run build` -> SDK ESM, CommonJS, and declarations emitted.
+- Layer docs: `bun run validate:layers` -> `Layer validation passed: docs/matched-abstraction`; `bun run test:layers` -> `Ran 10 tests ... OK`.
+- Orchestrator fix: generated worktrees now live as direct siblings of the repo root so relative local file dependencies resolve like the primary checkout.
 
 ## Current Verification Commands
 
@@ -94,6 +108,7 @@ VERIFY:
 - Browser and script credentials are scoped leases, not durable ambient credentials.
 - Schema validates shape; capability policy authorizes effects.
 - Managed auth compilation denies raw/advanced imports and non-request-reply exposure by default, requires `allow_responses.expiresMs` when response authority is present, distinguishes revoked from expired leases, and requires exported subjects to match declared exposure subjects.
+- Command acceptance requires command ids, claims statuses atomically before activation handoff is returned, resolves duplicate command ids without second activation, binds command session/capability context to the active lease, rejects stale revisions, exhausted chain budgets, and revoked/expired capability contexts, and emits `activation.intent` with `source.kind = "command_acceptance"` only for accepted first-seen commands.
 - Release gates must include allowed, denied-neighbor, malformed, duplicate, stale-revision, revoked-credential, and attributed-failure cases over NATS-mediated behavior.
 
 ## Milestone Index
@@ -115,6 +130,7 @@ Historical details live in matched-abstraction docs and git history. Do not expa
 - Endgame app plan: `docs/matched-abstraction/plan/endgame-app.md`.
 - Endgame contract authority task: `docs/matched-abstraction/task/endgame-contract-authority.md`.
 - Managed auth subjects task: `docs/matched-abstraction/task/managed-auth-subjects.md`.
+- Command acceptance task: `docs/matched-abstraction/task/command-acceptance.md`.
 - Codex endgame orchestration plan: `docs/matched-abstraction/plan/codex-endgame-orchestration.md`.
 - Codex endgame orchestrator task: `docs/matched-abstraction/task/codex-endgame-orchestrator.md`.
 

@@ -124,7 +124,7 @@ const browserCommand = z.strictObject({
   kind: z.literal("browser.command_intent"),
   type: z.literal("content.intent"),
   command: text,
-  commandId: text.optional(),
+  commandId: text,
   expectedRevision: text,
   payload: safeValue.optional(),
   context: browserCtx,
@@ -143,18 +143,34 @@ const acceptance = z.strictObject({
   error: err.optional(),
 });
 
+const requestReplySource = z.strictObject({
+  kind: z.literal("request_reply"),
+  activationName: text,
+  subject,
+  requestId: text,
+});
+
+const commandAcceptanceSource = z.strictObject({
+  kind: z.literal("command_acceptance"),
+  activationName: text,
+  subject,
+  commandId: text,
+  command: text,
+  artifactId: text,
+  artifactRevision: text,
+  frameId: text,
+});
+
 const activation = z.strictObject({
   kind: z.literal("activation.intent"),
   activationId: text,
   triggerId: text,
   scriptKey: text,
   scriptRevision: z.number().int().min(0).optional(),
-  source: z.strictObject({
-    kind: z.literal("request_reply"),
-    activationName: text,
-    subject,
-    requestId: text,
-  }),
+  source: z.discriminatedUnion("kind", [
+    requestReplySource,
+    commandAcceptanceSource,
+  ]),
   payload: safeValue.optional(),
   headers: z.record(text, text),
   observedAt: iso,
@@ -272,6 +288,7 @@ function contractError(
 }
 
 export * from "./managed-auth-subjects";
+export * from "./command-acceptance";
 
 function contractCritical(
   operation: string,

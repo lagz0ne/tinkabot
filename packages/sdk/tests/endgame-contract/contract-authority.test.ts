@@ -1,10 +1,12 @@
 import { describe, expect, test } from "bun:test";
 import {
-  TinkabotRuntimeError,
   contractSchemaId,
   parseContract,
+} from "../../src/endgame-contract/index";
+import {
+  TinkabotRuntimeError,
   type RuntimeErrorKind,
-} from "../../src/index";
+} from "../../src/nats-script-runtime/errors";
 
 interface ParityCase {
   caseId: string;

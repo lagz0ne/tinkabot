@@ -1,0 +1,23 @@
+{
+  "kind": "browser.command_intent",
+  "type": "content.intent",
+  "command": "select_artifact",
+  "expectedRevision": "artifact.rev.7",
+  "payload": {
+    "artifactKey": "preview.main"
+  },
+  "context": {
+    "sessionId": "session-001",
+    "capabilityId": "cap-001",
+    "artifactId": "artifact-001",
+    "artifactRevision": "artifact.rev.7",
+    "frameId": "frame-001",
+    "chain": {
+      "chainId": "chain-001",
+      "rootId": "root-001",
+      "parentId": "parent-001",
+      "hop": 1,
+      "maxHops": 5
+    }
+  }
+}

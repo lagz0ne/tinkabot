@@ -15,6 +15,11 @@
     "expect": { "valid": false, "errorKind": "ContractInvalid", "policy": "no-raw-authority" }
   },
   {
+    "caseId": "malformed-browser-missing-command-id",
+    "fixture": "fixtures/invalid/browser-command-missing-command-id.json",
+    "expect": { "valid": false, "errorKind": "ContractInvalid", "policy": "malformed" }
+  },
+  {
     "caseId": "allowed-auth-policy",
     "fixture": "fixtures/valid/auth-policy.json",
     "expect": { "valid": true, "policy": "allowed" }
@@ -97,6 +102,11 @@
   {
     "caseId": "allowed-activation",
     "fixture": "fixtures/valid/activation-request-reply.json",
+    "expect": { "valid": true, "policy": "allowed" }
+  },
+  {
+    "caseId": "allowed-command-acceptance-activation",
+    "fixture": "fixtures/valid/activation-command-acceptance.json",
     "expect": { "valid": true, "policy": "allowed" }
   },
   {

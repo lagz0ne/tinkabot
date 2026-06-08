@@ -204,7 +204,7 @@
     },
     "browserCommand": {
       "type": "object",
-      "required": ["kind", "type", "command", "expectedRevision", "context"],
+      "required": ["kind", "type", "command", "commandId", "expectedRevision", "context"],
       "additionalProperties": false,
       "properties": {
         "kind": { "const": "browser.command_intent" },
@@ -266,15 +266,10 @@
         "scriptKey": { "$ref": "#/$defs/text" },
         "scriptRevision": { "type": "integer", "minimum": 0 },
         "source": {
-          "type": "object",
-          "required": ["kind", "activationName", "subject", "requestId"],
-          "additionalProperties": false,
-          "properties": {
-            "kind": { "const": "request_reply" },
-            "activationName": { "$ref": "#/$defs/text" },
-            "subject": { "$ref": "#/$defs/subject" },
-            "requestId": { "$ref": "#/$defs/text" }
-          }
+          "oneOf": [
+            { "$ref": "#/$defs/requestReplyActivationSource" },
+            { "$ref": "#/$defs/commandAcceptanceActivationSource" }
+          ]
         },
         "payload": { "$ref": "#/$defs/safeValue" },
         "headers": {
@@ -294,6 +289,41 @@
         "dedupeKey": { "$ref": "#/$defs/text" },
         "provenance": { "$ref": "#/$defs/provenance" },
         "capability": { "$ref": "#/$defs/capability" }
+      }
+    },
+    "requestReplyActivationSource": {
+      "type": "object",
+      "required": ["kind", "activationName", "subject", "requestId"],
+      "additionalProperties": false,
+      "properties": {
+        "kind": { "const": "request_reply" },
+        "activationName": { "$ref": "#/$defs/text" },
+        "subject": { "$ref": "#/$defs/subject" },
+        "requestId": { "$ref": "#/$defs/text" }
+      }
+    },
+    "commandAcceptanceActivationSource": {
+      "type": "object",
+      "required": [
+        "kind",
+        "activationName",
+        "subject",
+        "commandId",
+        "command",
+        "artifactId",
+        "artifactRevision",
+        "frameId"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "kind": { "const": "command_acceptance" },
+        "activationName": { "$ref": "#/$defs/text" },
+        "subject": { "$ref": "#/$defs/subject" },
+        "commandId": { "$ref": "#/$defs/text" },
+        "command": { "$ref": "#/$defs/text" },
+        "artifactId": { "$ref": "#/$defs/text" },
+        "artifactRevision": { "$ref": "#/$defs/text" },
+        "frameId": { "$ref": "#/$defs/text" }
       }
     },
     "artifactManifest": {

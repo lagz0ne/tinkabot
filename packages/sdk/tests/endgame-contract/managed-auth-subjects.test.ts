@@ -1,14 +1,16 @@
 import { describe, expect, test } from "bun:test";
 import {
-  TinkabotRuntimeError,
   assertPublish,
   assertSubscribe,
   classifySubject,
   compileAuth,
   parseContract,
+} from "../../src/endgame-contract/index";
+import {
+  TinkabotRuntimeError,
   type RuntimeErrorKind,
   type RuntimeErrorLayer,
-} from "../../src/index";
+} from "../../src/nats-script-runtime/errors";
 
 interface AuthCase {
   caseId: string;
