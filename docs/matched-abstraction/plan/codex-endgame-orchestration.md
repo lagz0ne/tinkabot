@@ -38,6 +38,7 @@ After the worker creates a patch, the orchestrator applies it to an integration 
 - The root worktree must be clean unless the operator explicitly passes `--allow-dirty`.
 - The loop has hard `maxRounds`, `maxFix`, and timeout caps.
 - Agent logs, prompts, final summaries, manifests, patches, and verification results stay under `.codex-runs/`.
+- Generated git worktrees live as direct siblings of the repo root so existing relative local dependencies resolve the same way as the primary checkout.
 - Subagents may report success, but only the orchestrator can advance after running verification.
 
 ## Verification Strategy

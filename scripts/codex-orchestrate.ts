@@ -2,7 +2,7 @@
 
 import { createHash } from "node:crypto";
 import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
-import { dirname, join } from "node:path";
+import { basename, dirname, join } from "node:path";
 import { spawn } from "node:child_process";
 
 export type Status = "DONE" | "NEXT" | "TODO";
@@ -117,7 +117,7 @@ export function buildCodexArgs(opts: {
 
 export function planRound(m: Milestone, cfg: Pick<Args, "root" | "run" | "jobs">): Round {
   const run = cfg.run ?? join(cfg.root, ".codex-runs", "endgame", "dry-run");
-  const worker = join(run, "worktrees", `${m.n}-${m.topic}-worker`);
+  const worker = worktreeDir(cfg.root, run, `${m.n}-${m.topic}-worker`);
   const logs = join(run, "logs");
   const lease = [
     "apps/**",
@@ -228,7 +228,7 @@ export async function main(args = parseArgs()): Promise<void> {
     await mkdir(run, { recursive: true });
     await writeManifest(args.root, run, args, ms);
 
-    const integration = join(run, "integration");
+    const integration = worktreeDir(args.root, run, "integration");
     await worktree(args.root, integration, `codex/endgame-${id}`, "HEAD");
 
     for (let round = 1; round <= args.maxRounds; round++) {
@@ -268,7 +268,7 @@ async function reviewAndFix(root: string, rp: Round, rdir: string, args: Args) {
   await runCodex(args.codex, review, args);
   let text = await safeRead(review.out);
   for (let i = 1; /^BLOCKING:\s*yes/im.test(text) && i <= args.maxFix; i++) {
-    const cwd = join(rdir, "worktrees", `fix-${i}`);
+    const cwd = worktreeDir(root, rdir, `fix-${i}`);
     await worktree(root, cwd, `codex/fix-${runId()}-${i}`, "HEAD");
     const fix = {
       ...rp.worker,
@@ -482,6 +482,10 @@ function hash(text: string) {
 
 function runId() {
   return new Date().toISOString().replace(/[:.]/g, "-");
+}
+
+function worktreeDir(root: string, run: string, name: string) {
+  return join(dirname(root), `${basename(root)}-${basename(run)}-${name}`);
 }
 
 function num(value: string | undefined, fallback: number) {

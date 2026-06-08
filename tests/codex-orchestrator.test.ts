@@ -76,7 +76,7 @@ describe("CodexEndgameOrchestrator", () => {
     expect(round.worker.role).toBe("worker");
     expect(round.worker.sandbox).toBe("workspace-write");
     expect(round.worker.cwd).toBe(
-      "/repo/.codex-runs/endgame/round-001/worktrees/3-command-acceptance-worker",
+      "/repo-round-001-3-command-acceptance-worker",
     );
     expect(round.verify).toContain("bun run validate:layers");
     expect(round.verify).toContain("git diff --check");
