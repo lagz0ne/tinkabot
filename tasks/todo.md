@@ -4,6 +4,15 @@
 
 Execute the platform-structure reset through code layout: Go substrate owns NATS/auth/process/Docker-facing authority, Vite owns frontend shell delivery, SDK/schema owns shared contract shape, and root remains workspace orchestration.
 
+## Git Baseline Evidence
+
+- Local repository initialized on `main`.
+- Private GitHub repository created: `https://github.com/lagz0ne/tinkabot`.
+- Remote configured: `origin git@github.com:lagz0ne/tinkabot.git`.
+- Initial baseline commit: `99cc3c1ea6425ccb4ddfca0e9bdadc30bdc2cf64` (`chore: establish tinkabot workspace baseline`).
+- `git ls-remote origin refs/heads/main` -> `99cc3c1ea6425ccb4ddfca0e9bdadc30bdc2cf64 refs/heads/main`.
+- `gh repo view lagz0ne/tinkabot --json isPrivate,visibility,url,defaultBranchRef` -> private repo, default branch `main`.
+
 ## RED-GREEN-TDD Plan For Code Structure Reorganization
 
 - [x] RED: Prove the existing root-owned `src`, TypeScript tests, build config, package exports, and `dist` conflicted with platform ownership.
