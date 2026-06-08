@@ -1,0 +1,40 @@
+{
+  "name": "tinkabot",
+  "version": "0.1.0",
+  "type": "module",
+  "private": true,
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.mts",
+  "exports": {
+    ".": {
+      "import": {
+        "types": "./dist/index.d.mts",
+        "default": "./dist/index.mjs"
+      },
+      "require": {
+        "types": "./dist/index.d.cts",
+        "default": "./dist/index.cjs"
+      }
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsdown",
+    "test": "bun test tests",
+    "test:e2e": "bun test tests/e2e",
+    "typecheck": "bunx @typescript/native-preview --noEmit"
+  },
+  "dependencies": {
+    "@lagz0ne/nats-embedded": "file:../../../nats-embedded/packages/nats-embedded",
+    "@lagz0ne/nats-embedded-linux-x64": "file:../../../nats-embedded/packages/linux-x64",
+    "nats": "^2.29.3"
+  },
+  "devDependencies": {
+    "bun-types": "^1.2.15",
+    "tsdown": "^0.21.4",
+    "typescript": "^5.8.3"
+  }
+}

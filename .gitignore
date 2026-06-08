@@ -1,0 +1,22 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+coverage/
+
+# Package artifacts
+*.tgz
+
+# Bun install backups
+.old_modules-*/
+
+# Python test artifacts
+__pycache__/
+.pytest_cache/
+
+# Local environment and editor noise
+.env
+.env.*
+!.env.example
+.DS_Store
