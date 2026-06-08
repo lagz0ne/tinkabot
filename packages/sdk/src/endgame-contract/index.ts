@@ -289,6 +289,7 @@ function contractError(
 
 export * from "./managed-auth-subjects";
 export * from "./command-acceptance";
+export * from "./substrate-edge-bootstrap";
 
 function contractCritical(
   operation: string,

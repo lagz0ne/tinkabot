@@ -7,8 +7,8 @@
 - Latest pushed commit: `5c30a1f chore: add terse coding skill`.
 - Worktree baseline before this cleanup: clean against `origin/main`.
 - Root role: orchestration only.
-- Current implementation lives in `packages/sdk`.
-- Future lanes:
+- Current implementation lives in `packages/sdk` and `substrate/go`.
+- Active/future lanes:
   - `schemas`: canonical JSON Schema and codegen authority.
   - `substrate/go`: Go NATS/auth/process/Docker-facing substrate.
   - `apps/frontend`: Vite trusted shell.
@@ -22,8 +22,8 @@ Progress Tinkabot through the Endgame Plan by completing verified milestones.
 1. DONE: `endgame-contract-authority`: neutral schemas, fixtures, TS/Zod target, Go validation target, and parity command.
 2. DONE: `managed-auth-subjects`: identity/capability provenance, subject taxonomy, NATS auth compilation fixtures, lease/revocation/expiration proof, advanced capability denial, bounded responses, and export/exposure pairing.
 3. DONE: `command-acceptance`: durable intent acceptance, atomic idempotency, required command ids, capability context binding, stale-revision denial, capability lease denial, status materialization, activation handoff.
-4. NEXT: `substrate-edge-bootstrap`: Go substrate boundary plus Browser Edge credential/artifact bootstrap over shared contracts.
-5. `script-materializer-loop`: mediated script execution, accepted effects, materialized projections/artifacts, cleanup.
+4. DONE: `substrate-edge-bootstrap`: Go substrate boundary plus Browser Edge credential/artifact bootstrap over shared contracts.
+5. NEXT: `script-materializer-loop`: mediated script execution, accepted effects, materialized projections/artifacts, cleanup.
 6. `release-spine`: centralized ops evidence manifest with outside-in real NATS proof and inside-out ownership proof.
 
 ## Operating Rules
@@ -51,29 +51,29 @@ Progress Tinkabot through the Endgame Plan by completing verified milestones.
 
 ## Next Slice
 
-Task layer next: `substrate-edge-bootstrap`.
+Task layer next: `script-materializer-loop`.
 
 Assumption:
-- Go substrate and Browser Edge consume the existing contract/auth/command packet instead of inventing new identity, credential, artifact, or status shapes.
-- This slice bootstraps substrate/browser-edge boundaries only. It must not implement full script execution, materialization, schedule activation, or frontend rendering.
+- Script execution consumes accepted activation intents and scoped substrate/browser-edge authority without giving scripts ambient NATS access.
+- Script effects are mediated through the runtime facade, then materialized into projections/artifacts with attribution and cleanup.
+- This slice must not implement scheduler activation, release spine, or full frontend rendering.
 
 RED:
-- Use `triage-three` to pressure-test Go substrate and Browser Edge bootstrap before writing code.
-- Write failing tests for Go contract consumption, lease denial before credential descriptor creation, Browser Edge credential/content split, canonical `browser.command_intent` bridging, artifact gateway manifest policy, revocation denial, and no raw NATS credential exposure to generated content.
+- Use `triage-three` to pressure-test script/materializer flow before writing code.
+- Write failing tests for activation intent consumption, mediated script execution, facade effect acceptance/denial, projection/artifact materialization, attributed failures, cleanup, duplicate suppression, and revoked/stale capability denial.
 
 GREEN:
-- Add a pure/fakeable Go substrate-edge boundary that consumes shared contracts, models scoped worker credential descriptors, denies revoked/expired/stale leases, and validates artifact gateway policy shape.
-- Add a trusted Browser Edge bootstrap boundary that consumes sanitized bootstrap context, withholds raw authority from generated content, and emits canonical `browser.command_intent`.
-- Keep Go substrate authority, Browser Edge credential lifecycle, and generated-content access separate.
+- Add the smallest pure/fakeable script-materializer loop that can consume an accepted activation, run a script through the existing process/runtime contract, accept only mediated effects, and materialize projection/artifact outputs with attribution.
+- Keep script runtime, effect policy, materializer output, and cleanup ownership separate.
 
 VERIFY:
 - `bun run schema:parity`
-- substrate/browser-edge targeted tests once created
+- script/materializer targeted tests once created
 - `bun run test`
 - `bun run typecheck`
 - `bun run validate:layers`
 - `bun run test:layers`
-- no-slop scan over substrate/browser-edge docs, fixtures, and code
+- no-slop scan over script/materializer docs, fixtures, and code
 
 Evidence gathered:
 - Orchestrated command-acceptance worker patch was applied to the primary checkout after the first generated worktree failed full verification due dependency path placement.
@@ -86,6 +86,12 @@ Evidence gathered:
 - Orchestrator fix: generated worktrees now live as direct siblings of the repo root so relative local file dependencies resolve like the primary checkout.
 - Next-slice triage-three: confirmed risks are schema-only Go proof, frontend-local intent drift, raw authority leakage to generated content, and unproven artifact gateway policy.
 - Substrate Edge Bootstrap task doc: `docs/matched-abstraction/task/substrate-edge-bootstrap.md`; diagram `https://diashort.apps.quickable.co/d/8e1c7e86`.
+- Substrate Edge targeted Browser Edge: `bun test packages/sdk/tests/endgame-contract/substrate-edge-bootstrap.test.ts` -> `4 pass`, `0 fail`, `17 expect() calls`.
+- Substrate Edge targeted Go: `go test ./edge` from `substrate/go` -> `ok github.com/lagz0ne/tinkabot/substrate/go/edge`.
+- Substrate Edge schema parity: `bun run schema:parity` -> endgame contract tests `21 pass`, `0 fail`; Go contract and edge packages `ok`.
+- Substrate Edge full tests: `bun run test` -> `52 pass`, `0 fail`, `334 expect() calls`.
+- Substrate Edge typecheck: `bun run typecheck` -> SDK plus orchestrator typecheck passed.
+- Substrate Edge build/package: `bun run build` -> SDK bundles emitted; `bun run pack:dry` -> `tinkabot-0.1.0.tgz`, 6 files.
 
 ## Current Verification Commands
 
@@ -112,6 +118,7 @@ Evidence gathered:
 - Schema validates shape; capability policy authorizes effects.
 - Managed auth compilation denies raw/advanced imports and non-request-reply exposure by default, requires `allow_responses.expiresMs` when response authority is present, distinguishes revoked from expired leases, and requires exported subjects to match declared exposure subjects.
 - Command acceptance requires command ids, claims statuses atomically before activation handoff is returned, resolves duplicate command ids without second activation, binds command session/capability context to the active lease, rejects stale revisions, exhausted chain budgets, and revoked/expired capability contexts, and emits `activation.intent` with `source.kind = "command_acceptance"` only for accepted first-seen commands.
+- Substrate edge bootstrap stays pure/fakeable: Go derives scoped worker credential descriptors and artifact gateway policy from canonical contracts; Browser Edge splits worker-only credentials from content-safe context and emits only canonical `browser.command_intent` outward.
 - Release gates must include allowed, denied-neighbor, malformed, duplicate, stale-revision, revoked-credential, and attributed-failure cases over NATS-mediated behavior.
 
 ## Milestone Index

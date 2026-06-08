@@ -75,18 +75,29 @@ Task prep evidence:
 - `bun run validate:layers` -> `Layer validation passed: docs/matched-abstraction`
 - `bun run test:layers` -> `Ran 10 tests ... OK`
 
-Implementation gate:
+RED:
 
-- `bun run schema:parity`
-- Go substrate-edge targeted tests.
-- Browser Edge targeted tests.
-- `bun run test`
-- `bun run typecheck`
-- `bun run build`
-- `bun run pack:dry`
-- `bun run validate:layers`
-- `bun run test:layers`
-- no-slop scan over substrate-edge docs, fixtures, and code.
+- `bun test packages/sdk/tests/endgame-contract/substrate-edge-bootstrap.test.ts` -> failed with missing `createBrowserEdgeBootstrap` export.
+- `go test ./edge` from `substrate/go` -> failed with missing `BuildBootstrap`, `BootstrapOptions`, `ErrorKind`, and `EdgeError`.
+
+GREEN:
+
+- `bun test packages/sdk/tests/endgame-contract/substrate-edge-bootstrap.test.ts` -> `4 pass`, `0 fail`, `17 expect() calls`.
+- `go test ./edge` from `substrate/go` -> `ok github.com/lagz0ne/tinkabot/substrate/go/edge`.
+- `bun run schema:parity` -> endgame contract tests `21 pass`, `0 fail`, `152 expect() calls`; Go contract and edge packages `ok`.
+- `bun run typecheck` -> SDK plus orchestrator typecheck passed.
+- `bun run test` -> `52 pass`, `0 fail`, `334 expect() calls`.
+- `bun run build` -> SDK ESM, CommonJS, and declarations emitted.
+- `bun run pack:dry` -> `tinkabot-0.1.0.tgz`, 6 files, unpacked size `179.68KB`.
+- `bun run validate:layers` -> `Layer validation passed: docs/matched-abstraction`.
+- `bun run test:layers` -> `Ran 10 tests ... OK`.
+- no-slop scan over substrate-edge docs, fixtures, and code -> only intentional handoff vocabulary.
+
+Review passes:
+
+- No-slop pass: no live NATS WebSocket, Vite UI, HTTP serving, script execution, activation worker, materialization loop, or Docker sandboxing was added.
+- Simplify pass: Go owns substrate-edge derivation and gateway denial; TypeScript owns Browser Edge bootstrap and canonical command bridging; both stay pure/fakeable.
+- Review pass: empty credential refs are denied, revoked leases fail before worker credentials return, and default artifact namespace enforcement is active.
 
 ## Wrap-Up Announcement
 
