@@ -1,422 +1,129 @@
 # Tinkabot Handoff
 
-## Current Goal
+## Current State
 
-Execute the platform-structure reset through code layout: Go substrate owns NATS/auth/process/Docker-facing authority, Vite owns frontend shell delivery, SDK/schema owns shared contract shape, and root remains workspace orchestration.
+- Repo: `lagz0ne/tinkabot`, private, branch `main`.
+- Remote: `origin git@github.com:lagz0ne/tinkabot.git`.
+- Latest pushed commit: `5c30a1f chore: add terse coding skill`.
+- Worktree baseline before this cleanup: clean against `origin/main`.
+- Root role: orchestration only.
+- Current implementation lives in `packages/sdk`.
+- Future lanes:
+  - `schemas`: canonical JSON Schema and codegen authority.
+  - `substrate/go`: Go NATS/auth/process/Docker-facing substrate.
+  - `apps/frontend`: Vite trusted shell.
 
-## Git Baseline Evidence
+## Active Goal
 
-- Local repository initialized on `main`.
-- Private GitHub repository created: `https://github.com/lagz0ne/tinkabot`.
-- Remote configured: `origin git@github.com:lagz0ne/tinkabot.git`.
-- Initial baseline commit: `99cc3c1ea6425ccb4ddfca0e9bdadc30bdc2cf64` (`chore: establish tinkabot workspace baseline`).
-- `git ls-remote origin refs/heads/main` -> `99cc3c1ea6425ccb4ddfca0e9bdadc30bdc2cf64 refs/heads/main`.
-- `gh repo view lagz0ne/tinkabot --json isPrivate,visibility,url,defaultBranchRef` -> private repo, default branch `main`.
+Progress Tinkabot through the Endgame Plan by completing verified milestones.
 
-## RED-GREEN-TDD Plan For Code Structure Reorganization
+## Milestone Workflow
 
-- [x] RED: Prove the existing root-owned `src`, TypeScript tests, build config, package exports, and `dist` conflicted with platform ownership.
-- [x] RED: Preserve baseline behavior with `bun test`, `bun run typecheck`, `bun run build`, and layer validation before moving files.
-- [x] GREEN: Move the existing TypeScript package into `packages/sdk`.
-- [x] GREEN: Make root `package.json` workspace orchestration with delegated SDK commands.
-- [x] GREEN: Add ownership notes for `apps/frontend`, `substrate/go`, `schemas`, and `packages/sdk`.
-- [x] VERIFY: Run SDK tests, e2e, typecheck, build, dry pack, structure checks, layer validation, and layer unit tests.
-- [x] REFACTOR: Fix false-green Bun `--cwd` script shape and remove generated install backup.
+1. DONE: `endgame-contract-authority`: neutral schemas, fixtures, TS/Zod target, Go validation target, and parity command.
+2. DONE: `managed-auth-subjects`: identity/capability provenance, subject taxonomy, NATS auth compilation fixtures, lease/revocation/expiration proof, advanced capability denial, bounded responses, and export/exposure pairing.
+3. NEXT: `command-acceptance`: durable intent acceptance, idempotency, stale-revision denial, status materialization, activation handoff.
+4. `substrate-edge-bootstrap`: Go substrate boundary plus Browser Edge credential/artifact bootstrap over shared contracts.
+5. `script-materializer-loop`: mediated script execution, accepted effects, materialized projections/artifacts, cleanup.
+6. `release-spine`: centralized ops evidence manifest with outside-in real NATS proof and inside-out ownership proof.
 
-## Code Structure Reorganization Evidence
+## Operating Rules
 
-- Current root role: orchestration, docs, task handoff, layer validation, workspace scripts, and lockfile.
-- Current SDK package role: `packages/sdk` owns existing TypeScript source, TypeScript tests, package exports, build config, dependencies, and `dist`.
-- Current future lanes:
-  - `apps/frontend` for the Vite trusted shell.
-  - `substrate/go` for Go substrate authority.
-  - `schemas` for canonical JSON Schema and generated validation/type artifacts.
-- Added matched-abstraction docs:
-  - `docs/matched-abstraction/approach/code-structure.md`
-  - `docs/matched-abstraction/plan/code-structure.md`
-  - `docs/matched-abstraction/task/code-structure-reorganization.md`
-- Structure diagram: https://diashort.apps.quickable.co/d/b98307da
-- `bun test` -> `27 pass`, `0 fail`.
-- `bun run test:e2e` -> `1 pass`, `0 fail`.
+- Read this file first at session start.
+- Use RED-GREEN-TDD for non-trivial changes.
+- Use `matched-abstraction-thinking` for architecture, planning, task handoff, and layer docs.
+- Use `triage-three` before presenting non-trivial concepts or architecture choices; skip for direct execution/status.
+- Use `be-lazy` when coding: short names, compiler-backed inference, direct code, explicit only at public/safety/schema/error boundaries.
+- Verify before done. Prefer narrow meaningful checks, then record evidence here only when it changes the current handoff.
+
+## Current Direction
+
+- Endgame Approach is the current top-level app authority: `docs/matched-abstraction/approach/endgame-app.md`.
+- Endgame Plan is the current decomposition authority: `docs/matched-abstraction/plan/endgame-app.md`.
+- The product loop is source/artifact -> materialized projection -> browser intent -> durable backend acceptance -> activation -> script execution -> attributed event/projection update.
+- Go owns substrate authority: NATS infra, auth, process lifecycle, Docker/sandboxing direction, connection policy, activation ledger, artifact gateway, execution attribution.
+- Vite owns the trusted browser shell. Generated browser content remains a receiver and intent emitter.
+- Schema/SDK owns shared contract shape. JSON Schema is the first neutral source; generated or checked Zod, TS types, Go validators/types, and fixtures follow it.
+- Existing Bun/TypeScript runtime and `@lagz0ne/nats-embedded` work is regression evidence and SDK material, not current substrate authority.
+- Default scripts stay NATS-agnostic process contracts. Runtime facade mediates NATS publish/progress/import requests.
+- Activation is a first-class layer above substrate; request/reply is only one activation source.
+- Browser edge owns session bootstrap, browser credential mint/revoke, artifact serving, cache/CSP/sandbox policy, and missing browser control-plane behavior.
+- Control plane and app plane are separate authority domains.
+
+## Next Slice
+
+Task layer next: `command-acceptance`.
+
+RED:
+- Use `triage-three` to pressure-test command acceptance before writing code.
+- Write failing tests for schema-valid browser command intent acceptance, duplicate command idempotency, stale revision denial, revoked/expired capability denial, raw-authority rejection, status materialization, and activation handoff shape.
+
+GREEN:
+- Add the smallest command acceptance contract consumer that validates command intent, checks capability/revision context, records a durable acceptance status shape, and emits an activation handoff packet without executing scripts.
+- Keep browser intent schema validity separate from backend acceptance authority.
+
+VERIFY:
+- `bun run schema:parity`
+- command-acceptance targeted tests once created
+- `bun run test`
+- `bun run typecheck`
+- `bun run validate:layers`
+- `bun run test:layers`
+- no-slop scan over command-acceptance docs, fixtures, and code
+
+## Current Verification Commands
+
+- `bun test` or `bun run test` -> SDK tests.
+- `bun run test:e2e` -> SDK distribution BDD.
 - `bun run typecheck` -> `bunx @typescript/native-preview --noEmit`.
-- `bun run build` -> built `packages/sdk/dist`.
-- `bun run pack:dry` -> `Total files: 6`.
-- root `src`, root `dist`, root `tsconfig.json`, and root `tsdown.config.ts` structure probes -> no output.
-- Added `.gitignore` for `node_modules`, `dist`, `coverage`, dry-pack tarballs, Bun install backups, Python bytecode, local env files, and editor noise.
-- `git rev-parse --is-inside-work-tree` -> not a git repository, so `git check-ignore` cannot be used in this workspace.
-- `bun run validate:layers` -> `Layer validation passed: docs/matched-abstraction`.
-- `bun run test:layers` -> `Ran 10 tests ... OK`.
-- `find packages/sdk -maxdepth 1 -type f -name '*.tgz' -print` -> no output.
-- `find . -type d -name __pycache__ -print` -> no output.
+- `bun run build` -> builds `packages/sdk/dist`.
+- `bun run pack:dry` -> dry package check.
+- `bun run orchestrate:codex -- --dry-run --allow-dirty` -> smoke-test the Codex endgame orchestration plan without launching agents.
+- `bun run validate:layers` -> matched-abstraction docs.
+- `bun run test:layers` -> layer validator unit tests.
 
-## RED-GREEN-TDD Plan For Platform Structure Reset
+## Pinned Decisions
 
-- [x] RED: Capture stale active Bun substrate authority in docs and handoff.
-- [x] RED: Use Approach, Plan, and Task subagents to protect the platform reset layers.
-- [x] GREEN: Add platform-structure Approach, Plan, and Task docs.
-- [x] GREEN: Mark earlier Bun substrate authority as superseded evidence in NATS runtime docs.
-- [x] VERIFY: Run layer validation, stale-authority review, no-slop scan, and layer unit tests.
-- [x] REFACTOR: Do simplify and review passes for the docs-only reset.
+- NATS auth vocabulary is authoritative: `permissions.publish`, `permissions.subscribe`, `allow`, `deny`, `allow_responses`.
+- Metadata uses `desc`, not `meaning`.
+- Model both access and exposure: inside-out imports/publish and outside-in activation/consumption.
+- Subjects must be concrete values or concrete wildcard patterns. No placeholder subject strings.
+- Deny wins over allow. `allow_responses` is bounded to invocation/reply.
+- Canonical process IPC is framed stdio RPC; fd-specific helpers are adapters only.
+- A first slice may be small, but must be complete at its boundary with denial/failure paths.
+- NATS auth is the compiled enforcement shape; identity, ownership, session, revision, and capability provenance must survive into it.
+- Browser and script credentials are scoped leases, not durable ambient credentials.
+- Schema validates shape; capability policy authorizes effects.
+- Managed auth compilation denies raw/advanced imports and non-request-reply exposure by default, requires `allow_responses.expiresMs` when response authority is present, distinguishes revoked from expired leases, and requires exported subjects to match declared exposure subjects.
+- Release gates must include allowed, denied-neighbor, malformed, duplicate, stale-revision, revoked-credential, and attributed-failure cases over NATS-mediated behavior.
 
-## Platform Structure Reset Evidence
+## Milestone Index
 
-- Added matched-abstraction docs:
-  - `docs/matched-abstraction/approach/platform-structure.md`
-  - `docs/matched-abstraction/plan/platform-structure.md`
-  - `docs/matched-abstraction/task/platform-structure-reset.md`
-- Updated earlier NATS runtime docs so Bun and `@lagz0ne/nats-embedded` are preserved as historical or superseded evidence, not current platform authority.
-- `python3 -B .codex/skills/matched-abstraction-thinking/scripts/validate_layers.py docs/matched-abstraction` -> `Layer validation passed: docs/matched-abstraction`.
-- `python3 -B -m unittest tests/test_validate_layers.py` -> `Ran 10 tests ... OK`.
-- stale-authority review -> remaining Bun and `@lagz0ne/nats-embedded` matches are explicitly evidence, superseded, historical, or not current authority.
-- focused unresolved-marker scan over the new platform docs -> no matches.
-- `find . -type d -name __pycache__ -print` -> no output.
+Historical details live in matched-abstraction docs and git history. Do not expand this handoff with completed evidence unless it changes current work.
 
-## Platform Structure Direction
+- Baseline skill setup: `docs/matched-abstraction/task/baseline-skill-setup.md`.
+- NATS runtime design: `docs/matched-abstraction/{approach,plan}/nats-script-runtime.md`.
+- Traced TDD plan: `docs/matched-abstraction/plan/nats-script-runtime-traced-tdd.md`.
+- Runtime substrate and record store proof: `docs/matched-abstraction/task/nats-script-runtime-substrate-record-store.md`.
+- Distribution BDD proof: `docs/matched-abstraction/task/nats-script-runtime-distribution-bdd.md`.
+- Metadata and permissions proof: `docs/matched-abstraction/task/nats-script-runtime-metadata-permissions.md`.
+- Activation contract proof: `docs/matched-abstraction/task/nats-script-runtime-activation-contract.md`.
+- Request/reply activation adapter proof: `docs/matched-abstraction/task/nats-script-runtime-request-reply-activation-adapter.md`.
+- Browser frontend mediator proof: `docs/matched-abstraction/task/browser-frontend-dedicated-worker.md`.
+- Platform reset: `docs/matched-abstraction/{approach,plan,task}/platform-structure*.md`.
+- Code structure reset: `docs/matched-abstraction/{approach,plan}/code-structure.md` and `docs/matched-abstraction/task/code-structure-reorganization.md`.
+- Endgame app approach: `docs/matched-abstraction/approach/endgame-app.md`.
+- Endgame app plan: `docs/matched-abstraction/plan/endgame-app.md`.
+- Endgame contract authority task: `docs/matched-abstraction/task/endgame-contract-authority.md`.
+- Managed auth subjects task: `docs/matched-abstraction/task/managed-auth-subjects.md`.
+- Codex endgame orchestration plan: `docs/matched-abstraction/plan/codex-endgame-orchestration.md`.
+- Codex endgame orchestrator task: `docs/matched-abstraction/task/codex-endgame-orchestrator.md`.
 
-- Current substrate direction: Go owns NATS infrastructure, auth, Docker/sandboxing direction, process lifecycle, connection policy, command/activation ledger, artifact gateway, and execution attribution.
-- Current frontend direction: Vite owns trusted shell delivery; generated content remains a receiver and intent emitter.
-- Current SDK/schema direction: JSON Schema is the first neutral source; Zod validators, TypeScript SDK types, Go types/validators, fixtures, and parity tests are generated or checked from that source.
-- Current validation direction: TypeScript runtime-facing boundaries use Zod validation, not type-only contracts.
-- Current enforcement direction: code generation plus parity tests prevent Go, frontend, SDK, and tests from drifting.
-- Existing Bun and `@lagz0ne/nats-embedded` work remains evidence and regression material, not platform authority.
+## Recent Git
 
-## Session Note - 2026-06-08 Browser/NATS Kill Test
+- `99cc3c1 chore: establish tinkabot workspace baseline`.
+- `42d44fe chore: record git baseline`.
+- `5c30a1f chore: add terse coding skill`.
 
-- Ad hoc triage-three Run 2 Pusher pass requested for browser-visible NATS credentials, capability lifecycle, and artifact HTTP auth parity.
-- Scope is analysis only: no implementation or test files changed.
-- Output should be numbered kill findings with required design constraints and future RED-GREEN-TDD proofs.
+## Cleanup Note
 
-## RED-GREEN-TDD Plan For Managed Frontend Dedicated Worker
-
-- [x] RED: Add Approach, Plan, and Task docs for the managed frontend mediator boundary.
-- [x] RED: Add failing frontend mediator tests for typed content intents, raw NATS denial, materializer projection state, and dedicated-worker message routing.
-- [x] GREEN: Implement the smallest frontend mediator contract, materializer store, and dedicated-worker bridge.
-- [x] VERIFY: Run targeted tests, full `bun test`, typecheck, build, pack dry-run, and layer validation.
-- [x] REFACTOR: Do no-slop, simplify, and review passes.
-
-## Managed Frontend Dedicated Worker Evidence
-
-- Runtime code added:
-  - `src/browser-frontend/index.ts`
-  - exports in `src/index.ts`
-  - frontend mediator error kinds/layer in `src/nats-script-runtime/errors.ts`
-- Tests added:
-  - `tests/browser-frontend/dedicated-worker-mediator.test.ts`
-- Layer docs added:
-  - `docs/matched-abstraction/approach/browser-frontend-mediator.md`
-  - `docs/matched-abstraction/plan/browser-frontend-mediator.md`
-  - `docs/matched-abstraction/task/browser-frontend-dedicated-worker.md`
-- RED evidence: targeted test failed before implementation with `Export named 'createFrontendMediator' not found in module '/home/lagz0ne/dev/tinkabot/src/index.ts'`.
-- `bun test tests/browser-frontend/dedicated-worker-mediator.test.ts` -> `4 pass, 0 fail`.
-- `bun test` -> `27 pass, 0 fail`.
-- `bun run typecheck` -> `bunx @typescript/native-preview --noEmit`.
-- `bun run build` -> emitted ESM, CommonJS, and declaration artifacts.
-- `bun pm pack --dry-run` -> `Total files: 5`.
-- `python3 -B .codex/skills/matched-abstraction-thinking/scripts/validate_layers.py docs/matched-abstraction` -> `Layer validation passed: docs/matched-abstraction`.
-- `python3 -B -m unittest tests/test_validate_layers.py` -> `Ran 10 tests ... OK`.
-- Review pass found and fixed top-level raw NATS vocabulary bypass: generated content messages are scanned before parsing so fields such as `subject` or `token` cannot be silently dropped.
-- Focused unresolved-marker scan over the new browser frontend slice -> no matches.
-- `find . -type d -name __pycache__ -print` -> no output.
-
-## Active Feature Inputs
-
-- NATS-based system.
-- Scripts are TypeScript and live in NATS-managed storage/subjects.
-- Runtime can execute scripts.
-- Approach decision: execution is a NATS request/reply command that also creates an attributed execution event trail.
-- No sandbox for now, but metadata must record sandbox/security/runtime details.
-- Approach decision: scripts are trusted-only until sandboxing exists; metadata is declaration/accountability, not enforcement.
-- Tinkabot owns glue for CRUDing scripts and executing scripts.
-- Approach decision: script source and metadata live together as versioned logical records in JetStream KV.
-- Superseded approach: scripts do not get the TypeScript NATS client as the primary path.
-- Current approach: default scripts use the process facade; direct TypeScript NATS client or CLI access is an explicit advanced capability.
-- Approach correction: default scripts should not need a NATS client. They are process contracts using stdin/stdout/stderr plus runtime-owned IPC for publish/progress requests.
-- Approach decision: NATS interaction by scripts goes through the Tinkabot/runtime facade by default; direct TS NATS client or CLI access is an explicit advanced capability, not the base path.
-- Approach correction: choose a battle-tested long-run IPC contract, not a temporary convenience channel. Canonical process IPC is framed stdio RPC; fd 3 or shell helpers are adapters, not the core protocol.
-- Scripts can consume provided content/data and publish output/events back to NATS, forming a closed loop.
-- Approach decision: script metadata should use succinct, NATS-focused names and allow nested settings objects for future sub-configuration.
-- Approach decision: metadata types should carry LLM-oriented `desc`/reasoning notes, not only runtime config.
-- Approach decision: NATS capability metadata must model both access and exposure: inside-out publishing and outside-in invocation/consumption.
-- Approach decision: NATS wildcard subject patterns are first-class metadata so scripts can declare broad interests and output families.
-- Approach decision: metadata must not use placeholder subject strings; declared subjects/patterns are concrete values, and authority is encoded left-to-right in subject tokens.
-- Resolved decision: NATS `permissions.publish`, `permissions.subscribe`, `allow`/`deny`, and `allow_responses` are the authoritative metadata vocabulary.
-- Approach correction: scripts should not receive the whole NATS surface. They get a mediated mechanism with NATS-shaped security, controlled imports, and Tinkabot/runtime in the middle.
-- Approach decision accepted for now: `imports` can be the script-facing abstraction, with `permissions` as the underlying NATS security contract. Revisit after the first plan pass if it becomes awkward.
-- Resolved direction: script-facing schema and capability metadata cover input, output, IPC progress/publish requests, execution events, and imports without exposing unrestricted NATS flexibility.
-- Superseded evidence: Bun previously owned package management, TypeScript execution, test harness, local process lifecycle, env assembly, and NATS startup/shutdown for early proofs.
-- Superseded evidence: the previous local NATS provider was `@lagz0ne/nats-embedded` from `/home/lagz0ne/dev/nats-embedded`.
-- Superseded evidence: the previous v1 local proof defaulted to `@lagz0ne/nats-embedded`; current platform authority moved to Go substrate.
-- Local proof fact: Bun is installed, NATS CLI is installed, global `nats-server` is not installed.
-- Superseded local library fact: `@lagz0ne/nats-embedded` exposes `NatsServer.start({ port, host, jetstream, storeDir, websocket, config, args })`, `server.url`, `server.port`, `server.exited`, and `server.stop()`; it remains prior proof material, not current substrate authority.
-
-## RED-GREEN-TDD Plan For NATS Script Runtime Brainstorm
-
-- [x] RED: Capture the current design gap and highest-risk branch decisions.
-- [x] RED: Use a dedicated Approach subagent to protect purpose, invariants, non-goals, and readiness.
-- [x] GREEN: Ask one branch-resolving question at a time with a recommended answer.
-- [x] GREEN: Present Plan approaches and get approval for the design direction.
-- [x] GREEN: After approval, create matched layer docs for the feature.
-- [x] VERIFY: Validate layer docs and update this handoff with evidence.
-
-## Candidate Plan Direction
-
-- Recommended approach: contract-first fanout with one vertical lifecycle proof.
-- Superseded recommendation: contract-first fanout with a Bun runtime substrate lane first, then one vertical lifecycle proof.
-- Alternative: vertical lifecycle first, useful for integration discovery but can overfit the first script.
-- Alternative: runtime-boundary first, useful for the hardest no-whole-NATS boundary but can delay storage/schema/execution contracts.
-- Candidate visual: https://diashort.apps.quickable.co/d/cba2160a
-
-## NATS Script Runtime Design Evidence
-
-- Feature docs written:
-  - `docs/matched-abstraction/approach/nats-script-runtime.md`
-  - `docs/matched-abstraction/plan/nats-script-runtime.md`
-  - `docs/matched-abstraction/task/nats-script-runtime-design.md`
-- `python3 -B .codex/skills/matched-abstraction-thinking/scripts/validate_layers.py docs/matched-abstraction` -> `Layer validation passed: docs/matched-abstraction`.
-- `python3 -B -m unittest tests/test_validate_layers.py` -> `Ran 10 tests ... OK`.
-- `python3 -B /home/lagz0ne/.codex/skills/.system/skill-creator/scripts/quick_validate.py .codex/skills/matched-abstraction-thinking` -> `Skill is valid!`.
-- placeholder and uncertainty wording scan -> no matches.
-- generated bytecode directory scan -> no matches.
-- Edge-case hardening added after user correction:
-  - Approach: deny precedence, bounded response authority, exact attribution, and escalation when edge cases are dropped.
-  - Plan: edge-case matrix for substrate, record, metadata, imports, mediation, execution, events, and cleanup.
-  - Task: complete vertical proof criteria for success, validation failure, record failure, mediation failure, runtime failure, and recovery.
-
-## Active Design Correction
-
-- Do not let the first implementation become a loose MVP. The first slice can be small, but it must be precise, complete, and edge-case strict.
-- The vertical proof must prove the real contract boundary, including failures and denials, not just the happy path.
-- Edge-case pressure completed across Approach, Plan, and Task layers.
-- IPC hardening: prefer cross-platform framed stdio RPC over fd-specific IPC as the canonical long-run contract.
-
-## Active Test Planning Goal
-
-- [x] Draw the runtime layer graph.
-- [x] Define typed error sets per layer.
-- [x] Define Resolve / Transform / Propagate ownership.
-- [x] List tests by owning layer, not by end-to-end convenience.
-- [x] Make the vertical proof a final trust-compounding check, not the only test.
-
-## NATS Script Runtime Traced TDD Evidence
-
-- Traced-TDD docs written:
-  - `docs/matched-abstraction/plan/nats-script-runtime-traced-tdd.md`
-  - `docs/matched-abstraction/task/nats-script-runtime-traced-tdd.md`
-- Diagrams:
-  - Primary layer graph: https://diashort.apps.quickable.co/d/d29e5453
-  - Error ownership graph: https://diashort.apps.quickable.co/d/90f4566b
-  - Protocol graph: https://diashort.apps.quickable.co/d/0da56487
-  - Vertical proof graph: https://diashort.apps.quickable.co/d/12a339dc
-- `python3 -B .codex/skills/matched-abstraction-thinking/scripts/validate_layers.py docs/matched-abstraction` -> `Layer validation passed: docs/matched-abstraction`.
-- `python3 -B -m unittest tests/test_validate_layers.py` -> `Ran 10 tests ... OK`.
-- no-slop wording scan over docs, tasks, and tests -> no matches.
-- generated bytecode directory scan -> no matches.
-
-## Next Implementation Order
-
-1. DONE: RED/GREEN substrate and record-store tests.
-2. DONE: Final-form distribution build plus BDD end-to-end proof for the current slice.
-3. DONE: RED/GREEN metadata/schema and imports/permissions tests.
-4. NEXT: promote activation/trigger into Approach, Plan, Traced TDD, and RED tests before framed stdio RPC and process runtime.
-5. RED framed stdio RPC and process-runtime tests.
-6. RED event-trail and execution-exchange tests.
-7. RED vertical proof using embedded NATS and KV history.
-8. GREEN only the minimum runtime code needed to satisfy declared contracts.
-9. REFACTOR with no-slop, simplify, and review passes.
-
-## NATS Script Runtime Substrate And Record Store Evidence
-
-- Runtime code written:
-  - `src/nats-script-runtime/errors.ts`
-  - `src/nats-script-runtime/runtime-substrate.ts`
-  - `src/nats-script-runtime/script-record-store.ts`
-  - `src/nats-script-runtime/index.ts`
-- Tests written:
-  - `tests/nats-script-runtime/runtime-substrate.test.ts`
-  - `tests/nats-script-runtime/script-record-store.test.ts`
-- Project setup added:
-  - `package.json`
-  - `bun.lock`
-  - `tsconfig.json`
-- Task evidence doc added:
-  - `docs/matched-abstraction/task/nats-script-runtime-substrate-record-store.md`
-- RED evidence: `bun test` failed before implementation because `src/nats-script-runtime/index` did not exist.
-- `bun test` -> `7 pass, 0 fail`.
-- `bun run typecheck` -> `bunx @typescript/native-preview --noEmit` completed successfully.
-- `python3 -B .codex/skills/matched-abstraction-thinking/scripts/validate_layers.py docs/matched-abstraction` -> `Layer validation passed: docs/matched-abstraction`.
-- `python3 -B -m unittest tests/test_validate_layers.py` -> `Ran 10 tests ... OK`.
-- weak-word scan over source, tests, docs, tasks, and TS config -> no matches.
-- generated bytecode directory scan -> no matches.
-
-## NATS Script Runtime Distribution BDD Evidence
-
-- Distribution setup written:
-  - `src/index.ts`
-  - `tsdown.config.ts`
-  - package `version`, `main`, `module`, `types`, `exports`, `files`, `build`, and `test:e2e` fields
-- BDD scenario written:
-  - `tests/e2e/nats-script-runtime-distribution.feature.md`
-  - `tests/e2e/nats-script-runtime-distribution.bdd.test.ts`
-- Generated distribution:
-  - `dist/index.mjs`
-  - `dist/index.cjs`
-  - `dist/index.d.mts`
-  - `dist/index.d.cts`
-- Task evidence doc added:
-  - `docs/matched-abstraction/task/nats-script-runtime-distribution-bdd.md`
-- RED evidence: `bun test tests/e2e/nats-script-runtime-distribution.bdd.test.ts` failed with `Script not found "build"` before build metadata existed.
-- `bun run build` -> emitted ESM, CommonJS, and declaration artifacts.
-- `bun test tests/e2e/nats-script-runtime-distribution.bdd.test.ts` -> `1 pass, 0 fail`.
-- `bun test` -> `8 pass, 0 fail`.
-- `bun run typecheck` -> `bunx @typescript/native-preview --noEmit` completed successfully.
-- `bun pm pack --dry-run` -> package contains 5 files: `package.json` plus four `dist` artifacts.
-- `python3 -B .codex/skills/matched-abstraction-thinking/scripts/validate_layers.py docs/matched-abstraction` -> `Layer validation passed: docs/matched-abstraction`.
-- `python3 -B -m unittest tests/test_validate_layers.py` -> `Ran 10 tests ... OK`.
-- generated bytecode directory scan -> no matches.
-
-## NATS Script Runtime Metadata And Permissions Evidence
-
-- Runtime code written:
-  - `src/nats-script-runtime/metadata-validator.ts`
-  - `src/nats-script-runtime/permission-resolver.ts`
-  - `src/nats-script-runtime/subjects.ts`
-  - metadata and permission error kinds in `src/nats-script-runtime/errors.ts`
-  - exports in `src/nats-script-runtime/index.ts`
-- Tests written:
-  - `tests/nats-script-runtime/metadata-validator.test.ts`
-  - `tests/nats-script-runtime/permission-resolver.test.ts`
-- Task evidence doc added:
-  - `docs/matched-abstraction/task/nats-script-runtime-metadata-permissions.md`
-- RED evidence: targeted new slice tests failed before implementation because `MetadataValidator` and `PermissionResolver` were not exported.
-- `bun test tests/nats-script-runtime/metadata-validator.test.ts tests/nats-script-runtime/permission-resolver.test.ts` -> `8 pass, 0 fail`.
-- `bun test` -> `16 pass, 0 fail`.
-- `bun run typecheck` -> `bunx @typescript/native-preview --noEmit` completed successfully.
-- `bun run build` -> emitted ESM, CommonJS, and declaration artifacts.
-- `bun pm pack --dry-run` -> package contains 5 files.
-- `python3 -B .codex/skills/matched-abstraction-thinking/scripts/validate_layers.py docs/matched-abstraction` -> `Layer validation passed: docs/matched-abstraction`.
-- `python3 -B -m unittest tests/test_validate_layers.py` -> `Ran 10 tests ... OK`.
-- generated bytecode directory scan -> no matches.
-
-## Active Activation Layer Design Branch
-
-- Current request/reply execution is not enough to create chains.
-- Add a middle activation layer rather than expanding substrate. Substrate keeps owning NATS lifecycle; activation owns event sources and converts them into execution intents.
-- Candidate trigger sources: request/reply command, core subject subscription, JetStream durable consumer, KV watch, and schedule/timer provider.
-- Time-based triggers require extra care: schedule state, leadership or leases, idempotency keys, missed-fire handling, and replay after restart.
-- The activation layer must preserve the same constraints: no raw NATS for scripts by default, concrete subjects, NATS permission vocabulary, chain attribution, loop controls, and cleanup.
-- Triage-three conclusion on 2026-06-05: stop review and move to contract drafting plus RED tests. Run 1 proposed 31 findings, Challengers confirmed 31, Arbiter collapsed them to 9 unique verified findings, and Investor recommended no second run.
-- Verified activation findings: activation is a first-class layer, request/reply becomes an `ActivationIntent` adapter, durable activation state owns ledger/dedupe/cursors/ack policy, chain attribution and loop control are safety invariants, metadata needs activation/exposure declarations, subscribe authority must be enforced, substrate stays narrow through adapters, time activation is not first, and distribution BDD expands after activation is contracted.
-- Next activation order: update Approach/Plan, update Traced TDD with activation errors and R/T/P rows, write RED tests for activation metadata and subscribe enforcement, normalize request/reply through `ActivationIntent`, then add one durable source before schedule work.
-
-## RED-GREEN-TDD Plan For Activation Contract
-
-- [x] RED: Use Approach, Plan, and Task layer subagents to define activation deltas without layer mixing.
-- [x] RED: Update matched-abstraction docs so activation is authoritative before code changes.
-- [x] RED: Write failing activation tests for metadata exposure, subscribe enforcement, and `ActivationIntent`.
-- [x] GREEN: Add typed activation errors and the minimal activation/permission/metadata code needed for the RED tests.
-- [x] VERIFY: Run targeted tests, full `bun test`, typecheck, build, distribution pack dry-run, and layer validation.
-- [x] REFACTOR: Do no-slop, simplify, and review passes.
-
-## NATS Script Runtime Activation Contract Evidence
-
-- Runtime code written:
-  - `src/nats-script-runtime/activation-intent.ts`
-  - activation layer and error kinds in `src/nats-script-runtime/errors.ts`
-  - `nats.activations` metadata validation in `src/nats-script-runtime/metadata-validator.ts`
-  - subscribe and activation-source checks in `src/nats-script-runtime/permission-resolver.ts`
-  - exports in `src/nats-script-runtime/index.ts`
-- Tests written:
-  - `tests/nats-script-runtime/activation-intent.test.ts`
-  - activation cases in `tests/nats-script-runtime/metadata-validator.test.ts`
-  - activation permission cases in `tests/nats-script-runtime/permission-resolver.test.ts`
-- Docs updated:
-  - `docs/matched-abstraction/approach/nats-script-runtime.md`
-  - `docs/matched-abstraction/plan/nats-script-runtime.md`
-  - `docs/matched-abstraction/plan/nats-script-runtime-traced-tdd.md`
-  - `docs/matched-abstraction/task/nats-script-runtime-activation-contract.md`
-- Diagram added: https://diashort.apps.quickable.co/d/407896c2
-- RED evidence: targeted activation tests failed with `8 pass, 3 fail, 1 error` before `ActivationIntent`, subscribe resolver methods, and activation metadata validation existed.
-- `bun test tests/nats-script-runtime/metadata-validator.test.ts tests/nats-script-runtime/permission-resolver.test.ts tests/nats-script-runtime/activation-intent.test.ts` -> `12 pass, 0 fail`.
-- `bun test` -> `20 pass, 0 fail`.
-- `bun run typecheck` -> `bunx @typescript/native-preview --noEmit`.
-- `bun run build` -> emitted ESM, CommonJS, and declaration artifacts.
-- `bun pm pack --dry-run` -> `Total files: 5`.
-- `python3 -B .codex/skills/matched-abstraction-thinking/scripts/validate_layers.py docs/matched-abstraction` -> `Layer validation passed: docs/matched-abstraction`.
-- `python3 -B -m unittest tests/test_validate_layers.py` -> `Ran 10 tests ... OK`.
-- Review pass found and fixed activation exposure mismatch: `assertActivationSource` now rejects observed subjects that do not match the declared activation subject before checking subscribe permission.
-- unresolved-marker scan over docs, tasks, source, and tests -> no matches.
-- `find . -type d -name __pycache__ -print` -> no matches.
-
-## RED-GREEN-TDD Plan For Request/Reply Activation Adapter
-
-- [x] RED: Use Approach, Plan, and Task layer subagents to constrain the adapter slice.
-- [x] RED: Add request/reply activation adapter task doc before code.
-- [x] RED: Write failing adapter tests for authorization, intent preservation, and R/T/P behavior.
-- [x] GREEN: Add the minimal request/reply adapter module and exports.
-- [x] VERIFY: Run targeted tests, full `bun test`, typecheck, build, pack dry-run, and layer validation.
-- [x] REFACTOR: Do no-slop, simplify, and review passes.
-
-## NATS Script Runtime Request/Reply Activation Adapter Evidence
-
-- Runtime code written:
-  - `src/nats-script-runtime/request-reply-activation-adapter.ts`
-  - exports in `src/nats-script-runtime/index.ts`
-- Tests written:
-  - `tests/nats-script-runtime/request-reply-activation-adapter.test.ts`
-- Task doc added:
-  - `docs/matched-abstraction/task/nats-script-runtime-request-reply-activation-adapter.md`
-- RED evidence: targeted adapter test failed with `0 pass, 1 fail, 1 error` before `activateRequestReply` existed.
-- `bun test tests/nats-script-runtime/request-reply-activation-adapter.test.ts` -> `3 pass, 0 fail`.
-- `bun test` -> `23 pass, 0 fail`.
-- `bun run typecheck` -> `bunx @typescript/native-preview --noEmit`.
-- `bun run build` -> emitted ESM, CommonJS, and declaration artifacts.
-- `bun pm pack --dry-run` -> `Total files: 5`.
-- `python3 -B .codex/skills/matched-abstraction-thinking/scripts/validate_layers.py docs/matched-abstraction` -> `Layer validation passed: docs/matched-abstraction`.
-- `python3 -B -m unittest tests/test_validate_layers.py` -> `Ran 10 tests ... OK`.
-- Review/simplify pass narrowed the adapter test double to `ActivateRequestReplyOptions["resolver"]` instead of casting to full `PermissionResolver`.
-- unresolved-marker scan over docs, tasks, source, and tests -> no matches.
-- `find . -type d -name __pycache__ -print` -> no matches.
-
-## Completed Interrupt
-
-Add Karpathy-inspired agent guidelines to root agent instruction files.
-
-## RED-GREEN-TDD Plan For Interrupt
-
-- [x] RED: Confirm root `AGENTS.md` and `CLAUDE.md` do not already exist.
-- [x] RED: Choose one source of truth: `AGENTS.md` real file, `CLAUDE.md` symlink.
-- [x] GREEN: Add compact Karpathy/Codex-native guardrails to `AGENTS.md`.
-- [x] GREEN: Create `CLAUDE.md -> AGENTS.md` symlink.
-- [x] VERIFY: Prove the symlink, content, and test status.
-- [x] REFACTOR: Do no-slop, simplify, and review passes for the instruction edit.
-
-## Interrupt Verification Evidence
-
-- `ls -la AGENTS.md CLAUDE.md` -> `CLAUDE.md -> AGENTS.md`.
-- `cmp -s AGENTS.md CLAUDE.md` -> `cmp_exit=0`.
-- `python3 -m unittest tests/test_validate_layers.py` -> `Ran 10 tests ... OK`.
-- `python3 .codex/skills/matched-abstraction-thinking/scripts/validate_layers.py docs/matched-abstraction` -> `Layer validation passed: docs/matched-abstraction`.
-- Note: running the layer validator on `.` fails by design because the validator expects the layer root containing immediate `approach/`, `plan/`, and `task/` directories.
-
-## Assumptions Approved By "go"
-
-- Project-local skill path: `.codex/skills/matched-abstraction-thinking`.
-- Project abstraction documents path: `docs/matched-abstraction/`.
-- Layer directories: `approach/`, `plan/`, `task/`.
-- Each layer is represented by a dedicated subagent when the skill is used.
-- The main agent acts as orchestration, synthesis, verification, and change announcer.
-
-## RED-GREEN-TDD Plan
-
-- [x] RED: Define pressure cases for Approach, Plan, and Task layer behavior.
-- [x] RED: Ask separate subagents to pressure-test each layer contract.
-- [x] GREEN: Create the skill, reference material, project layer docs, and validation script.
-- [x] GREEN: Run skill validation and structural validation.
-- [x] REFACTOR: Do no-slop, simplify, and review passes.
-- [x] DONE: Summarize verified evidence and remaining caveats.
-
-## Notes
-
-- The workspace started empty and is not currently a git repository.
-- No `.c3/` directory was present, so the C3 codemap workflow does not apply yet.
-- Final verification evidence is recorded in `docs/matched-abstraction/task/baseline-skill-setup.md`.
+This file was reduced from a completed-evidence log to a current handoff. Completed details belong in layer docs, tests, and git commits.

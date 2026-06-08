@@ -1,0 +1,110 @@
+[
+  {
+    "caseId": "active-policy-compiles",
+    "fixture": "fixtures/valid/auth-policy.json",
+    "expect": {
+      "schemaValid": true,
+      "policy": "allowed",
+      "compiledFixture": "fixtures/expected/auth-policy.compiled-nats.json"
+    }
+  },
+  {
+    "caseId": "revoked-lease-denied",
+    "fixture": "fixtures/valid/auth-policy-revoked-lease.json",
+    "expect": {
+      "schemaValid": true,
+      "policy": "revoked-lease-denied",
+      "error": { "kind": "RevokedLease", "layer": "ManagedAuth" }
+    }
+  },
+  {
+    "caseId": "expired-lease-denied",
+    "fixture": "fixtures/valid/auth-policy-expired-lease.json",
+    "expect": {
+      "schemaValid": true,
+      "policy": "expired-lease-denied",
+      "error": { "kind": "ExpiredLease", "layer": "ManagedAuth" }
+    }
+  },
+  {
+    "caseId": "provenance-mismatch-denied",
+    "fixture": "fixtures/valid/auth-policy-provenance-mismatch.json",
+    "expect": {
+      "schemaValid": true,
+      "policy": "stale-revision-denied",
+      "error": { "kind": "StaleRevision", "layer": "ManagedAuth" }
+    }
+  },
+  {
+    "caseId": "control-overgrant-denied",
+    "fixture": "fixtures/valid/auth-policy-control-overgrant.json",
+    "expect": {
+      "schemaValid": true,
+      "policy": "reserved-subject-denied",
+      "error": { "kind": "SubjectReserved", "layer": "SubjectTaxonomy" }
+    }
+  },
+  {
+    "caseId": "wildcard-overreach-denied",
+    "fixture": "fixtures/valid/auth-policy-wildcard-overreach.json",
+    "expect": {
+      "schemaValid": true,
+      "policy": "wildcard-overreach-denied",
+      "error": { "kind": "SubjectWildcardOverreach", "layer": "SubjectTaxonomy" }
+    }
+  },
+  {
+    "caseId": "advanced-import-denied",
+    "fixture": "fixtures/valid/auth-policy-advanced-import.json",
+    "expect": {
+      "schemaValid": true,
+      "policy": "advanced-capability-denied",
+      "error": { "kind": "AdvancedCapabilityDenied", "layer": "ManagedAuth" }
+    }
+  },
+  {
+    "caseId": "advanced-exposure-denied",
+    "fixture": "fixtures/valid/auth-policy-advanced-exposure.json",
+    "expect": {
+      "schemaValid": true,
+      "policy": "advanced-capability-denied",
+      "error": { "kind": "AdvancedCapabilityDenied", "layer": "ManagedAuth" }
+    }
+  },
+  {
+    "caseId": "unbounded-response-denied",
+    "fixture": "fixtures/valid/auth-policy-unbounded-response.json",
+    "expect": {
+      "schemaValid": true,
+      "policy": "response-unbounded-denied",
+      "error": { "kind": "ResponseAuthorityUnbounded", "layer": "ManagedAuth" }
+    }
+  },
+  {
+    "caseId": "exposure-missing-export-denied",
+    "fixture": "fixtures/valid/auth-policy-exposure-missing-export.json",
+    "expect": {
+      "schemaValid": true,
+      "policy": "import-export-mismatch",
+      "error": { "kind": "ImportExportMismatch", "layer": "SubjectTaxonomy" }
+    }
+  },
+  {
+    "caseId": "export-missing-exposure-denied",
+    "fixture": "fixtures/valid/auth-policy-export-missing-exposure.json",
+    "expect": {
+      "schemaValid": true,
+      "policy": "import-export-mismatch",
+      "error": { "kind": "ImportExportMismatch", "layer": "SubjectTaxonomy" }
+    }
+  },
+  {
+    "caseId": "exposure-subject-missing-denied",
+    "fixture": "fixtures/valid/auth-policy-exposure-subject-missing.json",
+    "expect": {
+      "schemaValid": true,
+      "policy": "exposure-subject-missing",
+      "error": { "kind": "ExposureSubjectMissing", "layer": "SubjectTaxonomy" }
+    }
+  }
+]

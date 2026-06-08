@@ -1,0 +1,38 @@
+{
+  "kind": "command.acceptance",
+  "type": "command.acceptance",
+  "commandId": "cmd-stale-001",
+  "status": "rejected",
+  "sequence": 2,
+  "observedAt": "2026-06-08T00:00:02.000Z",
+  "provenance": {
+    "schemaId": "tb.schema.endgame.contract_authority.v1",
+    "schemaVersion": "v1",
+    "appRevision": "app.rev.1",
+    "createdAt": "2026-06-08T00:00:00.000Z",
+    "producer": "command-acceptance"
+  },
+  "capability": {
+    "principalId": "principal.browser.001",
+    "sessionId": "session-001",
+    "capabilityId": "cap-001",
+    "leaseId": "lease-001",
+    "leaseStatus": "active",
+    "appRevision": "app.rev.1",
+    "schemaVersion": "v1"
+  },
+  "chain": {
+    "chainId": "chain-001",
+    "rootId": "root-001",
+    "hop": 1,
+    "maxHops": 5
+  },
+  "error": {
+    "kind": "StaleRevision",
+    "message": "Expected artifact.rev.6 but current artifact.rev.7",
+    "origin": {
+      "layer": "CommandAcceptance",
+      "operation": "accept"
+    }
+  }
+}

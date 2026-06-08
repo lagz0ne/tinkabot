@@ -1,0 +1,386 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "tb.schema.endgame.contract_authority.v1",
+  "title": "Tinkabot Endgame Contract Authority v1",
+  "oneOf": [
+    { "$ref": "#/$defs/authPolicy" },
+    { "$ref": "#/$defs/browserCommand" },
+    { "$ref": "#/$defs/commandAcceptance" },
+    { "$ref": "#/$defs/activationIntent" },
+    { "$ref": "#/$defs/artifactManifest" },
+    { "$ref": "#/$defs/materialProjection" },
+    { "$ref": "#/$defs/eventEnvelope" }
+  ],
+  "$defs": {
+    "text": {
+      "type": "string",
+      "minLength": 1
+    },
+    "subject": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9_-]+\\.[A-Za-z0-9_-]+(?:\\.(?:[A-Za-z0-9_-]+|\\*))*?(?:\\.>)?$"
+    },
+    "safeValue": {
+      "oneOf": [
+        { "type": "null" },
+        { "type": "boolean" },
+        { "type": "number" },
+        { "type": "string" },
+        {
+          "type": "array",
+          "items": { "$ref": "#/$defs/safeValue" }
+        },
+        {
+          "type": "object",
+          "propertyNames": {
+            "not": {
+              "pattern": "([sS][uU][bB][jJ][eE][cC][tT]|[rR][eE][pP][lL][yY]|[tT][oO][kK][eE][nN]|[cC][rR][eE][dD][eE][nN][tT][iI][aA][lL]|[pP][eE][rR][mM][iI][sS][sS][iI][oO][nN]|[pP][uU][bB][lL][iI][sS][hH]|[sS][uU][bB][sS][cC][rR][iI][bB][eE]|[nN][aA][tT][sS])"
+            }
+          },
+          "additionalProperties": { "$ref": "#/$defs/safeValue" }
+        }
+      ]
+    },
+    "chain": {
+      "type": "object",
+      "required": ["chainId", "rootId", "hop", "maxHops"],
+      "additionalProperties": false,
+      "properties": {
+        "chainId": { "$ref": "#/$defs/text" },
+        "rootId": { "$ref": "#/$defs/text" },
+        "parentId": { "$ref": "#/$defs/text" },
+        "hop": { "type": "integer", "minimum": 0 },
+        "maxHops": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "provenance": {
+      "type": "object",
+      "required": ["schemaId", "schemaVersion", "appRevision", "createdAt", "producer"],
+      "additionalProperties": false,
+      "properties": {
+        "schemaId": { "const": "tb.schema.endgame.contract_authority.v1" },
+        "schemaVersion": { "const": "v1" },
+        "appRevision": { "$ref": "#/$defs/text" },
+        "createdAt": { "$ref": "#/$defs/text" },
+        "producer": { "$ref": "#/$defs/text" },
+        "digest": { "$ref": "#/$defs/text" }
+      }
+    },
+    "capability": {
+      "type": "object",
+      "required": [
+        "principalId",
+        "sessionId",
+        "capabilityId",
+        "leaseId",
+        "leaseStatus",
+        "appRevision",
+        "schemaVersion"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "principalId": { "$ref": "#/$defs/text" },
+        "sessionId": { "$ref": "#/$defs/text" },
+        "capabilityId": { "$ref": "#/$defs/text" },
+        "leaseId": { "$ref": "#/$defs/text" },
+        "leaseStatus": { "enum": ["active", "revoked", "expired"] },
+        "appRevision": { "$ref": "#/$defs/text" },
+        "schemaVersion": { "const": "v1" }
+      }
+    },
+    "error": {
+      "type": "object",
+      "required": ["kind", "message", "origin"],
+      "additionalProperties": false,
+      "properties": {
+        "kind": { "$ref": "#/$defs/text" },
+        "message": { "$ref": "#/$defs/text" },
+        "origin": {
+          "type": "object",
+          "required": ["layer", "operation"],
+          "additionalProperties": false,
+          "properties": {
+            "layer": { "$ref": "#/$defs/text" },
+            "operation": { "$ref": "#/$defs/text" }
+          }
+        }
+      }
+    },
+    "permissionList": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "allow": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/subject" }
+        },
+        "deny": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/subject" }
+        }
+      }
+    },
+    "authPolicy": {
+      "type": "object",
+      "required": ["kind", "provenance", "capability", "permissions"],
+      "additionalProperties": false,
+      "properties": {
+        "kind": { "const": "auth.policy" },
+        "provenance": { "$ref": "#/$defs/provenance" },
+        "capability": { "$ref": "#/$defs/capability" },
+        "permissions": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "publish": { "$ref": "#/$defs/permissionList" },
+            "subscribe": { "$ref": "#/$defs/permissionList" },
+            "allow_responses": {
+              "type": "object",
+              "required": ["max"],
+              "additionalProperties": false,
+              "properties": {
+                "max": { "type": "integer", "minimum": 1 },
+                "expiresMs": { "type": "integer", "minimum": 1 }
+              }
+            }
+          }
+        },
+        "imports": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "object",
+            "required": ["kind"],
+            "additionalProperties": false,
+            "properties": {
+              "kind": { "enum": ["publish", "subscribe", "raw_nats", "cli"] },
+              "subjects": {
+                "type": "array",
+                "items": { "$ref": "#/$defs/subject" }
+              },
+              "desc": { "$ref": "#/$defs/text" }
+            }
+          }
+        },
+        "exports": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/subject" }
+        },
+        "exposure": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "object",
+            "required": ["kind"],
+            "additionalProperties": false,
+            "properties": {
+              "kind": {
+                "enum": ["request_reply", "subject", "kv_watch", "object_change", "stream"]
+              },
+              "subject": { "$ref": "#/$defs/subject" },
+              "desc": { "$ref": "#/$defs/text" }
+            }
+          }
+        }
+      }
+    },
+    "browserContext": {
+      "type": "object",
+      "required": [
+        "sessionId",
+        "capabilityId",
+        "artifactId",
+        "artifactRevision",
+        "frameId",
+        "chain"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "sessionId": { "$ref": "#/$defs/text" },
+        "capabilityId": { "$ref": "#/$defs/text" },
+        "artifactId": { "$ref": "#/$defs/text" },
+        "artifactRevision": { "$ref": "#/$defs/text" },
+        "frameId": { "$ref": "#/$defs/text" },
+        "chain": { "$ref": "#/$defs/chain" }
+      }
+    },
+    "browserCommand": {
+      "type": "object",
+      "required": ["kind", "type", "command", "expectedRevision", "context"],
+      "additionalProperties": false,
+      "properties": {
+        "kind": { "const": "browser.command_intent" },
+        "type": { "const": "content.intent" },
+        "command": { "$ref": "#/$defs/text" },
+        "commandId": { "$ref": "#/$defs/text" },
+        "expectedRevision": { "$ref": "#/$defs/text" },
+        "payload": { "$ref": "#/$defs/safeValue" },
+        "context": { "$ref": "#/$defs/browserContext" }
+      }
+    },
+    "commandAcceptance": {
+      "type": "object",
+      "required": [
+        "kind",
+        "type",
+        "commandId",
+        "status",
+        "sequence",
+        "observedAt",
+        "provenance",
+        "capability",
+        "chain"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "kind": { "const": "command.acceptance" },
+        "type": { "const": "command.acceptance" },
+        "commandId": { "$ref": "#/$defs/text" },
+        "status": { "enum": ["accepted", "rejected", "applied", "failed"] },
+        "sequence": { "type": "integer", "minimum": 0 },
+        "observedAt": { "$ref": "#/$defs/text" },
+        "provenance": { "$ref": "#/$defs/provenance" },
+        "capability": { "$ref": "#/$defs/capability" },
+        "chain": { "$ref": "#/$defs/chain" },
+        "error": { "$ref": "#/$defs/error" }
+      }
+    },
+    "activationIntent": {
+      "type": "object",
+      "required": [
+        "kind",
+        "activationId",
+        "triggerId",
+        "scriptKey",
+        "source",
+        "headers",
+        "observedAt",
+        "chain",
+        "dedupeKey",
+        "provenance",
+        "capability"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "kind": { "const": "activation.intent" },
+        "activationId": { "$ref": "#/$defs/text" },
+        "triggerId": { "$ref": "#/$defs/text" },
+        "scriptKey": { "$ref": "#/$defs/text" },
+        "scriptRevision": { "type": "integer", "minimum": 0 },
+        "source": {
+          "type": "object",
+          "required": ["kind", "activationName", "subject", "requestId"],
+          "additionalProperties": false,
+          "properties": {
+            "kind": { "const": "request_reply" },
+            "activationName": { "$ref": "#/$defs/text" },
+            "subject": { "$ref": "#/$defs/subject" },
+            "requestId": { "$ref": "#/$defs/text" }
+          }
+        },
+        "payload": { "$ref": "#/$defs/safeValue" },
+        "headers": {
+          "type": "object",
+          "additionalProperties": { "$ref": "#/$defs/text" }
+        },
+        "observedAt": { "$ref": "#/$defs/text" },
+        "reply": {
+          "type": "object",
+          "required": ["subject"],
+          "additionalProperties": false,
+          "properties": {
+            "subject": { "$ref": "#/$defs/subject" }
+          }
+        },
+        "chain": { "$ref": "#/$defs/chain" },
+        "dedupeKey": { "$ref": "#/$defs/text" },
+        "provenance": { "$ref": "#/$defs/provenance" },
+        "capability": { "$ref": "#/$defs/capability" }
+      }
+    },
+    "artifactManifest": {
+      "type": "object",
+      "required": [
+        "kind",
+        "artifactId",
+        "artifactRevision",
+        "digest",
+        "mediaType",
+        "objectRef",
+        "sandboxPolicy",
+        "createdAt",
+        "provenance"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "kind": { "const": "artifact.manifest" },
+        "artifactId": { "$ref": "#/$defs/text" },
+        "artifactRevision": { "$ref": "#/$defs/text" },
+        "digest": { "$ref": "#/$defs/text" },
+        "mediaType": { "$ref": "#/$defs/text" },
+        "objectRef": { "$ref": "#/$defs/text" },
+        "sandboxPolicy": { "$ref": "#/$defs/text" },
+        "framePolicy": { "$ref": "#/$defs/text" },
+        "cspPolicy": { "$ref": "#/$defs/text" },
+        "createdAt": { "$ref": "#/$defs/text" },
+        "provenance": { "$ref": "#/$defs/provenance" }
+      }
+    },
+    "materialProjection": {
+      "type": "object",
+      "required": [
+        "kind",
+        "projectionId",
+        "snapshotRevision",
+        "artifactRevision",
+        "sequence",
+        "value",
+        "observedAt",
+        "provenance"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "kind": { "const": "material.projection" },
+        "projectionId": { "$ref": "#/$defs/text" },
+        "snapshotRevision": { "$ref": "#/$defs/text" },
+        "artifactRevision": { "$ref": "#/$defs/text" },
+        "sequence": { "type": "integer", "minimum": 0 },
+        "value": { "$ref": "#/$defs/safeValue" },
+        "observedAt": { "$ref": "#/$defs/text" },
+        "provenance": { "$ref": "#/$defs/provenance" }
+      }
+    },
+    "eventEnvelope": {
+      "type": "object",
+      "required": [
+        "kind",
+        "eventId",
+        "eventType",
+        "status",
+        "principalId",
+        "capabilityId",
+        "chain",
+        "observedAt",
+        "provenance",
+        "revisions"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "kind": { "const": "event.envelope" },
+        "eventId": { "$ref": "#/$defs/text" },
+        "eventType": { "$ref": "#/$defs/text" },
+        "status": { "enum": ["success", "failed", "denied", "stale", "revoked"] },
+        "principalId": { "$ref": "#/$defs/text" },
+        "capabilityId": { "$ref": "#/$defs/text" },
+        "chain": { "$ref": "#/$defs/chain" },
+        "observedAt": { "$ref": "#/$defs/text" },
+        "provenance": { "$ref": "#/$defs/provenance" },
+        "subject": { "$ref": "#/$defs/subject" },
+        "store": { "$ref": "#/$defs/text" },
+        "revisions": {
+          "type": "object",
+          "additionalProperties": { "$ref": "#/$defs/text" }
+        },
+        "error": { "$ref": "#/$defs/error" }
+      }
+    }
+  }
+}

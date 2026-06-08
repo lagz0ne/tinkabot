@@ -1,0 +1,122 @@
+[
+  {
+    "caseId": "allowed-browser-command",
+    "fixture": "fixtures/valid/browser-command.json",
+    "expect": { "valid": true, "policy": "allowed" }
+  },
+  {
+    "caseId": "denied-browser-raw-nats",
+    "fixture": "fixtures/invalid/browser-command-raw-nats.json",
+    "expect": { "valid": false, "errorKind": "ContractInvalid", "policy": "no-raw-authority" }
+  },
+  {
+    "caseId": "denied-browser-raw-nats-cased",
+    "fixture": "fixtures/invalid/browser-command-raw-nats-cased.json",
+    "expect": { "valid": false, "errorKind": "ContractInvalid", "policy": "no-raw-authority" }
+  },
+  {
+    "caseId": "allowed-auth-policy",
+    "fixture": "fixtures/valid/auth-policy.json",
+    "expect": { "valid": true, "policy": "allowed" }
+  },
+  {
+    "caseId": "schema-valid-auth-revoked-lease",
+    "fixture": "fixtures/valid/auth-policy-revoked-lease.json",
+    "expect": { "valid": true, "policy": "revoked-lease-denied" }
+  },
+  {
+    "caseId": "schema-valid-auth-expired-lease",
+    "fixture": "fixtures/valid/auth-policy-expired-lease.json",
+    "expect": { "valid": true, "policy": "expired-lease-denied" }
+  },
+  {
+    "caseId": "schema-valid-auth-provenance-mismatch",
+    "fixture": "fixtures/valid/auth-policy-provenance-mismatch.json",
+    "expect": { "valid": true, "policy": "stale-revision-denied" }
+  },
+  {
+    "caseId": "schema-valid-auth-control-overgrant",
+    "fixture": "fixtures/valid/auth-policy-control-overgrant.json",
+    "expect": { "valid": true, "policy": "reserved-subject-denied" }
+  },
+  {
+    "caseId": "schema-valid-auth-wildcard-overreach",
+    "fixture": "fixtures/valid/auth-policy-wildcard-overreach.json",
+    "expect": { "valid": true, "policy": "wildcard-overreach-denied" }
+  },
+  {
+    "caseId": "schema-valid-auth-advanced-import",
+    "fixture": "fixtures/valid/auth-policy-advanced-import.json",
+    "expect": { "valid": true, "policy": "advanced-capability-denied" }
+  },
+  {
+    "caseId": "schema-valid-auth-advanced-exposure",
+    "fixture": "fixtures/valid/auth-policy-advanced-exposure.json",
+    "expect": { "valid": true, "policy": "advanced-capability-denied" }
+  },
+  {
+    "caseId": "schema-valid-auth-unbounded-response",
+    "fixture": "fixtures/valid/auth-policy-unbounded-response.json",
+    "expect": { "valid": true, "policy": "response-unbounded-denied" }
+  },
+  {
+    "caseId": "schema-valid-auth-exposure-missing-export",
+    "fixture": "fixtures/valid/auth-policy-exposure-missing-export.json",
+    "expect": { "valid": true, "policy": "import-export-mismatch" }
+  },
+  {
+    "caseId": "schema-valid-auth-export-missing-exposure",
+    "fixture": "fixtures/valid/auth-policy-export-missing-exposure.json",
+    "expect": { "valid": true, "policy": "import-export-mismatch" }
+  },
+  {
+    "caseId": "schema-valid-auth-exposure-subject-missing",
+    "fixture": "fixtures/valid/auth-policy-exposure-subject-missing.json",
+    "expect": { "valid": true, "policy": "exposure-subject-missing" }
+  },
+  {
+    "caseId": "malformed-placeholder-subject",
+    "fixture": "fixtures/invalid/subject-placeholder.json",
+    "expect": { "valid": false, "errorKind": "ContractInvalid", "policy": "malformed" }
+  },
+  {
+    "caseId": "malformed-wildcard-subject",
+    "fixture": "fixtures/invalid/subject-wildcard.json",
+    "expect": { "valid": false, "errorKind": "ContractInvalid", "policy": "malformed" }
+  },
+  {
+    "caseId": "stale-command-revision",
+    "fixture": "fixtures/valid/command-stale-revision.json",
+    "expect": { "valid": true, "policy": "stale-revision-denied" }
+  },
+  {
+    "caseId": "revoked-capability",
+    "fixture": "fixtures/valid/revoked-capability.json",
+    "expect": { "valid": true, "policy": "revoked-lease-denied" }
+  },
+  {
+    "caseId": "allowed-activation",
+    "fixture": "fixtures/valid/activation-request-reply.json",
+    "expect": { "valid": true, "policy": "allowed" }
+  },
+  {
+    "caseId": "allowed-artifact-manifest",
+    "fixture": "fixtures/valid/artifact-manifest.json",
+    "expect": { "valid": true, "policy": "allowed" }
+  },
+  {
+    "caseId": "allowed-material-projection",
+    "fixture": "fixtures/valid/material-projection.json",
+    "expect": { "valid": true, "policy": "allowed" }
+  },
+  {
+    "caseId": "attributed-denial-error",
+    "fixture": "fixtures/valid/attributed-denial.json",
+    "expect": { "valid": true, "policy": "attributed-failure" }
+  },
+  {
+    "caseId": "malformed-missing-provenance",
+    "fixture": "fixtures/invalid/missing-provenance.json",
+    "expect": { "valid": false, "errorKind": "ContractInvalid", "policy": "malformed" }
+  }
+]

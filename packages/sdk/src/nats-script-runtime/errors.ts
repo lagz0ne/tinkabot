@@ -1,4 +1,7 @@
 export type RuntimeErrorLayer =
+  | "ContractAuthority"
+  | "ManagedAuth"
+  | "SubjectTaxonomy"
   | "RuntimeSubstrate"
   | "ScriptRecordStore"
   | "MetadataSchema"
@@ -12,6 +15,20 @@ export type RuntimeErrorLayer =
   | "ExecutionExchange";
 
 export type RuntimeErrorKind =
+  | "ContractInvalid"
+  | "ContractCritical"
+  | "RevokedLease"
+  | "ExpiredLease"
+  | "StaleRevision"
+  | "ResponseAuthorityUnbounded"
+  | "ManagedAuthCritical"
+  | "SubjectReserved"
+  | "SubjectWildcardOverreach"
+  | "SubjectNamespaceCollision"
+  | "ImportExportMismatch"
+  | "ExposureSubjectMissing"
+  | "SubjectDeniedNeighbor"
+  | "SubjectTaxonomyCritical"
   | "SubstrateStartupFailed"
   | "SubstrateUnavailable"
   | "SubstrateCleanupFailed"

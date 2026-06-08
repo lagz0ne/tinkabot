@@ -1,0 +1,10 @@
+{
+  "kind": "artifact.manifest",
+  "artifactId": "artifact-001",
+  "artifactRevision": "artifact.rev.7",
+  "digest": "sha256:5a1e",
+  "mediaType": "application/javascript",
+  "objectRef": "obj://frontend/artifact-001/rev-7/bundle.js",
+  "sandboxPolicy": "sandbox.browser.subapp.v1",
+  "createdAt": "2026-06-08T00:00:05.000Z"
+}

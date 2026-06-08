@@ -1,0 +1,24 @@
+{
+  "kind": "auth.policy",
+  "provenance": {
+    "schemaId": "tb.schema.endgame.contract_authority.v1",
+    "schemaVersion": "v1",
+    "appRevision": "app.rev.1",
+    "createdAt": "2026-06-08T00:00:00.000Z",
+    "producer": "contract-authority"
+  },
+  "capability": {
+    "principalId": "principal.browser.001",
+    "sessionId": "session-001",
+    "capabilityId": "cap-001",
+    "leaseId": "lease-001",
+    "leaseStatus": "active",
+    "appRevision": "app.rev.1",
+    "schemaVersion": "v1"
+  },
+  "permissions": {
+    "publish": {
+      "allow": ["*.proof.out"]
+    }
+  }
+}

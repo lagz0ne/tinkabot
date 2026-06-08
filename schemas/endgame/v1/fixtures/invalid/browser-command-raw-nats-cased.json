@@ -1,0 +1,24 @@
+{
+  "kind": "browser.command_intent",
+  "type": "content.intent",
+  "command": "select_artifact",
+  "commandId": "cmd-raw-002",
+  "expectedRevision": "artifact.rev.7",
+  "payload": {
+    "replySubject": "tb.proof.reply.leak",
+    "Subject": "tb.internal.admin.delete"
+  },
+  "context": {
+    "sessionId": "session-001",
+    "capabilityId": "cap-001",
+    "artifactId": "artifact-001",
+    "artifactRevision": "artifact.rev.7",
+    "frameId": "frame-001",
+    "chain": {
+      "chainId": "chain-001",
+      "rootId": "root-001",
+      "hop": 1,
+      "maxHops": 5
+    }
+  }
+}

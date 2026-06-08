@@ -11,6 +11,9 @@ coverage/
 # Bun install backups
 .old_modules-*/
 
+# Codex orchestration runs
+.codex-runs/
+
 # Python test artifacts
 __pycache__/
 .pytest_cache/

@@ -12,6 +12,7 @@
         "@lagz0ne/nats-embedded": "file:../../../nats-embedded/packages/nats-embedded",
         "@lagz0ne/nats-embedded-linux-x64": "file:../../../nats-embedded/packages/linux-x64",
         "nats": "^2.29.3",
+        "zod": "^4.4.3",
       },
       "devDependencies": {
         "bun-types": "^1.2.15",
@@ -170,6 +171,8 @@
     "undici-types": ["undici-types@6.21.0", "", {}, "sha512-iwDZqg0QAGrg9Rav5H4n0M64c3mkR59cJ6wQp+7C4nI0gsmExaedaYLNO44eT4AtBBwjbTiGPMlt2Md0T9H9JQ=="],
 
     "unrun": ["unrun@0.2.39", "", { "dependencies": { "rolldown": "1.0.0-rc.17" }, "peerDependencies": { "synckit": "^0.11.11" }, "optionalPeers": ["synckit"], "bin": { "unrun": "dist/cli.mjs" } }, "sha512-h9FxYVpztY/wwq+bauLOh6Y3CWu2IVeRLq5lxzneBiIU9Tn86OGp9xiQrGhnYspAmg5dzdY0Cc8+Y70kuTARCg=="],
+
+    "zod": ["zod@4.4.3", "", {}, "sha512-ytENFjIJFl2UwYglde2jchW2Hwm4GJFLDiSXWdTrJQBIN9Fcyp7n4DhxJEiWNAJMV1/BqWfW/kkg71UDcHJyTQ=="],
 
     "tinkabot/@lagz0ne/nats-embedded": ["@lagz0ne/nats-embedded@file:../nats-embedded/packages/nats-embedded", { "devDependencies": { "@types/node": "^22.0.0", "bun-types": "^1.2.0", "tsdown": "^0.21.4", "typescript": "^5.7.0" }, "optionalDependencies": { "@lagz0ne/nats-embedded-darwin-arm64": "0.3.1", "@lagz0ne/nats-embedded-darwin-x64": "0.3.1", "@lagz0ne/nats-embedded-linux-arm64": "0.3.1", "@lagz0ne/nats-embedded-linux-x64": "0.3.1", "@lagz0ne/nats-embedded-win32-arm64": "0.3.1", "@lagz0ne/nats-embedded-win32-x64": "0.3.1" } }],
 

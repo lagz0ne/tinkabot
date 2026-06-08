@@ -1,0 +1,54 @@
+{
+  "provenance": {
+    "schemaId": "tb.schema.endgame.contract_authority.v1",
+    "schemaVersion": "v1",
+    "appRevision": "app.rev.1",
+    "createdAt": "2026-06-08T00:00:00.000Z",
+    "producer": "contract-authority"
+  },
+  "capability": {
+    "principalId": "principal.browser.001",
+    "sessionId": "session-001",
+    "capabilityId": "cap-001",
+    "leaseId": "lease-001",
+    "leaseStatus": "active",
+    "appRevision": "app.rev.1",
+    "schemaVersion": "v1"
+  },
+  "permissions": {
+    "publish": {
+      "allow": ["tb.proof.out.allowed.>"],
+      "deny": ["tb.proof.out.denied.>"]
+    },
+    "subscribe": {
+      "allow": ["tb.proof.runtime.>"],
+      "deny": ["tb.internal.control.>"]
+    },
+    "allow_responses": {
+      "max": 1,
+      "expiresMs": 30000
+    }
+  },
+  "imports": {
+    "out": {
+      "kind": "publish",
+      "subjects": ["tb.proof.out.allowed.>"],
+      "desc": "Allowed output family."
+    }
+  },
+  "exports": ["tb.proof.runtime.execute"],
+  "exposure": {
+    "execute": {
+      "kind": "request_reply",
+      "subject": "tb.proof.runtime.execute",
+      "desc": "Caller-facing execution subject."
+    }
+  },
+  "subjects": {
+    "publish": ["tb.proof.out.allowed.>", "tb.proof.out.denied.>"],
+    "subscribe": ["tb.proof.runtime.>", "tb.internal.control.>"],
+    "imports": ["tb.proof.out.allowed.>"],
+    "exports": ["tb.proof.runtime.execute"],
+    "exposure": ["tb.proof.runtime.execute"]
+  }
+}

@@ -30,7 +30,8 @@
   "dependencies": {
     "@lagz0ne/nats-embedded": "file:../../../nats-embedded/packages/nats-embedded",
     "@lagz0ne/nats-embedded-linux-x64": "file:../../../nats-embedded/packages/linux-x64",
-    "nats": "^2.29.3"
+    "nats": "^2.29.3",
+    "zod": "^4.4.3"
   },
   "devDependencies": {
     "bun-types": "^1.2.15",
