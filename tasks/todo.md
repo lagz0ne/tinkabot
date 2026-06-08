@@ -10,7 +10,7 @@
 - Current implementation lives in `packages/sdk` and `substrate/go`.
 - Active/future lanes:
   - `schemas`: canonical JSON Schema and codegen authority.
-  - `substrate/go`: Go NATS/auth/process/Docker-facing substrate.
+  - `substrate/go`: Go embedded-NATS/auth/process/Docker-facing substrate.
   - `apps/frontend`: Vite trusted shell.
 
 ## Active Goal
@@ -23,8 +23,10 @@ Progress Tinkabot through the Endgame Plan by completing verified milestones.
 2. DONE: `managed-auth-subjects`: identity/capability provenance, subject taxonomy, NATS auth compilation fixtures, lease/revocation/expiration proof, advanced capability denial, bounded responses, and export/exposure pairing.
 3. DONE: `command-acceptance`: durable intent acceptance, atomic idempotency, required command ids, capability context binding, stale-revision denial, capability lease denial, status materialization, activation handoff.
 4. DONE: `substrate-edge-bootstrap`: Go substrate boundary plus Browser Edge credential/artifact bootstrap over shared contracts.
-5. NEXT: `script-materializer-loop`: mediated script execution, accepted effects, materialized projections/artifacts, cleanup.
-6. `release-spine`: centralized ops evidence manifest with outside-in real NATS proof and inside-out ownership proof.
+5. NEXT: `go-substrate-core`: Go-owned embedded NATS lifecycle, HA/scale topology, auth render, credential leases, store substrate, activation ledger, process boundary, gateway substrate, attribution.
+6. `activation-source-router`: request/reply, subject subscriptions, KV/Object/Stream watches, and schedule sources become accepted activation records with cursor and lease attribution.
+7. `script-materializer-loop`: mediated script execution, accepted effects, materialized projections/artifacts, cleanup.
+8. `release-spine`: centralized ops evidence manifest with outside-in real NATS proof and inside-out ownership proof.
 
 ## Operating Rules
 
@@ -40,7 +42,7 @@ Progress Tinkabot through the Endgame Plan by completing verified milestones.
 - Endgame Approach is the current top-level app authority: `docs/matched-abstraction/approach/endgame-app.md`.
 - Endgame Plan is the current decomposition authority: `docs/matched-abstraction/plan/endgame-app.md`.
 - The product loop is source/artifact -> materialized projection -> browser intent -> durable backend acceptance -> activation -> script execution -> attributed event/projection update.
-- Go owns substrate authority: NATS infra, auth, process lifecycle, Docker/sandboxing direction, connection policy, activation ledger, artifact gateway, execution attribution.
+- Go owns substrate authority: embedded NATS lifecycle, NATS-native HA/scale posture, auth, process lifecycle, Docker/sandboxing direction, connection policy, activation ledger, artifact gateway, execution attribution.
 - Vite owns the trusted browser shell. Generated browser content remains a receiver and intent emitter.
 - Schema/SDK owns shared contract shape. JSON Schema is the first neutral source; generated or checked Zod, TS types, Go validators/types, and fixtures follow it.
 - Existing Bun/TypeScript runtime and `@lagz0ne/nats-embedded` work is regression evidence and SDK material, not current substrate authority.
@@ -51,29 +53,31 @@ Progress Tinkabot through the Endgame Plan by completing verified milestones.
 
 ## Next Slice
 
-Task layer next: `script-materializer-loop`.
+Task layer next: `go-substrate-core`.
 
 Assumption:
-- Script execution consumes accepted activation intents and scoped substrate/browser-edge authority without giving scripts ambient NATS access.
-- Script effects are mediated through the runtime facade, then materialized into projections/artifacts with attribution and cleanup.
-- This slice must not implement scheduler activation, release spine, or full frontend rendering.
+- Go must own embedded NATS substrate contracts before activation/script/materializer work consumes them.
+- The existing Go `contract` and `edge` packages prove schema parity and edge bootstrap, but not live substrate ownership.
+- This slice creates typed, fakeable Go substrate core contracts without implementing full live NATS auth backend, activation-source routing, script execution, Docker, materialization, release spine, or frontend rendering.
+- HA/scale posture is part of Go substrate core, but it must map to NATS-provided clustering, JetStream replica/quorum, route/gateway/leaf, WebSocket, and readiness semantics rather than bespoke replication or routing.
 
 RED:
-- Use `triage-three` to pressure-test script/materializer flow before writing code.
-- Write failing tests for activation intent consumption, mediated script execution, facade effect acceptance/denial, projection/artifact materialization, attributed failures, cleanup, duplicate suppression, and revoked/stale capability denial.
+- Use `triage-three` to pressure-test Go substrate core before writing code.
+- Write failing Go tests for embedded NATS topology/readiness/shutdown, HA/scale degraded states, auth render, credential lease mint/revoke, store substrate revision/cursor errors, activation ledger dedupe/loop suppression, process boundary config, gateway substrate config, and attribution events.
 
 GREEN:
-- Add the smallest pure/fakeable script-materializer loop that can consume an accepted activation, run a script through the existing process/runtime contract, accept only mediated effects, and materialize projection/artifact outputs with attribution.
-- Keep script runtime, effect policy, materializer output, and cleanup ownership separate.
+- Add the smallest pure/fakeable Go substrate core package that consumes canonical contracts and produces typed substrate outputs for embedded NATS lifecycle, HA/scale topology, auth render, leases, store substrate, ledger, process boundary, gateway, and attribution.
+- Keep NATS lifecycle, auth rendering, store/ledger, process boundary, gateway substrate, and attribution ownership separate inside Go.
 
 VERIFY:
 - `bun run schema:parity`
-- script/materializer targeted tests once created
+- RED tests `T-GO-CORE-LIFECYCLE` through `T-GO-ATTRIBUTION` pass under `go test ./...` from `substrate/go`
+- `go test ./...` from `substrate/go`
 - `bun run test`
 - `bun run typecheck`
 - `bun run validate:layers`
 - `bun run test:layers`
-- no-slop scan over script/materializer docs, fixtures, and code
+- no-slop scan over Go substrate docs, fixtures, and code
 
 Evidence gathered:
 - Orchestrated command-acceptance worker patch was applied to the primary checkout after the first generated worktree failed full verification due dependency path placement.
@@ -92,6 +96,7 @@ Evidence gathered:
 - Substrate Edge full tests: `bun run test` -> `52 pass`, `0 fail`, `334 expect() calls`.
 - Substrate Edge typecheck: `bun run typecheck` -> SDK plus orchestrator typecheck passed.
 - Substrate Edge build/package: `bun run build` -> SDK bundles emitted; `bun run pack:dry` -> `tinkabot-0.1.0.tgz`, 6 files.
+- Go substrate matched-abstraction docs: `docs/matched-abstraction/approach/go-substrate.md`, `docs/matched-abstraction/plan/go-substrate.md`, `docs/matched-abstraction/task/go-substrate-core.md`; diagram `https://diashort.apps.quickable.co/d/4a99eb1d`.
 
 ## Current Verification Commands
 
@@ -119,6 +124,9 @@ Evidence gathered:
 - Managed auth compilation denies raw/advanced imports and non-request-reply exposure by default, requires `allow_responses.expiresMs` when response authority is present, distinguishes revoked from expired leases, and requires exported subjects to match declared exposure subjects.
 - Command acceptance requires command ids, claims statuses atomically before activation handoff is returned, resolves duplicate command ids without second activation, binds command session/capability context to the active lease, rejects stale revisions, exhausted chain budgets, and revoked/expired capability contexts, and emits `activation.intent` with `source.kind = "command_acceptance"` only for accepted first-seen commands.
 - Substrate edge bootstrap stays pure/fakeable: Go derives scoped worker credential descriptors and artifact gateway policy from canonical contracts; Browser Edge splits worker-only credentials from content-safe context and emits only canonical `browser.command_intent` outward.
+- Go substrate embeds and manages NATS by default; HA/scale posture uses NATS-provided clustering, JetStream replica/quorum, route/gateway/leaf, WebSocket, queue/consumer, and observability semantics rather than bespoke substrate replication or routing.
+- Go substrate core must exist before activation/script/materializer implementation consumes substrate behavior; TypeScript runtime work is regression evidence, not substrate authority.
+- Activation-source router must sit between Go substrate core and script-materializer-loop so reactive triggers do not get invented inside script execution.
 - Release gates must include allowed, denied-neighbor, malformed, duplicate, stale-revision, revoked-credential, and attributed-failure cases over NATS-mediated behavior.
 
 ## Milestone Index
@@ -138,10 +146,13 @@ Historical details live in matched-abstraction docs and git history. Do not expa
 - Code structure reset: `docs/matched-abstraction/{approach,plan}/code-structure.md` and `docs/matched-abstraction/task/code-structure-reorganization.md`.
 - Endgame app approach: `docs/matched-abstraction/approach/endgame-app.md`.
 - Endgame app plan: `docs/matched-abstraction/plan/endgame-app.md`.
+- Go substrate approach: `docs/matched-abstraction/approach/go-substrate.md`.
+- Go substrate plan: `docs/matched-abstraction/plan/go-substrate.md`.
 - Endgame contract authority task: `docs/matched-abstraction/task/endgame-contract-authority.md`.
 - Managed auth subjects task: `docs/matched-abstraction/task/managed-auth-subjects.md`.
 - Command acceptance task: `docs/matched-abstraction/task/command-acceptance.md`.
 - Substrate edge bootstrap task: `docs/matched-abstraction/task/substrate-edge-bootstrap.md`.
+- Go substrate core task: `docs/matched-abstraction/task/go-substrate-core.md`.
 - Codex endgame orchestration plan: `docs/matched-abstraction/plan/codex-endgame-orchestration.md`.
 - Codex endgame orchestrator task: `docs/matched-abstraction/task/codex-endgame-orchestrator.md`.
 

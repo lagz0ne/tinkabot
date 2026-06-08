@@ -17,3 +17,4 @@ Project-specific corrections:
 - When triage converges across architecture, reliability, and test-contract angles, stop reviewing and convert the findings into matched-abstraction docs plus RED tests. More review is lower value than executable contract pressure.
 - Before presenting concepts or strategy, use `triage-three` as decision support more often: stress-test the idea, collapse weak branches, and present the user with sharper tradeoffs plus a recommended path.
 - Add and use `be-lazy` for coding posture: short clear names, compiler-backed inference, direct code, and no redundant ceremony, while keeping public contracts and safety boundaries explicit.
+- For the Go substrate, embed and manage NATS as the default platform component. HA/scale posture must use NATS-provided clustering, JetStream replica/quorum, route/gateway/leaf, WebSocket, queue/consumer, and observability semantics rather than bespoke replication or treating NATS as an external-only dependency.
