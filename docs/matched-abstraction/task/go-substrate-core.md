@@ -16,7 +16,7 @@ Diagram: https://diashort.apps.quickable.co/d/4a99eb1d
 
 ## Objective
 
-Establish the first Go-owned substrate core boundary so later activation, script, and materializer work consumes Go substrate contracts instead of TypeScript runtime assumptions. This task turns Go from schema/edge proof into the owner of embedded NATS lifecycle shape, HA/scale topology envelope, auth render shape, credential lease semantics, activation ledger shape, process boundary config, gateway substrate config, and typed substrate errors.
+Establish the first Go-owned substrate core boundary so the embedded-NATS adapter, activation, script, and materializer work consume Go substrate contracts instead of TypeScript runtime assumptions. This task turns Go from schema/edge proof into the owner of embedded NATS lifecycle shape, HA/scale topology envelope, auth render shape, credential lease semantics, activation ledger shape, process boundary config, gateway substrate config, and typed substrate errors.
 
 ## Scope
 
@@ -35,7 +35,7 @@ This task owns one executable unit: the fakeable Go substrate core contract. Its
 
 ## Non-Goals
 
-- No full live embedded NATS cluster orchestration beyond a fakeable lifecycle and topology contract.
+- No live embedded NATS adapter or full live cluster orchestration beyond a fakeable lifecycle and topology contract.
 - No real account JWT/operator auth backend.
 - No activation-source router for request/reply, subject, KV/Object/Stream, or schedule triggers.
 - No script execution.
@@ -84,7 +84,7 @@ Expected failing tests before implementation:
 
 ## Execution Notes
 
-Keep this slice pure and fakeable. Define Go substrate contracts and fakes that preserve live embedded NATS/process semantics, including NATS-native HA/scale posture, then prove them with inside-out Go tests. Do not start activation-source routers, scripts, or materializers from this task.
+Keep this slice pure and fakeable. Define Go substrate contracts and fakes that preserve live embedded NATS/process semantics, including NATS-native HA/scale posture, then prove them with inside-out Go tests. Do not start the embedded-NATS adapter, activation-source routers, scripts, or materializers from this task.
 
 Use the existing `contract` and `edge` packages as inputs. If a shape belongs to schema or managed auth, consume it; do not recreate authority in Go-local vocabulary.
 
@@ -108,4 +108,4 @@ Implementation gate:
 
 ## Wrap-Up Announcement
 
-The `go-substrate-core` milestone is complete when Go owns a verified, typed, fakeable substrate core contract that later activation, script, and materializer work can consume for embedded NATS lifecycle, HA/scale topology, auth render, leases, store substrate, ledger, process boundary, gateway substrate, and attribution without relying on TypeScript runtime authority.
+The `go-substrate-core` milestone is complete when Go owns a verified, typed, fakeable substrate core contract that `embedded-nats-adapter` and later activation, script, and materializer work can consume for embedded NATS lifecycle, HA/scale topology, auth render, leases, store substrate, ledger, process boundary, gateway substrate, and attribution without relying on TypeScript runtime authority.

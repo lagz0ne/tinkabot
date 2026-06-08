@@ -24,9 +24,10 @@ Progress Tinkabot through the Endgame Plan by completing verified milestones.
 3. DONE: `command-acceptance`: durable intent acceptance, atomic idempotency, required command ids, capability context binding, stale-revision denial, capability lease denial, status materialization, activation handoff.
 4. DONE: `substrate-edge-bootstrap`: Go substrate boundary plus Browser Edge credential/artifact bootstrap over shared contracts.
 5. NEXT: `go-substrate-core`: Go-owned embedded NATS lifecycle, HA/scale topology, auth render, credential leases, store substrate, activation ledger, process boundary, gateway substrate, attribution.
-6. `activation-source-router`: request/reply, subject subscriptions, KV/Object/Stream watches, and schedule sources become accepted activation records with cursor and lease attribution.
-7. `script-materializer-loop`: mediated script execution, accepted effects, materialized projections/artifacts, cleanup.
-8. `release-spine`: centralized ops evidence manifest with outside-in real NATS proof and inside-out ownership proof.
+6. `embedded-nats-adapter`: attach Go substrate contracts to a real embedded NATS runtime with JetStream, auth load path, WebSocket posture, topology probes, and drain/shutdown behavior.
+7. `activation-source-router`: request/reply, subject subscriptions, KV/Object/Stream watches, and schedule sources become accepted activation records with cursor and lease attribution.
+8. `script-materializer-loop`: mediated script execution, accepted effects, materialized projections/artifacts, cleanup.
+9. `release-spine`: centralized ops evidence manifest with outside-in real NATS proof and inside-out ownership proof.
 
 ## Operating Rules
 
@@ -61,6 +62,7 @@ Assumption:
 - The existing Go `contract` and `edge` packages prove schema parity and edge bootstrap, but not live substrate ownership.
 - This slice creates typed, fakeable Go substrate core contracts without implementing full live NATS auth backend, activation-source routing, script execution, Docker, materialization, release spine, or frontend rendering.
 - HA/scale posture is part of Go substrate core, but it must map to NATS-provided clustering, JetStream replica/quorum, route/gateway/leaf, WebSocket, and readiness semantics rather than bespoke replication or routing.
+- `go-substrate-core` hands contracts to `embedded-nats-adapter`; activation-source routing waits until live embedded NATS semantics have a substrate adapter.
 
 RED:
 - Use `triage-three` to pressure-test Go substrate core before writing code.
@@ -99,6 +101,7 @@ Evidence gathered:
 - Substrate Edge build/package: `bun run build` -> SDK bundles emitted; `bun run pack:dry` -> `tinkabot-0.1.0.tgz`, 6 files.
 - Go substrate matched-abstraction docs: `docs/matched-abstraction/approach/go-substrate.md`, `docs/matched-abstraction/plan/go-substrate.md`, `docs/matched-abstraction/task/go-substrate-core.md`; diagram `https://diashort.apps.quickable.co/d/4a99eb1d`.
 - Go substrate Approach seal: embedded NATS ownership, NATS-native HA/scale, NATS auth vocabulary, separated authority envelopes, mediated scripts, generated-content denial, and typed substrate failures are locked unless Approach is explicitly reopened.
+- Go substrate Plan refinement: `embedded-nats-adapter` now sits between `go-substrate-core` and `activation-source-router`; Plan diagram `https://diashort.apps.quickable.co/d/5edab343`; traced test ownership requires one owning Task test per declared error and explicit Resolve/Transform/Propagate for consumed errors.
 
 ## Current Verification Commands
 
@@ -128,8 +131,9 @@ Evidence gathered:
 - Substrate edge bootstrap stays pure/fakeable: Go derives scoped worker credential descriptors and artifact gateway policy from canonical contracts; Browser Edge splits worker-only credentials from content-safe context and emits only canonical `browser.command_intent` outward.
 - Go substrate Approach is sealed for `go-substrate-core`; downstream Plan/Task work may refine decomposition and verification, but cannot redefine embedded NATS ownership, HA/scale authority, auth vocabulary, authority envelopes, mediated scripts, generated-content denial, or typed substrate failures.
 - Go substrate embeds and manages NATS by default; HA/scale posture uses NATS-provided clustering, JetStream replica/quorum, route/gateway/leaf, WebSocket, queue/consumer, and observability semantics rather than bespoke substrate replication or routing.
-- Go substrate core must exist before activation/script/materializer implementation consumes substrate behavior; TypeScript runtime work is regression evidence, not substrate authority.
-- Activation-source router must sit between Go substrate core and script-materializer-loop so reactive triggers do not get invented inside script execution.
+- Go substrate core must exist before embedded-NATS adapter, activation, script, or materializer implementation consumes substrate behavior; TypeScript runtime work is regression evidence, not substrate authority.
+- Embedded NATS adapter must sit between Go substrate core and activation-source router so real NATS lifecycle, JetStream, auth load path, WebSocket posture, topology probes, and drain/shutdown semantics are proven before reactive triggers depend on them.
+- Activation-source router must sit after embedded-NATS adapter and before script-materializer-loop so reactive triggers do not get invented inside script execution.
 - Release gates must include allowed, denied-neighbor, malformed, duplicate, stale-revision, revoked-credential, and attributed-failure cases over NATS-mediated behavior.
 
 ## Milestone Index
