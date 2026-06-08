@@ -15,3 +15,5 @@ Project-specific corrections:
 - For package distribution work, verify the pack shape as well as the build. `bun pm pack --dry-run` caught the missing package version before final handoff.
 - Request/reply execution alone cannot create script chains. Model reactive and automated starts as an activation layer above substrate, not as substrate itself.
 - When triage converges across architecture, reliability, and test-contract angles, stop reviewing and convert the findings into matched-abstraction docs plus RED tests. More review is lower value than executable contract pressure.
+- Before presenting concepts or strategy, use `triage-three` as decision support more often: stress-test the idea, collapse weak branches, and present the user with sharper tradeoffs plus a recommended path.
+- Add and use `be-lazy` for coding posture: short clear names, compiler-backed inference, direct code, and no redundant ceremony, while keeping public contracts and safety boundaries explicit.

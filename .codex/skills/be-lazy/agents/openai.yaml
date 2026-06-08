@@ -1,0 +1,4 @@
+interface:
+  display_name: "Be Lazy"
+  short_description: "Write terse compiler-backed code"
+  default_prompt: "Use $be-lazy to simplify this code with shorter names, less ceremony, and compiler-backed inference."
