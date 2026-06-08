@@ -222,6 +222,7 @@ export async function main(args = parseArgs()): Promise<void> {
     return;
   }
 
+  await mkdir(dirname(lock), { recursive: true });
   await mkdir(lock, { recursive: false });
   try {
     await mkdir(run, { recursive: true });
