@@ -29,63 +29,67 @@ afterEach(async () => {
 });
 
 describe("Feature: NATS script runtime distribution", () => {
-  test("Scenario: built package runs substrate and record-store contract end to end", async () => {
-    await givenCleanDistributionBuild();
-    const api = await whenConsumerImportsEsmDistribution();
-    const cjs = whenConsumerRequiresCjsDistribution();
+  test(
+    "Scenario: built package runs substrate and record-store contract end to end",
+    async () => {
+      await givenCleanDistributionBuild();
+      const api = await whenConsumerImportsEsmDistribution();
+      const cjs = whenConsumerRequiresCjsDistribution();
 
-    thenDistributionExportsRuntimeApi(api);
-    thenDistributionExportsRuntimeApi(cjs);
+      thenDistributionExportsRuntimeApi(api);
+      thenDistributionExportsRuntimeApi(cjs);
 
-    const substrate = await api.RuntimeSubstrate.start({
-      storeDir: await tempStoreDir(),
-    });
-
-    try {
-      const store = await api.ScriptRecordStore.open(substrate, {
-        bucket: "TB_SCRIPT_RECORDS_BDD_DIST",
-        history: 3,
+      const substrate = await api.RuntimeSubstrate.start({
+        storeDir: await tempStoreDir(),
       });
 
-      const firstRevision = await store.create(
-        "scripts.dist.echo",
-        record("first"),
-      );
-      const secondRevision = await store.update(
-        "scripts.dist.echo",
-        record("second"),
-        { previousRevision: firstRevision },
-      );
+      try {
+        const store = await api.ScriptRecordStore.open(substrate, {
+          bucket: "TB_SCRIPT_RECORDS_BDD_DIST",
+          history: 3,
+        });
 
-      const first = await store.get("scripts.dist.echo", {
-        revision: firstRevision,
-      });
-      const second = await store.get("scripts.dist.echo", {
-        revision: secondRevision,
-      });
+        const firstRevision = await store.create(
+          "scripts.dist.echo",
+          record("first"),
+        );
+        const secondRevision = await store.update(
+          "scripts.dist.echo",
+          record("second"),
+          { previousRevision: firstRevision },
+        );
 
-      expect(first.record.source).toBe("export default 'first';");
-      expect(first.revision).toBe(firstRevision);
-      expect(second.record.source).toBe("export default 'second';");
-      expect(second.revision).toBe(secondRevision);
+        const first = await store.get("scripts.dist.echo", {
+          revision: firstRevision,
+        });
+        const second = await store.get("scripts.dist.echo", {
+          revision: secondRevision,
+        });
 
-      const deletedRevision = await store.create(
-        "scripts.dist.deleted",
-        record("deleted"),
-      );
-      await store.delete("scripts.dist.deleted", {
-        previousRevision: deletedRevision,
-      });
+        expect(first.record.source).toBe("export default 'first';");
+        expect(first.revision).toBe(firstRevision);
+        expect(second.record.source).toBe("export default 'second';");
+        expect(second.revision).toBe(secondRevision);
 
-      const deletedError = await captureRuntimeError(api, () =>
-        store.get("scripts.dist.deleted"),
-      );
-      expect(deletedError.kind).toBe("RecordDeletedOrStale");
-      expect(deletedError.origin.layer).toBe("ScriptRecordStore");
-    } finally {
-      await substrate.stop();
-    }
-  });
+        const deletedRevision = await store.create(
+          "scripts.dist.deleted",
+          record("deleted"),
+        );
+        await store.delete("scripts.dist.deleted", {
+          previousRevision: deletedRevision,
+        });
+
+        const deletedError = await captureRuntimeError(api, () =>
+          store.get("scripts.dist.deleted"),
+        );
+        expect(deletedError.kind).toBe("RecordDeletedOrStale");
+        expect(deletedError.origin.layer).toBe("ScriptRecordStore");
+      } finally {
+        await substrate.stop();
+      }
+    },
+    15_000,
+  );
 });
 
 async function givenCleanDistributionBuild(): Promise<void> {

@@ -291,6 +291,19 @@ export function createCommandAcceptance(
       triggerId: commandId,
       scriptKey: route.scriptKey,
       scriptRevision: route.scriptRevision,
+      sourcePrincipal: {
+        principalId: "principal.source.command_acceptance",
+        sourceId: `src-command-${activationName}`,
+        sourceKind: "command_acceptance",
+        authorityRef: `auth.source.command_acceptance.${activationName}`,
+      },
+      sourceLease: {
+        leaseId: opts.capability.leaseId,
+        leaseStatus: opts.capability.leaseStatus,
+        appRevision: opts.provenance.appRevision,
+        schemaVersion: opts.provenance.schemaVersion,
+        scriptRevision: route.scriptRevision,
+      },
       source: {
         kind: "command_acceptance",
         activationName,

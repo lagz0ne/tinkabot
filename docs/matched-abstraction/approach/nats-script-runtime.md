@@ -56,6 +56,8 @@ Deny semantics are meaningful. When `allow` and `deny` overlap, deny wins. `allo
 
 Every execution outcome must be attributable to the exact source, metadata, permissions, caller, activation subject, runtime context, chain context, and event trail used. This includes success, denial, invalid metadata, missing record, revision mismatch, script failure, and cleanup behavior.
 
+Script-side release confidence is proven from the outside through real NATS commands. A caller should be able to use the `nats` CLI to send a request or publish an event into embedded NATS, then observe the platform reaction through a reply, status subject, stream, KV/Object Store record, or materialized projection. This does not grant scripts raw NATS access; it proves the caller/platform boundary.
+
 Activation owns outside-in exposure: request/reply subjects, ordinary subject subscriptions, JetStream durable consumers, KV watches, and schedule providers that may start script execution.
 
 Activation owns durable activation state: source cursors, dedupe records, activation ledger entries, restart recovery, and source-specific delivery position.
@@ -86,6 +88,7 @@ Plan can proceed when it preserves these invariants:
 - Script records live in JetStream KV as source plus metadata.
 - Execution starts from `ActivationIntent`; request/reply is one activation source with optional reply context.
 - Default scripts do not need NATS client code; NATS interaction goes through the runtime facade and declared permissions.
+- Script-side outside-in tests use embedded NATS plus real `nats` CLI commands for ordinary trigger and observation behavior.
 - Schemas describe script-facing input, output, and event surfaces, not the entire NATS system.
 - Exposure and imports stay separate metadata concepts.
 - Subscribe authority is enforceable before an activation source is bound or consumed.

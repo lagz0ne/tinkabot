@@ -110,6 +110,81 @@
     "expect": { "valid": true, "policy": "allowed" }
   },
   {
+    "caseId": "allowed-activation-source-subject",
+    "fixture": "fixtures/valid/activation-source-subject.json",
+    "expect": { "valid": true, "policy": "allowed", "ownerLayer": "ContractAuthority" }
+  },
+  {
+    "caseId": "allowed-activation-source-kv",
+    "fixture": "fixtures/valid/activation-source-kv.json",
+    "expect": { "valid": true, "policy": "allowed", "ownerLayer": "ContractAuthority" }
+  },
+  {
+    "caseId": "allowed-activation-source-object",
+    "fixture": "fixtures/valid/activation-source-object.json",
+    "expect": { "valid": true, "policy": "allowed", "ownerLayer": "ContractAuthority" }
+  },
+  {
+    "caseId": "allowed-activation-source-stream",
+    "fixture": "fixtures/valid/activation-source-stream.json",
+    "expect": { "valid": true, "policy": "allowed", "ownerLayer": "ContractAuthority" }
+  },
+  {
+    "caseId": "allowed-activation-source-schedule",
+    "fixture": "fixtures/valid/activation-source-schedule.json",
+    "expect": { "valid": true, "policy": "allowed", "ownerLayer": "ContractAuthority" }
+  },
+  {
+    "caseId": "malformed-activation-source-unknown-kind",
+    "fixture": "fixtures/invalid/activation-source-unknown-kind.json",
+    "expect": { "valid": false, "errorKind": "ContractInvalid", "policy": "malformed", "ownerLayer": "ContractAuthority" }
+  },
+  {
+    "caseId": "malformed-activation-source-missing-lease",
+    "fixture": "fixtures/invalid/activation-source-missing-lease.json",
+    "expect": { "valid": false, "errorKind": "ContractInvalid", "policy": "malformed", "ownerLayer": "ContractAuthority" }
+  },
+  {
+    "caseId": "malformed-activation-source-invalid-cursor",
+    "fixture": "fixtures/invalid/activation-source-invalid-cursor.json",
+    "expect": { "valid": false, "errorKind": "ContractInvalid", "policy": "malformed", "ownerLayer": "ContractAuthority" }
+  },
+  {
+    "caseId": "malformed-activation-source-invalid-wildcard",
+    "fixture": "fixtures/invalid/activation-source-invalid-wildcard.json",
+    "expect": { "valid": false, "errorKind": "ContractInvalid", "policy": "malformed", "ownerLayer": "ContractAuthority" }
+  },
+  {
+    "caseId": "malformed-activation-source-missing-observed-subject",
+    "fixture": "fixtures/invalid/activation-source-missing-observed-subject.json",
+    "expect": { "valid": false, "errorKind": "ContractInvalid", "policy": "malformed", "ownerLayer": "ContractAuthority" }
+  },
+  {
+    "caseId": "schema-valid-activation-source-denied-neighbor",
+    "fixture": "fixtures/valid/activation-source-denied-neighbor.json",
+    "expect": { "valid": true, "policy": "denied-neighbor-denied", "ownerLayer": "SourceAuthority" }
+  },
+  {
+    "caseId": "schema-valid-activation-source-wildcard-overreach",
+    "fixture": "fixtures/valid/activation-source-wildcard-overreach.json",
+    "expect": { "valid": true, "policy": "wildcard-overreach-denied", "ownerLayer": "SourceAuthority" }
+  },
+  {
+    "caseId": "schema-valid-activation-source-stale-cursor",
+    "fixture": "fixtures/valid/activation-source-stale-cursor.json",
+    "expect": { "valid": true, "policy": "stale-revision-denied", "ownerLayer": "ActivationLedger" }
+  },
+  {
+    "caseId": "schema-valid-activation-source-revoked-lease",
+    "fixture": "fixtures/valid/activation-source-revoked-lease.json",
+    "expect": { "valid": true, "policy": "revoked-lease-denied", "ownerLayer": "SourceAuthority" }
+  },
+  {
+    "caseId": "schema-valid-activation-source-expired-lease",
+    "fixture": "fixtures/valid/activation-source-expired-lease.json",
+    "expect": { "valid": true, "policy": "expired-lease-denied", "ownerLayer": "SourceAuthority" }
+  },
+  {
     "caseId": "allowed-artifact-manifest",
     "fixture": "fixtures/valid/artifact-manifest.json",
     "expect": { "valid": true, "policy": "allowed" }

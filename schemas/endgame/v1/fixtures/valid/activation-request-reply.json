@@ -4,6 +4,19 @@
   "triggerId": "req-001",
   "scriptKey": "scripts.proof.echo",
   "scriptRevision": 7,
+  "sourcePrincipal": {
+    "principalId": "principal.source.request",
+    "sourceId": "src-request-runtime",
+    "sourceKind": "request_reply",
+    "authorityRef": "auth.source.request.runtime"
+  },
+  "sourceLease": {
+    "leaseId": "lease-source-request-001",
+    "leaseStatus": "active",
+    "appRevision": "app.rev.1",
+    "schemaVersion": "v1",
+    "scriptRevision": 7
+  },
   "source": {
     "kind": "request_reply",
     "activationName": "request",

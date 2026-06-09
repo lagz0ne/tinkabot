@@ -6,17 +6,22 @@ references:
   - ./platform-structure.md
   - ./nats-script-runtime.md
   - ./browser-frontend-mediator.md
+  - ./browser-isolation.md
 ---
 
 # Endgame App Approach
 
 Diagram: https://diashort.apps.quickable.co/d/c3d3cbfd
 
+Service-worker session flow: https://diashort.apps.quickable.co/d/f202fd1b
+
 ## Purpose
 
-Tinkabot is a complete managed NATS application platform. It combines a trusted embedded browser substrate, a managed backend script substrate, NATS-native storage and activation, schema-backed contracts, managed NATS auth, centralized operational entrypoints, and verification that proves behavior both outside-in and inside-out through NATS-shaped boundaries.
+Tinkabot is a complete managed NATS application platform. It combines a trusted embedded browser substrate, server-owned service-worker setup, a managed backend script substrate, NATS-native storage and activation, schema-backed contracts, managed NATS auth, centralized operational entrypoints, and verification that proves behavior both inside-out and outside-in through real NATS-mediated boundaries.
 
 The endgame is not a demo runtime. The system must be releasable as a coherent app whose browser, backend scripts, auth, activation, storage, build, and test surfaces all share one authority model.
+
+The system seam is NATS. Local function calls, fakes, generated files, and browser fixtures may prove ownership inside a layer, but they do not satisfy endgame confidence until the same behavior is observable through real NATS subjects, requests, streams, KV/Object Store records, or materialized projections.
 
 ## Core Thesis
 
@@ -26,9 +31,9 @@ The product loop is the unit of design: source and artifacts become durable mate
 
 The app owns a managed NATS control plane: identities, ownership, permissions, imports, exports, exposure, revocation, and attribution are expressed in NATS auth vocabulary and mediated by the substrate. Domain identity is a policy input; NATS auth is the compiled enforcement shape.
 
-The browser side is an embedded frontend substrate. A trusted shell, dedicated worker, and browser edge mediate browser-to-server NATS participation for sub-apps. Generated or supplied sub-app content renders materialized state and emits typed command intents; it does not hold raw NATS authority.
+The browser side is an embedded frontend substrate. A trusted shell, dedicated worker, scoped service worker, and browser edge mediate browser-to-server participation for sub-apps. Generated or supplied sub-app content renders materialized state and emits typed command intents from an opaque sandboxed frame; it does not hold raw NATS authority.
 
-The browser edge owns session bootstrap, browser credential minting and revocation, artifact serving, cache policy, content security policy, frame sandboxing, and any control-plane behavior that NATS does not provide directly to the browser.
+The browser edge owns session bootstrap, service-worker setup, browser credential minting and revocation, artifact serving, cache policy, content security policy, frame sandboxing, and any control-plane behavior that NATS does not provide directly to the browser.
 
 The backend side is a managed script substrate. Scripts are stored, described, activated, executed, audited, and constrained by metadata, schema, and runtime facade policy. Current execution may be trusted, but the contract must preserve a later sandbox path without redefining script behavior.
 
@@ -36,7 +41,7 @@ The storage side uses NATS-native material. Durable manifests, projections, arti
 
 The operations side has one centralized entry surface for development, test, build, release, and local service orchestration. The exact runner is subordinate to the principle that operational behavior is discoverable, repeatable, and not scattered across ad hoc commands.
 
-The verification side treats NATS as the integration boundary. Outside-in tests prove app behavior from caller/browser/script-facing entrances. Inside-out tests prove schema, auth, activation, materializer, runtime facade, and substrate contracts before they compose.
+The verification side treats NATS as the integration boundary. Outside-in tests prove app behavior from caller/browser/script-facing entrances through real NATS-mediated surfaces. Inside-out tests prove schema, auth, activation, materializer, runtime facade, and substrate contracts before they compose.
 
 ## Layer Contract
 
@@ -50,11 +55,12 @@ Task owns one executable proof at a time. Task may implement, test, and report e
 
 - No MVP framing. A narrow slice may be accepted only when its boundary is complete, denied paths included.
 - No raw NATS access for generated browser content.
+- No token-bearing service worker that becomes an ambient browser credential holder.
 - No raw NATS access for backend scripts by default.
 - No invented permission vocabulary where NATS auth vocabulary already exists.
 - No local browser state as durable product truth.
 - No optimistic frontend side effects as authoritative completion.
-- No sandbox implementation decision in this Approach; only a contract that keeps sandboxing possible.
+- No backend script sandbox implementation decision in this Approach; only a contract that keeps script sandboxing possible.
 - No scattered build, test, or service scripts.
 - No language-local schema authority in Go or TypeScript.
 - No treating request/reply as the whole activation model.
@@ -65,7 +71,9 @@ NATS is the substrate and auth vocabulary, not a blanket escape hatch. Every act
 
 Control plane and app plane are separate authority domains. Scripts, generated browser content, and sub-app sessions cannot import, expose, publish, subscribe, or watch auth, script, schema, build, credential, or materializer-control surfaces unless they are acting through a named control-plane service role.
 
-Mediation is mandatory at trust boundaries. Generated browser content talks to the trusted shell and worker through typed IPC. Backend scripts talk to the runtime through a process protocol and facade. Neither side chooses raw subjects or credentials by default.
+Mediation is mandatory at trust boundaries. Generated browser content runs in an opaque sandboxed iframe and talks to the trusted shell and worker through leased typed IPC. Backend scripts talk to the runtime through a process protocol and facade. Neither side chooses raw subjects or credentials by default.
+
+Service-worker setup is substrate-owned. The server issues an HttpOnly, Secure, SameSite cookie session, serves the service-worker script under a controlled scope, and sets the allowed worker scope. Browser registration identity is app and scope based; session, lease, capability, and revision authority are server-side checks on every substrate endpoint and mediated message path. The app uses the scoped substrate surface; generated content does not receive bearer tokens, NATS credentials, raw subjects, permission material, substrate cookies, or service-worker registration authority.
 
 Managed auth is lifecycle-aware and provenance-preserving. Issuance, scope, import/export shape, rotation, revocation, denial, and attribution are substrate concerns, and every granted authority must trace from app identity and ownership to a declared exposure, import, or service role.
 
@@ -85,7 +93,11 @@ Materialized state is observed truth. Browser views consume durable snapshots, m
 
 Materialized content is untrusted data until it crosses a named validation and projection boundary. Trusted shell state, generated content state, artifact manifests, and product truth remain separate.
 
-Generated frontend artifacts are untrusted receiver code with isolated execution identity. Artifact origin, frame identity, revision, digest, integrity, and sandbox policy are part of the authority boundary.
+Generated frontend artifacts are untrusted receiver code with isolated execution identity. Artifact origin, frame identity, revision, digest, integrity, and sandbox policy are part of the authority boundary. The v1 browser isolation model uses an iframe sandbox that allows scripts but denies same-origin access; unsafe same-origin `allow-scripts` plus `allow-same-origin` is rejected for untrusted generated content.
+
+Frame IPC is leased authority, not origin-string trust. The trusted shell validates source window or port identity, nonce, frame lease, schema revision, artifact revision, capability context, and message shape before forwarding generated-content intents.
+
+Service-worker isolation depends on server-controlled origin or path scope. Multiple sub-apps sharing an origin must still receive distinct service-worker scopes, cookie paths or equivalent session partitioning, CSP/frame policy, and command validation. Cookie-backed convenience does not weaken typed intent, CSRF/origin, fetch-metadata, revision, revocation, or capability checks.
 
 Every embedded artifact, frame, or sub-app is an independent principal. Cross-sub-app communication is brokered, schema-shaped, scoped, and attributed; privileged peer-to-peer authority is not a default capability.
 
@@ -106,6 +118,8 @@ Sandboxing is a future enforcement upgrade, not a future contract rewrite. Path,
 Centralized operations are product infrastructure. Build, test, local service startup, generated contract checks, and release packaging must be available through one managed entry surface with stable names and verifiable results.
 
 Verification confidence requires both directions. Outside-in tests prove that real app entrances produce correct NATS-mediated outcomes. Inside-out tests prove the smaller contracts that make failures diagnosable.
+
+Inside-out tests are not a substitute for the NATS seam. They are the diagnostic map that explains a real-NATS outside-in pass or failure.
 
 A release is not ready unless schema provenance, generated Go artifacts, generated TypeScript/Zod artifacts, fixtures, live browser-worker-substrate proof, centralized operation entries, and cross-lane contract results all agree from the same schema and app revision.
 
@@ -151,7 +165,9 @@ Plan work may proceed only when it preserves these gates:
 - Control-plane and app-plane authority are separated by account, authoritative prefix, or equivalent deny-enforced boundary.
 - Identity, ownership, session, revision, and capability provenance survive compilation into NATS auth.
 - Browser sub-apps remain receivers and typed intent emitters, not NATS clients.
+- Browser sub-apps run as opaque sandboxed generated content unless a stronger separate-origin model is proven by Plan.
 - Browser edge ownership is explicit for credentials, artifact serving, cache/CSP/sandbox policy, and missing browser control-plane behavior.
+- Service-worker setup is server-owned, cookie-session-backed, scope-isolated, and token-free for generated content.
 - Backend scripts remain NATS-agnostic by default and use the runtime facade for allowed effects.
 - Script process contracts are sandbox-compatible from the first release boundary.
 - Artifact and materializer authority is durable and observable through NATS-facing storage or subjects.

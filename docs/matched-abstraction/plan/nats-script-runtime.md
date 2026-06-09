@@ -4,6 +4,7 @@ topic: nats-script-runtime
 references:
   - ../approach/nats-script-runtime.md
   - ../approach/platform-structure.md
+  - ./script-nats-cli-proof.md
   - ./platform-structure.md
   - ./orchestration.md
 ---
@@ -58,6 +59,7 @@ Verification is layered:
 - Activation checks prove outside-in exposure is declared, subscribe authority is enforced, request/reply normalizes into `ActivationIntent`, and chain/loop fields are present before execution.
 - Embedded substrate evidence checks prove Bun can start JetStream through `@lagz0ne/nats-embedded` and cleanly stop it. Current platform checks must prove the Go substrate path.
 - Vertical proof checks store, load, execute, reply, event attribution, and cleanup in one closed loop.
+- Script-side outside-in proof uses the real `nats` CLI against embedded NATS. Commands such as `nats request`, `nats publish`, `nats subscribe`, `nats kv`, and `nats object` are the release-facing trigger and observation tools, not mocks.
 
 Edge-case verification matrix:
 
@@ -72,6 +74,16 @@ Edge-case verification matrix:
 | Execution exchange | Success, invalid input, script throw, timeout or cancellation, reply failure behavior |
 | Event trail | Success and failure events include execution id, script id/revision, caller, request subject, status, timestamps, and output/error reference |
 | Cleanup | Clients close, subscriptions drain, embedded server stops, temp store is removed or isolated, proof is rerunnable |
+
+CLI proof matrix:
+
+| CLI command | Expected platform reaction |
+| --- | --- |
+| `nats request <allowed-command-subject> <payload>` | command accepted, activation accepted, script executed, response or typed denial returned |
+| `nats publish <allowed-source-subject> <payload>` | source router accepts activation, script status/event appears on observable subject or stream |
+| `nats publish <denied-neighbor-subject> <payload>` | no script execution; denial or auth failure is observable |
+| `nats subscribe <status-or-event-subject> --count 1` | attributed status/event includes activation, script, source, lease, revision, and chain context |
+| `nats kv get <projection-bucket> <key>` or `nats object get <artifact-bucket> <name>` | materialized truth or artifact evidence is visible after accepted execution |
 
 ## Escalation Log
 

@@ -15,6 +15,7 @@ interface ParityCase {
     valid: boolean;
     errorKind?: RuntimeErrorKind;
     policy?: string;
+    ownerLayer?: string;
   };
 }
 
@@ -41,6 +42,7 @@ describe("EndgameContractAuthority", () => {
         "revoked-lease-denied",
         "expired-lease-denied",
         "reserved-subject-denied",
+        "denied-neighbor-denied",
         "wildcard-overreach-denied",
         "advanced-capability-denied",
         "response-unbounded-denied",
@@ -52,6 +54,10 @@ describe("EndgameContractAuthority", () => {
 
     for (const item of cases) {
       const fixture = await readJson(item.fixture);
+
+      if (item.expect.ownerLayer) {
+        expect(item.expect.ownerLayer).toMatch(/^(ContractAuthority|SourceAuthority|ActivationLedger)$/);
+      }
 
       if (item.expect.valid) {
         expect(parseContract(fixture).kind).toBeString();

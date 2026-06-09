@@ -1,9 +1,11 @@
 package core
 
 import (
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"strings"
+	"sync"
 
 	"github.com/lagz0ne/tinkabot/substrate/go/contract"
 )
@@ -19,6 +21,8 @@ const (
 	AuthRenderInvalid       Kind = "AuthRenderInvalid"
 	WildcardOverreach       Kind = "WildcardOverreach"
 	PermissionCompileFailed Kind = "PermissionCompileFailed"
+	SourceAuthDenied        Kind = "SourceAuthDenied"
+	DeniedNeighbor          Kind = "DeniedNeighbor"
 	LeaseMintDenied         Kind = "LeaseMintDenied"
 	LeaseRevoked            Kind = "LeaseRevoked"
 	LeaseExpired            Kind = "LeaseExpired"
@@ -29,6 +33,7 @@ const (
 	DeletedRecord           Kind = "DeletedRecord"
 	CursorFailure           Kind = "CursorFailure"
 	DuplicateActivation     Kind = "DuplicateActivation"
+	StaleCursor             Kind = "StaleCursor"
 	StaleChain              Kind = "StaleChain"
 	LoopSuppressed          Kind = "LoopSuppressed"
 	LeaseAcquireFailed      Kind = "LeaseAcquireFailed"
@@ -61,14 +66,16 @@ func (e *Error) Error() string {
 }
 
 func (e *Error) Event() Event {
+	prov := map[string]string{"origin": "go-substrate-core"}
+	for k, v := range e.Details {
+		prov[k] = v
+	}
 	return Event{
-		Kind:      "substrate.error",
-		Layer:     e.Layer,
-		Operation: e.Operation,
-		Cause:     string(e.Kind),
-		Provenance: map[string]string{
-			"origin": "go-substrate-core",
-		},
+		Kind:       "substrate.error",
+		Layer:      e.Layer,
+		Operation:  e.Operation,
+		Cause:      string(e.Kind),
+		Provenance: prov,
 	}
 }
 
@@ -90,8 +97,9 @@ const (
 type Status string
 
 const (
-	Accepted  Status = "accepted"
-	Duplicate Status = "duplicate"
+	Accepted   Status = "accepted"
+	Duplicate  Status = "duplicate"
+	Suppressed Status = "suppressed"
 )
 
 type LeaseKind string
@@ -200,15 +208,62 @@ type Store struct {
 }
 
 type Activation struct {
-	ActivationID string `json:"activationId"`
-	DedupeKey    string `json:"dedupeKey"`
-	ScriptKey    string `json:"scriptKey"`
-	Source       struct {
-		Kind string `json:"kind"`
-	} `json:"source"`
-	Chain      Chain      `json:"chain"`
-	Capability Capability `json:"capability"`
-	Provenance Provenance `json:"provenance"`
+	ActivationID    string          `json:"activationId"`
+	DedupeKey       string          `json:"dedupeKey"`
+	ScriptKey       string          `json:"scriptKey"`
+	ScriptRevision  int             `json:"scriptRevision"`
+	SourcePrincipal SourcePrincipal `json:"sourcePrincipal"`
+	SourceLease     SourceLease     `json:"sourceLease"`
+	Source          Source          `json:"source"`
+	Chain           Chain           `json:"chain"`
+	Capability      Capability      `json:"capability"`
+	Provenance      Provenance      `json:"provenance"`
+}
+
+type SourcePrincipal struct {
+	PrincipalID  string `json:"principalId"`
+	SourceID     string `json:"sourceId"`
+	SourceKind   string `json:"sourceKind"`
+	AuthorityRef string `json:"authorityRef"`
+}
+
+type SourceLease struct {
+	LeaseID        string `json:"leaseId"`
+	LeaseStatus    string `json:"leaseStatus"`
+	AppRevision    string `json:"appRevision"`
+	SchemaVersion  string `json:"schemaVersion"`
+	ScriptRevision int    `json:"scriptRevision"`
+}
+
+type Source struct {
+	Kind               string `json:"kind"`
+	ActivationName     string `json:"activationName"`
+	Subject            string `json:"subject"`
+	RequestID          string `json:"requestId"`
+	CommandID          string `json:"commandId"`
+	Pattern            string `json:"pattern"`
+	ObservedSubject    string `json:"observedSubject"`
+	MessageID          string `json:"messageId"`
+	Bucket             string `json:"bucket"`
+	Key                string `json:"key"`
+	Operation          string `json:"operation"`
+	Revision           int64  `json:"revision"`
+	WatchRevision      int64  `json:"watchRevision"`
+	Resume             string `json:"resume"`
+	Name               string `json:"name"`
+	Digest             string `json:"digest"`
+	ObjectMetaSequence int64  `json:"objectMetaSequence"`
+	WatchPosition      string `json:"watchPosition"`
+	Stream             string `json:"stream"`
+	Consumer           string `json:"consumer"`
+	StreamSequence     int64  `json:"streamSequence"`
+	ConsumerSequence   int64  `json:"consumerSequence"`
+	DeliveryAttempt    int64  `json:"deliveryAttempt"`
+	ScheduleID         string `json:"scheduleId"`
+	TickID             string `json:"tickId"`
+	LeaderEpoch        int64  `json:"leaderEpoch"`
+	FencingToken       string `json:"fencingToken"`
+	Clock              string `json:"clock"`
 }
 
 type Chain struct {
@@ -220,11 +275,31 @@ type Chain struct {
 }
 
 type LedgerRecord struct {
-	ActivationID string
-	DedupeKey    string
+	ActivationID      string
+	DedupeKey         string
+	SourceID          string
+	SourceKind        string
+	SourcePrincipalID string
+	SourceLeaseID     string
+	SourcePosition    int64
+	SourceCursor      string
+	ReplayCursor      string
+	ChainID           string
+	Status            Status
+}
+
+type SourceGrant struct {
+	SourceID     string
 	SourceKind   string
-	ChainID      string
-	Status       Status
+	PrincipalID  string
+	LeaseID      string
+	AuthorityRef string
+	Subject      string
+	AllowResponses
+	Imports  map[string]Import
+	Exports  []string
+	Exposure Exposure
+	Event    Event
 }
 
 type Process struct {
@@ -469,6 +544,316 @@ func CheckStore(s Store) (Store, error) {
 	return s, nil
 }
 
+func AuthorizeSource(auth Auth, act Activation) (SourceGrant, error) {
+	ctx := sourceCtx(act)
+	failAuth := func(kind Kind, msg string, details map[string]string) (SourceGrant, error) {
+		return SourceGrant{}, fail(kind, "SourceAuthority", "AuthorizeSource", msg, merge(ctx, details))
+	}
+
+	if strings.TrimSpace(auth.User) == "" || strings.TrimSpace(act.SourcePrincipal.PrincipalID) == "" {
+		return failAuth(SourceAuthDenied, "source principal is required", nil)
+	}
+	if auth.User != act.SourcePrincipal.PrincipalID {
+		return failAuth(SourceAuthDenied, "source principal does not match auth user", map[string]string{"authUser": auth.User})
+	}
+	if auth.Capability.PrincipalID != "" && auth.Capability.PrincipalID != auth.User {
+		return failAuth(SourceAuthDenied, "capability principal does not match auth user", map[string]string{"capabilityPrincipal": auth.Capability.PrincipalID})
+	}
+	if act.SourcePrincipal.SourceID == "" || act.SourcePrincipal.SourceKind == "" || act.SourcePrincipal.AuthorityRef == "" {
+		return failAuth(SourceAuthDenied, "source authority reference is required", nil)
+	}
+	if act.SourcePrincipal.SourceKind != act.Source.Kind {
+		return failAuth(SourceAuthDenied, "source principal kind does not match source", map[string]string{"principalKind": act.SourcePrincipal.SourceKind, "kind": act.Source.Kind})
+	}
+	if auth.Capability.LeaseID != "" && auth.Capability.LeaseID != act.SourceLease.LeaseID {
+		return failAuth(SourceAuthDenied, "source lease does not match auth lease", map[string]string{"authLeaseId": auth.Capability.LeaseID})
+	}
+	if err := checkSourceLease(act, auth); err != nil {
+		return SourceGrant{}, err
+	}
+
+	sub, err := sourceSubject(act)
+	if err != nil {
+		return SourceGrant{}, err
+	}
+	if err := checkSourceAperture(act); err != nil {
+		return SourceGrant{}, err
+	}
+
+	exp, ok := auth.Exposure[act.SourcePrincipal.AuthorityRef]
+	if !ok {
+		return failAuth(SourceAuthDenied, "source exposure is missing", nil)
+	}
+	if exp.Subject == "" {
+		return failAuth(PermissionCompileFailed, "source exposure subject is required", nil)
+	}
+	if want := exposureKind(act.Source.Kind); want != "" && exp.Kind != want {
+		return failAuth(PermissionCompileFailed, "source exposure kind does not match source", map[string]string{"exposureKind": exp.Kind, "expected": want})
+	}
+	if !subjectMatches(exp.Subject, sub) {
+		return failAuth(DeniedNeighbor, "source exposure does not cover observed subject", map[string]string{"exposure": exp.Subject, "subject": sub})
+	}
+	if !contains(auth.Exports, exp.Subject) {
+		return failAuth(PermissionCompileFailed, "source exposure is not exported", map[string]string{"subject": exp.Subject})
+	}
+	if err := checkSourceImports(auth, sub, ctx); err != nil {
+		return SourceGrant{}, err
+	}
+	if act.Source.Kind == "request_reply" && (auth.AllowResponses.Max <= 0 || auth.AllowResponses.ExpiresMs <= 0) {
+		return failAuth(PermissionCompileFailed, "request/reply source requires bounded responses", nil)
+	}
+
+	for _, check := range sourceChecks(act.Source, sub) {
+		if !allowed(auth.Subscribe, check) {
+			return failAuth(DeniedNeighbor, "source subject is outside subscribe aperture", map[string]string{"subject": check})
+		}
+	}
+
+	return SourceGrant{
+		SourceID:       act.SourcePrincipal.SourceID,
+		SourceKind:     act.Source.Kind,
+		PrincipalID:    act.SourcePrincipal.PrincipalID,
+		LeaseID:        act.SourceLease.LeaseID,
+		AuthorityRef:   act.SourcePrincipal.AuthorityRef,
+		Subject:        sub,
+		AllowResponses: auth.AllowResponses,
+		Imports:        copyImports(auth.Imports),
+		Exports:        copyStrings(auth.Exports),
+		Exposure:       exp,
+		Event:          sourceEvent("activation.source.authorized", act, sub),
+	}, nil
+}
+
+func checkSourceLease(act Activation, auth Auth) error {
+	ctx := sourceCtx(act)
+	status := act.SourceLease.LeaseStatus
+	if status == "" {
+		return fail(SourceAuthDenied, "SourceAuthority", "AuthorizeSource", "source lease status is required", ctx)
+	}
+	if status == "revoked" || auth.Capability.LeaseStatus == "revoked" {
+		return fail(LeaseRevoked, "SourceAuthority", "AuthorizeSource", "source lease is revoked", ctx)
+	}
+	if status == "expired" || auth.Capability.LeaseStatus == "expired" {
+		return fail(LeaseExpired, "SourceAuthority", "AuthorizeSource", "source lease is expired", ctx)
+	}
+	if status != "active" {
+		return fail(SourceAuthDenied, "SourceAuthority", "AuthorizeSource", "source lease is not active", ctx)
+	}
+	if act.SourceLease.LeaseID == "" {
+		return fail(SourceAuthDenied, "SourceAuthority", "AuthorizeSource", "source lease id is required", ctx)
+	}
+	if act.SourceLease.AppRevision != act.Provenance.AppRevision || act.SourceLease.SchemaVersion != act.Provenance.SchemaVersion {
+		return fail(StaleChain, "SourceAuthority", "AuthorizeSource", "source lease revision is stale", ctx)
+	}
+	if act.SourceLease.ScriptRevision != 0 && act.ScriptRevision != 0 && act.SourceLease.ScriptRevision != act.ScriptRevision {
+		return fail(StaleChain, "SourceAuthority", "AuthorizeSource", "source lease script revision is stale", ctx)
+	}
+	return nil
+}
+
+func checkSourceImports(auth Auth, sub string, ctx map[string]string) error {
+	for name, imp := range auth.Imports {
+		if imp.Kind == "raw_nats" || imp.Kind == "cli" {
+			return fail(PermissionCompileFailed, "SourceAuthority", "AuthorizeSource", "advanced import is denied", merge(ctx, map[string]string{"import": name, "kind": imp.Kind}))
+		}
+		if imp.Kind != "publish" && imp.Kind != "subscribe" {
+			return fail(PermissionCompileFailed, "SourceAuthority", "AuthorizeSource", "source import kind is unsupported", merge(ctx, map[string]string{"import": name, "kind": imp.Kind}))
+		}
+		for _, impSub := range imp.Subjects {
+			if imp.Kind == "subscribe" && !subjectMatches(impSub, sub) {
+				return fail(DeniedNeighbor, "SourceAuthority", "AuthorizeSource", "source import does not cover observed subject", merge(ctx, map[string]string{"import": name, "subject": impSub, "observed": sub}))
+			}
+			if imp.Kind == "subscribe" && !allowed(auth.Subscribe, impSub) {
+				return fail(DeniedNeighbor, "SourceAuthority", "AuthorizeSource", "source import is outside subscribe aperture", merge(ctx, map[string]string{"import": name, "subject": impSub}))
+			}
+			if imp.Kind == "publish" && !allowed(auth.Publish, impSub) {
+				return fail(DeniedNeighbor, "SourceAuthority", "AuthorizeSource", "source import is outside publish aperture", merge(ctx, map[string]string{"import": name, "subject": impSub}))
+			}
+		}
+	}
+	return nil
+}
+
+func sourceSubject(act Activation) (string, error) {
+	src := act.Source
+	ctx := sourceCtx(act)
+	switch src.Kind {
+	case "request_reply", "command_acceptance":
+		if src.Subject == "" {
+			return "", fail(SourceAuthDenied, "SourceAuthority", "AuthorizeSource", "source subject is required", ctx)
+		}
+		return src.Subject, nil
+	case "subject":
+		if src.ObservedSubject == "" {
+			return "", fail(SourceAuthDenied, "SourceAuthority", "AuthorizeSource", "observed subject is required", ctx)
+		}
+		return src.ObservedSubject, nil
+	case "kv":
+		if src.Bucket == "" || src.Key == "" {
+			return "", fail(SourceAuthDenied, "SourceAuthority", "AuthorizeSource", "KV source coordinate is required", ctx)
+		}
+		return "$KV." + src.Bucket + "." + src.Key, nil
+	case "object":
+		if src.Bucket == "" || src.Name == "" {
+			return "", fail(SourceAuthDenied, "SourceAuthority", "AuthorizeSource", "object source coordinate is required", ctx)
+		}
+		return "$O." + src.Bucket + "." + src.Name, nil
+	case "stream":
+		if src.Subject == "" {
+			return "", fail(SourceAuthDenied, "SourceAuthority", "AuthorizeSource", "stream subject is required", ctx)
+		}
+		return src.Subject, nil
+	case "schedule":
+		if src.ScheduleID == "" || src.TickID == "" {
+			return "", fail(SourceAuthDenied, "SourceAuthority", "AuthorizeSource", "schedule source coordinate is required", ctx)
+		}
+		return "tb.schedule." + src.ScheduleID + "." + src.TickID, nil
+	default:
+		return "", fail(SourceAuthDenied, "SourceAuthority", "AuthorizeSource", "source kind is unsupported", merge(ctx, map[string]string{"kind": src.Kind}))
+	}
+}
+
+func checkSourceAperture(act Activation) error {
+	src := act.Source
+	ctx := sourceCtx(act)
+	if src.Kind != "subject" {
+		return nil
+	}
+	if src.Pattern == "" {
+		return fail(SourceAuthDenied, "SourceAuthority", "AuthorizeSource", "source pattern is required", ctx)
+	}
+	if !validSubject(src.Pattern) {
+		return fail(WildcardOverreach, "SourceAuthority", "AuthorizeSource", "source pattern is invalid", merge(ctx, map[string]string{"subject": src.Pattern}))
+	}
+	if s := overbroad([]string{src.Pattern}); s != "" {
+		return fail(WildcardOverreach, "SourceAuthority", "AuthorizeSource", "source wildcard is too broad", merge(ctx, map[string]string{"subject": s}))
+	}
+	if contains(strings.Split(src.Pattern, "."), ">") {
+		return fail(WildcardOverreach, "SourceAuthority", "AuthorizeSource", "source wildcard is too broad", merge(ctx, map[string]string{"subject": src.Pattern}))
+	}
+	if !subjectMatches(src.Pattern, src.ObservedSubject) {
+		return fail(DeniedNeighbor, "SourceAuthority", "AuthorizeSource", "observed subject does not match source pattern", merge(ctx, map[string]string{"pattern": src.Pattern, "subject": src.ObservedSubject}))
+	}
+	return nil
+}
+
+func sourceChecks(src Source, sub string) []string {
+	if src.Kind == "subject" {
+		return []string{src.Pattern, sub}
+	}
+	return []string{sub}
+}
+
+func exposureKind(kind string) string {
+	switch kind {
+	case "request_reply", "command_acceptance":
+		return "request_reply"
+	case "subject", "schedule":
+		return "subject"
+	case "kv":
+		return "kv_watch"
+	case "object":
+		return "object_change"
+	case "stream":
+		return "stream"
+	default:
+		return ""
+	}
+}
+
+func allowed(perms PermList, subject string) bool {
+	if matchAny(perms.Deny, subject) {
+		return false
+	}
+	return matchAny(perms.Allow, subject)
+}
+
+func matchAny(patterns []string, subject string) bool {
+	for _, pattern := range patterns {
+		if subjectMatches(pattern, subject) {
+			return true
+		}
+	}
+	return false
+}
+
+func subjectMatches(pattern, subject string) bool {
+	pp := strings.Split(pattern, ".")
+	ss := strings.Split(subject, ".")
+	for i, j := 0, 0; i < len(pp); i, j = i+1, j+1 {
+		token := pp[i]
+		if token == ">" {
+			return len(ss) > j
+		}
+		if j >= len(ss) {
+			return false
+		}
+		if token != "*" && token != ss[j] {
+			return false
+		}
+	}
+	return len(pp) == len(ss)
+}
+
+func validSubject(subject string) bool {
+	if subject == "" || strings.Contains(subject, "<") || strings.Contains(subject, "{") {
+		return false
+	}
+	tokens := strings.Split(subject, ".")
+	for i, token := range tokens {
+		if token == "" {
+			return false
+		}
+		wild := token == "*" || token == ">"
+		if (strings.Contains(token, "*") || strings.Contains(token, ">")) && !wild {
+			return false
+		}
+		if token == ">" && i != len(tokens)-1 {
+			return false
+		}
+		if wild && i < 2 {
+			return false
+		}
+	}
+	return true
+}
+
+func sourceCtx(act Activation) map[string]string {
+	return map[string]string{
+		"origin":       "activation-source-authority",
+		"sourceId":     act.SourcePrincipal.SourceID,
+		"sourceKind":   act.Source.Kind,
+		"principalId":  act.SourcePrincipal.PrincipalID,
+		"leaseId":      act.SourceLease.LeaseID,
+		"authorityRef": act.SourcePrincipal.AuthorityRef,
+	}
+}
+
+func sourceEvent(kind string, act Activation, sub string) Event {
+	prov := act.Provenance.Map()
+	for k, v := range sourceCtx(act) {
+		prov[k] = v
+	}
+	prov["subject"] = sub
+	return Event{
+		Kind:       kind,
+		Layer:      "SourceAuthority",
+		Operation:  "AuthorizeSource",
+		Provenance: prov,
+	}
+}
+
+func merge(base, extra map[string]string) map[string]string {
+	out := map[string]string{}
+	for k, v := range base {
+		out[k] = v
+	}
+	for k, v := range extra {
+		out[k] = v
+	}
+	return out
+}
+
 type Ledger struct {
 	seen         map[string]LedgerRecord
 	CursorFailed bool
@@ -504,6 +889,253 @@ func (l *Ledger) Accept(act Activation, lease Lease) (LedgerRecord, error) {
 	}
 	l.seen[act.DedupeKey] = rec
 	return rec, nil
+}
+
+type DurableLedger struct {
+	store LedgerStore
+}
+
+type LedgerStore interface {
+	Dedupe(string) (LedgerRecord, bool, error)
+	Source(string) (LedgerRecord, bool, error)
+	SaveAccepted(LedgerRecord) error
+	SaveSuppressed(LedgerRecord) error
+	Replay(string, int) ([]LedgerRecord, error)
+}
+
+type MemoryLedgerStore struct {
+	mu            sync.Mutex
+	byDedupe      map[string]LedgerRecord
+	byCursor      map[string]LedgerRecord
+	bySource      map[string]LedgerRecord
+	order         []string
+	suppressed    []LedgerRecord
+	WriteConflict bool
+	CursorFailed  bool
+}
+
+type sourceCursor struct {
+	pos int64
+	cur string
+}
+
+func NewMemoryLedgerStore() *MemoryLedgerStore {
+	return &MemoryLedgerStore{
+		byDedupe: map[string]LedgerRecord{},
+		byCursor: map[string]LedgerRecord{},
+		bySource: map[string]LedgerRecord{},
+	}
+}
+
+func NewDurableLedger(store LedgerStore) *DurableLedger {
+	if store == nil {
+		store = NewMemoryLedgerStore()
+	}
+	return &DurableLedger{store: store}
+}
+
+func (l *DurableLedger) Accept(act Activation, lease Lease) (LedgerRecord, error) {
+	if act.DedupeKey == "" {
+		return LedgerRecord{}, fail(CursorFailure, "ActivationLedger", "Accept", "dedupe key is required", nil)
+	}
+	if act.SourcePrincipal.SourceID == "" || act.SourcePrincipal.PrincipalID == "" {
+		return LedgerRecord{}, fail(CursorFailure, "ActivationLedger", "Accept", "source principal is required", nil)
+	}
+	if act.SourcePrincipal.SourceKind == "" || act.SourcePrincipal.SourceKind != act.Source.Kind {
+		return LedgerRecord{}, fail(CursorFailure, "ActivationLedger", "Accept", "source principal kind does not match source", map[string]string{"sourceKind": act.SourcePrincipal.SourceKind, "kind": act.Source.Kind})
+	}
+	if act.SourceLease.LeaseStatus != "active" || lease.Status != "active" {
+		return LedgerRecord{}, fail(LeaseAcquireFailed, "ActivationLedger", "Accept", "activation source lease is not active", map[string]string{"leaseId": act.SourceLease.LeaseID})
+	}
+	if act.SourceLease.LeaseID == "" || lease.ID == "" || lease.ID != act.SourceLease.LeaseID {
+		return LedgerRecord{}, fail(LeaseAcquireFailed, "ActivationLedger", "Accept", "activation source lease does not match", map[string]string{"leaseId": lease.ID, "sourceLeaseId": act.SourceLease.LeaseID})
+	}
+	if rec, ok, err := l.store.Dedupe(act.DedupeKey); err != nil {
+		return LedgerRecord{}, err
+	} else if ok {
+		rec.Status = Duplicate
+		return rec, nil
+	}
+	pos, cur, err := sourcePosition(act.Source)
+	if err != nil {
+		return LedgerRecord{}, err
+	}
+	rec := LedgerRecord{
+		ActivationID:      act.ActivationID,
+		DedupeKey:         act.DedupeKey,
+		SourceID:          act.SourcePrincipal.SourceID,
+		SourceKind:        act.Source.Kind,
+		SourcePrincipalID: act.SourcePrincipal.PrincipalID,
+		SourceLeaseID:     act.SourceLease.LeaseID,
+		SourcePosition:    pos,
+		SourceCursor:      cur,
+		ReplayCursor:      replayCursor(act.SourcePrincipal.SourceID, cur),
+		ChainID:           act.Chain.ChainID,
+		Status:            Accepted,
+	}
+	if act.Chain.MaxHops > 0 && act.Chain.Hop >= act.Chain.MaxHops {
+		rec.Status = Suppressed
+		if err := l.store.SaveSuppressed(rec); err != nil {
+			return LedgerRecord{}, err
+		}
+		return LedgerRecord{}, fail(LoopSuppressed, "ActivationLedger", "Accept", "activation chain hop limit reached", map[string]string{"chainId": act.Chain.ChainID})
+	}
+	if prev, ok, err := l.store.Source(act.SourcePrincipal.SourceID); err != nil {
+		return LedgerRecord{}, err
+	} else if ok && stale(recordCursor(prev), recordCursor(rec)) {
+		return LedgerRecord{}, fail(StaleCursor, "ActivationLedger", "Accept", "source cursor is stale", map[string]string{"sourceId": act.SourcePrincipal.SourceID, "cursor": cur})
+	}
+	if err := l.store.SaveAccepted(rec); err != nil {
+		return LedgerRecord{}, err
+	}
+	return rec, nil
+}
+
+func (l *DurableLedger) Replay(after string, limit int) ([]LedgerRecord, error) {
+	return l.store.Replay(after, limit)
+}
+
+func (s *MemoryLedgerStore) Dedupe(key string) (LedgerRecord, bool, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	rec, ok := s.byDedupe[key]
+	return rec, ok, nil
+}
+
+func (s *MemoryLedgerStore) Source(id string) (LedgerRecord, bool, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	rec, ok := s.bySource[id]
+	return rec, ok, nil
+}
+
+func (s *MemoryLedgerStore) SaveAccepted(rec LedgerRecord) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if s.WriteConflict {
+		return fail(WriteConflict, "ActivationLedger", "Accept", "ledger write conflict", map[string]string{"dedupeKey": rec.DedupeKey})
+	}
+	if _, ok := s.byDedupe[rec.DedupeKey]; ok {
+		return fail(WriteConflict, "ActivationLedger", "Accept", "ledger write conflict", map[string]string{"dedupeKey": rec.DedupeKey})
+	}
+	s.byDedupe[rec.DedupeKey] = rec
+	s.byCursor[rec.ReplayCursor] = rec
+	s.bySource[rec.SourceID] = rec
+	s.order = append(s.order, rec.ReplayCursor)
+	return nil
+}
+
+func (s *MemoryLedgerStore) SaveSuppressed(rec LedgerRecord) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.suppressed = append(s.suppressed, rec)
+	return nil
+}
+
+func (s *MemoryLedgerStore) Replay(after string, limit int) ([]LedgerRecord, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if s.CursorFailed {
+		return nil, fail(ReplayCursorFailed, "ActivationLedger", "Replay", "replay cursor failed", nil)
+	}
+	if limit <= 0 {
+		return nil, fail(ReplayCursorFailed, "ActivationLedger", "Replay", "replay limit is invalid", nil)
+	}
+	if after != "" {
+		if _, ok := s.byCursor[after]; !ok {
+			return nil, fail(ReplayCursorFailed, "ActivationLedger", "Replay", "replay cursor is unknown", map[string]string{"cursor": after})
+		}
+	}
+	start := after == ""
+	out := []LedgerRecord{}
+	for _, cur := range s.order {
+		if !start {
+			start = cur == after
+			continue
+		}
+		if rec, ok := s.byCursor[cur]; ok {
+			out = append(out, rec)
+			if len(out) == limit {
+				break
+			}
+		}
+	}
+	return out, nil
+}
+
+func (s *MemoryLedgerStore) AcceptedCount() int {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return len(s.order)
+}
+
+func (s *MemoryLedgerStore) SuppressedCount() int {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return len(s.suppressed)
+}
+
+func stale(prev, next sourceCursor) bool {
+	if prev.pos > 0 && next.pos > 0 {
+		return next.pos <= prev.pos
+	}
+	return prev.cur != "" && next.cur == prev.cur
+}
+
+func recordCursor(rec LedgerRecord) sourceCursor {
+	return sourceCursor{pos: rec.SourcePosition, cur: rec.SourceCursor}
+}
+
+func replayCursor(sourceID, cursor string) string {
+	return fmt.Sprintf("v1.%s.%s", enc(sourceID), enc(cursor))
+}
+
+func enc(s string) string {
+	return base64.RawURLEncoding.EncodeToString([]byte(s))
+}
+
+func sourcePosition(src Source) (int64, string, error) {
+	switch src.Kind {
+	case "request_reply":
+		if src.Subject == "" || src.RequestID == "" {
+			return 0, "", fail(CursorFailure, "ActivationLedger", "SourcePosition", "request id is required", nil)
+		}
+		return 0, src.RequestID, nil
+	case "command_acceptance":
+		if src.Subject == "" || src.CommandID == "" {
+			return 0, "", fail(CursorFailure, "ActivationLedger", "SourcePosition", "command id is required", nil)
+		}
+		return 0, src.CommandID, nil
+	case "subject":
+		if src.Pattern == "" || src.ObservedSubject == "" || src.MessageID == "" {
+			return 0, "", fail(CursorFailure, "ActivationLedger", "SourcePosition", "subject position is required", nil)
+		}
+		return 0, src.MessageID, nil
+	case "kv":
+		if src.Bucket == "" || src.Key == "" || src.Revision <= 0 || src.Resume == "" {
+			return 0, "", fail(CursorFailure, "ActivationLedger", "SourcePosition", "KV revision and resume cursor are required", nil)
+		}
+		return src.Revision, src.Resume, nil
+	case "object":
+		if src.Bucket == "" || src.Name == "" || src.ObjectMetaSequence <= 0 || src.WatchPosition == "" {
+			return 0, "", fail(CursorFailure, "ActivationLedger", "SourcePosition", "object meta sequence is required", nil)
+		}
+		return src.ObjectMetaSequence, src.WatchPosition, nil
+	case "stream":
+		if src.Stream == "" || src.Consumer == "" || src.StreamSequence <= 0 || src.ConsumerSequence <= 0 {
+			return 0, "", fail(CursorFailure, "ActivationLedger", "SourcePosition", "stream sequence is required", nil)
+		}
+		return src.StreamSequence, fmt.Sprintf("%s:%s:%d:%d", src.Stream, src.Consumer, src.StreamSequence, src.ConsumerSequence), nil
+	case "schedule":
+		if src.ScheduleID == "" || src.LeaderEpoch <= 0 || src.TickID == "" || src.FencingToken == "" {
+			return 0, "", fail(CursorFailure, "ActivationLedger", "SourcePosition", "schedule fencing position is required", nil)
+		}
+		return src.LeaderEpoch, fmt.Sprintf("%s:%s:%s:%d", src.ScheduleID, src.TickID, src.FencingToken, src.LeaderEpoch), nil
+	default:
+		return 0, "", fail(CursorFailure, "ActivationLedger", "SourcePosition", "source kind is unsupported", map[string]string{"kind": src.Kind})
+	}
 }
 
 func CheckProcess(p Process) (Process, error) {

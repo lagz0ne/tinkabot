@@ -56,6 +56,31 @@ const capability = z.strictObject({
   schemaVersion: z.literal("v1"),
 });
 
+const sourceKind = z.enum([
+  "request_reply",
+  "command_acceptance",
+  "subject",
+  "kv",
+  "object",
+  "stream",
+  "schedule",
+]);
+
+const sourcePrincipal = z.strictObject({
+  principalId: text,
+  sourceId: text,
+  sourceKind,
+  authorityRef: text,
+});
+
+const sourceLease = z.strictObject({
+  leaseId: text,
+  leaseStatus: z.enum(["active", "revoked", "expired"]),
+  appRevision: text,
+  schemaVersion: z.literal("v1"),
+  scriptRevision: z.number().int().min(0).optional(),
+});
+
 const safeValue = z.unknown().superRefine((value, ctx) => {
   scanRaw(value, ctx, []);
 });
@@ -161,15 +186,78 @@ const commandAcceptanceSource = z.strictObject({
   frameId: text,
 });
 
+const subjectSource = z.strictObject({
+  kind: z.literal("subject"),
+  activationName: text,
+  pattern: subject,
+  observedSubject: subject,
+  messageId: text,
+});
+
+const kvSource = z.strictObject({
+  kind: z.literal("kv"),
+  activationName: text,
+  bucket: text,
+  key: text,
+  operation: z.enum(["put", "delete", "purge"]),
+  revision: z.number().int().min(0),
+  watchRevision: z.number().int().min(0),
+  resume: text,
+});
+
+const objectSource = z.strictObject({
+  kind: z.literal("object"),
+  activationName: text,
+  bucket: text,
+  name: text,
+  digest: text,
+  revision: z.number().int().min(0).optional(),
+  objectMetaSequence: z.number().int().min(0),
+  watchPosition: text,
+});
+
+const streamSource = z.strictObject({
+  kind: z.literal("stream"),
+  activationName: text,
+  stream: text,
+  consumer: text,
+  streamSequence: z.number().int().min(0),
+  consumerSequence: z.number().int().min(0),
+  subject,
+  deliveryAttempt: z.number().int().min(1),
+});
+
+const scheduleSource = z.strictObject({
+  kind: z.literal("schedule"),
+  activationName: text,
+  scheduleId: text,
+  tickId: text,
+  dueAt: iso,
+  ownerPrincipalId: text,
+  leaderEpoch: z.number().int().min(0),
+  fencingToken: text,
+  acquiredAt: iso,
+  expiresAt: iso,
+  clockId: text,
+  clock: text,
+});
+
 const activation = z.strictObject({
   kind: z.literal("activation.intent"),
   activationId: text,
   triggerId: text,
   scriptKey: text,
   scriptRevision: z.number().int().min(0).optional(),
+  sourcePrincipal,
+  sourceLease,
   source: z.discriminatedUnion("kind", [
     requestReplySource,
     commandAcceptanceSource,
+    subjectSource,
+    kvSource,
+    objectSource,
+    streamSource,
+    scheduleSource,
   ]),
   payload: safeValue.optional(),
   headers: z.record(text, text),

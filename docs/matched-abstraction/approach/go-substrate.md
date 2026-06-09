@@ -13,7 +13,7 @@ Diagram: https://diashort.apps.quickable.co/d/4a99eb1d
 
 ## Purpose
 
-The Go substrate is the server-side authority layer for Tinkabot's managed NATS platform. It embeds and manages NATS as the default substrate, owns live NATS lifecycle, NATS-auth-shaped enforcement, durable NATS stores, activation ledgers, artifact gateway substrate, process boundaries, execution attribution, and the later Docker/sandbox enforcement path.
+The Go substrate is the server-side authority layer for Tinkabot's managed NATS platform. It embeds and manages NATS as the default substrate, owns live NATS lifecycle, NATS-auth-shaped enforcement, durable NATS stores, activation ledgers, artifact gateway substrate, browser session and service-worker bootstrap substrate, process boundaries, execution attribution, and the later Docker/sandbox enforcement path.
 
 Go is not a schema sidecar and not only a policy mirror. TypeScript may provide SDK contracts and browser-facing helpers, but Go owns the substrate surfaces that become operationally real.
 
@@ -41,7 +41,7 @@ Go substrate owns durable NATS stores for activation, scripts, manifests, projec
 
 Go substrate owns execution boundaries: script process command, path, env, process protocol attachment, lifecycle, timeout, cancellation, resource envelope, audit context, and future Docker/sandbox placement.
 
-Go substrate owns server-side gateway boundaries for artifact retrieval and browser bootstrap support. Browser Edge can consume sanitized bootstrap shape and render-time policy, but Go owns the server substrate that mints or denies credentials and serves or denies artifact material.
+Go substrate owns server-side gateway boundaries for artifact retrieval, browser bootstrap support, cookie-backed session establishment, and scoped service-worker setup. Browser Edge can consume sanitized bootstrap shape and render-time policy, but Go owns the server substrate that mints or denies credentials, sets or clears browser session cookies, serves or denies service-worker scripts, and serves or denies artifact material.
 
 ## Layer Contract
 
@@ -76,6 +76,8 @@ Go preserves provenance. Every live credential, store write, activation record, 
 
 Go owns revocation as enforcement, not decoration. Revoked or expired leases cannot mint new credentials, run processes, write effects, or keep gateway authority.
 
+Go owns browser bootstrap sessions as server-side authority. Service-worker setup uses server-issued HttpOnly, Secure, SameSite cookie sessions and server-controlled worker scope; generated content must not receive bearer tokens, NATS credentials, or permission material.
+
 Go process execution remains sandbox-compatible before Docker exists. The non-sandboxed path must already declare execution target, environment, IO, lifecycle, resource, identity, cleanup, and audit behavior.
 
 Go substrate failures are typed at the substrate boundary. Unknowns become substrate critical errors with origin, operation, and cause. Lower storage, auth, gateway, process, and NATS errors resolve or transform at their owning Go layer.
@@ -106,5 +108,6 @@ Plan work may proceed only when it preserves these gates:
 - HA/scale proof remains based on NATS-provided clustering, JetStream replica/quorum, route/gateway/leaf, queue/consumer, and observability behavior.
 - Script execution remains mediated through a facade and process protocol, not ambient NATS.
 - Browser Edge receives only scoped worker authority and content-safe bootstrap output.
+- Browser session and service-worker bootstrap support remains server-owned, cookie-session-backed, scoped, revocable, and content-safe.
 - Future Docker/sandbox enforcement can be added without changing the script behavior contract.
 - Release proof remains able to connect these inside-out Go proofs to live NATS-mediated outside-in scenarios.

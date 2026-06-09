@@ -7,19 +7,22 @@
     "apps/*"
   ],
   "scripts": {
-    "build": "bun run --cwd packages/sdk build",
+    "build": "bun run --cwd apps/frontend build && bun run --cwd packages/sdk build",
+    "build:frontend": "bun run --cwd apps/frontend build",
     "orchestrate:codex": "bun run scripts/codex-orchestrate.ts",
-    "test": "bun test packages/sdk/tests tests/*.test.ts",
+    "test": "bun test packages/sdk/tests apps/frontend/tests tests/*.test.ts",
+    "test:frontend": "bun run --cwd apps/frontend test",
     "test:sdk": "bun test packages/sdk/tests",
     "test:orchestrator": "bun test tests/codex-orchestrator.test.ts",
     "test:contracts": "bun test packages/sdk/tests/endgame-contract",
-    "test:go": "cd substrate/go && go test ./...",
+    "test:go": "bun run build:frontend && cd substrate/go && go test ./...",
     "test:schema": "bun run schema:parity",
     "schema:parity": "bun run test:contracts && bun run test:go",
     "test:e2e": "bun test packages/sdk/tests/e2e",
-    "typecheck": "bun run --cwd packages/sdk typecheck && bun run typecheck:orchestrator",
+    "typecheck": "bun run --cwd apps/frontend typecheck && bun run --cwd packages/sdk typecheck && bun run typecheck:orchestrator",
+    "typecheck:frontend": "bun run --cwd apps/frontend typecheck",
     "typecheck:orchestrator": "bunx @typescript/native-preview --noEmit -p tsconfig.orchestrator.json",
-    "pack:dry": "bun pm pack --cwd packages/sdk --dry-run",
+    "pack:dry": "cd packages/sdk && bun pm pack --dry-run",
     "test:layers": "python3 -B -m unittest tests/test_validate_layers.py",
     "validate:layers": "python3 -B .codex/skills/matched-abstraction-thinking/scripts/validate_layers.py docs/matched-abstraction"
   }

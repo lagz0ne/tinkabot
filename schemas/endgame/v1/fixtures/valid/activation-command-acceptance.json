@@ -4,6 +4,19 @@
   "triggerId": "cmd-001",
   "scriptKey": "scripts.proof.select_artifact",
   "scriptRevision": 7,
+  "sourcePrincipal": {
+    "principalId": "principal.source.command_acceptance",
+    "sourceId": "src-command-browser_command",
+    "sourceKind": "command_acceptance",
+    "authorityRef": "auth.source.command_acceptance.browser_command"
+  },
+  "sourceLease": {
+    "leaseId": "lease-001",
+    "leaseStatus": "active",
+    "appRevision": "app.rev.1",
+    "schemaVersion": "v1",
+    "scriptRevision": 7
+  },
   "source": {
     "kind": "command_acceptance",
     "activationName": "browser_command",

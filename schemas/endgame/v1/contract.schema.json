@@ -88,6 +88,40 @@
         "schemaVersion": { "const": "v1" }
       }
     },
+    "activationSourceKind": {
+      "enum": [
+        "request_reply",
+        "command_acceptance",
+        "subject",
+        "kv",
+        "object",
+        "stream",
+        "schedule"
+      ]
+    },
+    "sourcePrincipal": {
+      "type": "object",
+      "required": ["principalId", "sourceId", "sourceKind", "authorityRef"],
+      "additionalProperties": false,
+      "properties": {
+        "principalId": { "$ref": "#/$defs/text" },
+        "sourceId": { "$ref": "#/$defs/text" },
+        "sourceKind": { "$ref": "#/$defs/activationSourceKind" },
+        "authorityRef": { "$ref": "#/$defs/text" }
+      }
+    },
+    "sourceLease": {
+      "type": "object",
+      "required": ["leaseId", "leaseStatus", "appRevision", "schemaVersion"],
+      "additionalProperties": false,
+      "properties": {
+        "leaseId": { "$ref": "#/$defs/text" },
+        "leaseStatus": { "enum": ["active", "revoked", "expired"] },
+        "appRevision": { "$ref": "#/$defs/text" },
+        "schemaVersion": { "const": "v1" },
+        "scriptRevision": { "type": "integer", "minimum": 0 }
+      }
+    },
     "error": {
       "type": "object",
       "required": ["kind", "message", "origin"],
@@ -250,6 +284,8 @@
         "activationId",
         "triggerId",
         "scriptKey",
+        "sourcePrincipal",
+        "sourceLease",
         "source",
         "headers",
         "observedAt",
@@ -265,10 +301,17 @@
         "triggerId": { "$ref": "#/$defs/text" },
         "scriptKey": { "$ref": "#/$defs/text" },
         "scriptRevision": { "type": "integer", "minimum": 0 },
+        "sourcePrincipal": { "$ref": "#/$defs/sourcePrincipal" },
+        "sourceLease": { "$ref": "#/$defs/sourceLease" },
         "source": {
           "oneOf": [
             { "$ref": "#/$defs/requestReplyActivationSource" },
-            { "$ref": "#/$defs/commandAcceptanceActivationSource" }
+            { "$ref": "#/$defs/commandAcceptanceActivationSource" },
+            { "$ref": "#/$defs/subjectActivationSource" },
+            { "$ref": "#/$defs/kvActivationSource" },
+            { "$ref": "#/$defs/objectActivationSource" },
+            { "$ref": "#/$defs/streamActivationSource" },
+            { "$ref": "#/$defs/scheduleActivationSource" }
           ]
         },
         "payload": { "$ref": "#/$defs/safeValue" },
@@ -324,6 +367,121 @@
         "artifactId": { "$ref": "#/$defs/text" },
         "artifactRevision": { "$ref": "#/$defs/text" },
         "frameId": { "$ref": "#/$defs/text" }
+      }
+    },
+    "subjectActivationSource": {
+      "type": "object",
+      "required": ["kind", "activationName", "pattern", "observedSubject", "messageId"],
+      "additionalProperties": false,
+      "properties": {
+        "kind": { "const": "subject" },
+        "activationName": { "$ref": "#/$defs/text" },
+        "pattern": { "$ref": "#/$defs/subject" },
+        "observedSubject": { "$ref": "#/$defs/subject" },
+        "messageId": { "$ref": "#/$defs/text" }
+      }
+    },
+    "kvActivationSource": {
+      "type": "object",
+      "required": [
+        "kind",
+        "activationName",
+        "bucket",
+        "key",
+        "operation",
+        "revision",
+        "watchRevision",
+        "resume"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "kind": { "const": "kv" },
+        "activationName": { "$ref": "#/$defs/text" },
+        "bucket": { "$ref": "#/$defs/text" },
+        "key": { "$ref": "#/$defs/text" },
+        "operation": { "enum": ["put", "delete", "purge"] },
+        "revision": { "type": "integer", "minimum": 0 },
+        "watchRevision": { "type": "integer", "minimum": 0 },
+        "resume": { "$ref": "#/$defs/text" }
+      }
+    },
+    "objectActivationSource": {
+      "type": "object",
+      "required": [
+        "kind",
+        "activationName",
+        "bucket",
+        "name",
+        "digest",
+        "objectMetaSequence",
+        "watchPosition"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "kind": { "const": "object" },
+        "activationName": { "$ref": "#/$defs/text" },
+        "bucket": { "$ref": "#/$defs/text" },
+        "name": { "$ref": "#/$defs/text" },
+        "digest": { "$ref": "#/$defs/text" },
+        "revision": { "type": "integer", "minimum": 0 },
+        "objectMetaSequence": { "type": "integer", "minimum": 0 },
+        "watchPosition": { "$ref": "#/$defs/text" }
+      }
+    },
+    "streamActivationSource": {
+      "type": "object",
+      "required": [
+        "kind",
+        "activationName",
+        "stream",
+        "consumer",
+        "streamSequence",
+        "consumerSequence",
+        "subject",
+        "deliveryAttempt"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "kind": { "const": "stream" },
+        "activationName": { "$ref": "#/$defs/text" },
+        "stream": { "$ref": "#/$defs/text" },
+        "consumer": { "$ref": "#/$defs/text" },
+        "streamSequence": { "type": "integer", "minimum": 0 },
+        "consumerSequence": { "type": "integer", "minimum": 0 },
+        "subject": { "$ref": "#/$defs/subject" },
+        "deliveryAttempt": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "scheduleActivationSource": {
+      "type": "object",
+      "required": [
+        "kind",
+        "activationName",
+        "scheduleId",
+        "tickId",
+        "dueAt",
+        "ownerPrincipalId",
+        "leaderEpoch",
+        "fencingToken",
+        "acquiredAt",
+        "expiresAt",
+        "clockId",
+        "clock"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "kind": { "const": "schedule" },
+        "activationName": { "$ref": "#/$defs/text" },
+        "scheduleId": { "$ref": "#/$defs/text" },
+        "tickId": { "$ref": "#/$defs/text" },
+        "dueAt": { "$ref": "#/$defs/text" },
+        "ownerPrincipalId": { "$ref": "#/$defs/text" },
+        "leaderEpoch": { "type": "integer", "minimum": 0 },
+        "fencingToken": { "$ref": "#/$defs/text" },
+        "acquiredAt": { "$ref": "#/$defs/text" },
+        "expiresAt": { "$ref": "#/$defs/text" },
+        "clockId": { "$ref": "#/$defs/text" },
+        "clock": { "$ref": "#/$defs/text" }
       }
     },
     "artifactManifest": {
