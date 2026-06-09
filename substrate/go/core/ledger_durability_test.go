@@ -17,7 +17,7 @@ func TestDurableLedgerAcceptsAllSourceCursors(t *testing.T) {
 		{"kv", "fixtures/valid/activation-source-kv.json", "src-kv-material", "kv", 42, "kv:tb_proof_kv:42"},
 		{"object", "fixtures/valid/activation-source-object.json", "src-object-artifacts", "object", 91, "obj:tb_proof_objects:91"},
 		{"stream", "fixtures/valid/activation-source-stream.json", "src-stream-events", "stream", 100, "tb_proof_events:activation_source:100:8"},
-		{"schedule", "fixtures/valid/activation-source-schedule.json", "src-schedule-daily", "schedule", 3, "sched-daily:tick-001:fence-003:3"},
+		{"schedule", "fixtures/valid/activation-source-schedule.json", "src-schedule-daily", "schedule", 1, "sched-daily:tick-001:fence-003:3:clock-main:0001"},
 	}
 
 	for _, c := range cases {

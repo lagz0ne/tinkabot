@@ -38,6 +38,13 @@ const (
 	LoopSuppressed          Kind = "LoopSuppressed"
 	LeaseAcquireFailed      Kind = "LeaseAcquireFailed"
 	ReplayCursorFailed      Kind = "ReplayCursorFailed"
+	ScheduleConfigInvalid   Kind = "ScheduleConfigInvalid"
+	ScheduleLeaseMissing    Kind = "ScheduleLeaseMissing"
+	ScheduleLeaseLost       Kind = "ScheduleLeaseLost"
+	ClockInvalid            Kind = "ClockInvalid"
+	ScheduleTickDuplicate   Kind = "ScheduleTickDuplicate"
+	CatchUpFailed           Kind = "CatchUpFailed"
+	RestartRecoveryFailed   Kind = "RestartRecoveryFailed"
 	ProcessConfigInvalid    Kind = "ProcessConfigInvalid"
 	ProtocolUnavailable     Kind = "ProtocolUnavailable"
 	ResourceDenied          Kind = "ResourceDenied"
@@ -261,8 +268,13 @@ type Source struct {
 	DeliveryAttempt    int64  `json:"deliveryAttempt"`
 	ScheduleID         string `json:"scheduleId"`
 	TickID             string `json:"tickId"`
+	DueAt              string `json:"dueAt"`
+	OwnerPrincipalID   string `json:"ownerPrincipalId"`
 	LeaderEpoch        int64  `json:"leaderEpoch"`
 	FencingToken       string `json:"fencingToken"`
+	AcquiredAt         string `json:"acquiredAt"`
+	ExpiresAt          string `json:"expiresAt"`
+	ClockID            string `json:"clockId"`
 	Clock              string `json:"clock"`
 }
 
@@ -1129,10 +1141,11 @@ func sourcePosition(src Source) (int64, string, error) {
 		}
 		return src.StreamSequence, fmt.Sprintf("%s:%s:%d:%d", src.Stream, src.Consumer, src.StreamSequence, src.ConsumerSequence), nil
 	case "schedule":
-		if src.ScheduleID == "" || src.LeaderEpoch <= 0 || src.TickID == "" || src.FencingToken == "" {
-			return 0, "", fail(CursorFailure, "ActivationLedger", "SourcePosition", "schedule fencing position is required", nil)
+		pos, err := clockPos(src.ClockID, src.Clock)
+		if err != nil || src.ScheduleID == "" || src.LeaderEpoch <= 0 || src.TickID == "" || src.FencingToken == "" {
+			return 0, "", fail(CursorFailure, "ActivationLedger", "SourcePosition", "schedule clock and fencing position are required", nil)
 		}
-		return src.LeaderEpoch, fmt.Sprintf("%s:%s:%s:%d", src.ScheduleID, src.TickID, src.FencingToken, src.LeaderEpoch), nil
+		return pos, fmt.Sprintf("%s:%s:%s:%d:%s", src.ScheduleID, src.TickID, src.FencingToken, src.LeaderEpoch, src.Clock), nil
 	default:
 		return 0, "", fail(CursorFailure, "ActivationLedger", "SourcePosition", "source kind is unsupported", map[string]string{"kind": src.Kind})
 	}
