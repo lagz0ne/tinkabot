@@ -82,6 +82,8 @@ RED/GREEN:
 - `bun run validate:layers` -> `Layer validation passed: docs/matched-abstraction`.
 - `bun run test:layers` -> `Ran 10 tests ... OK`.
 - `git diff --check` -> `clean`.
+- `git commit c3c3649` -> frontend workspace, Go embed package, and generated embed site are committed source.
+- `git archive HEAD apps/frontend substrate/go/frontend package.json` -> archive contains `apps/frontend`, `substrate/go/frontend/frontend.go`, `substrate/go/frontend/site/index.html`, and built assets.
 
 ## Wrap-Up Announcement
 
