@@ -77,6 +77,25 @@ Task prep evidence:
 - `bun run test:layers` -> `Ran 10 tests ... OK`.
 - `git diff --check` -> `clean`.
 
+RED/GREEN:
+
+- `go test ./edge -run 'TestGatewayMutation|TestServiceWorker' -count=1` from `substrate/go` -> RED failed before implementation with missing browser gateway and service-worker policy symbols.
+- `go test ./embednats -run TestBrowserGatewayCommandAcceptanceOverRealNATS -count=1` from `substrate/go` -> RED failed before implementation with missing gateway mutation symbols, then failed on missing `_INBOX.>` authority until the test principal was narrowed to request/reply authority.
+- `go test ./edge -run 'TestGatewayMutation|TestServiceWorker' -count=1` from `substrate/go` -> gateway denies bad CSRF, bad Origin, bad Fetch-Metadata, credentialed generated-origin CORS, stale artifact revision, and revoked lease; service-worker setup denies wrong scope, broad `Service-Worker-Allowed`, stale worker revision, generated-content registration, and generated-artifact scope overlap.
+- `go test ./embednats -run TestBrowserGatewayCommandAcceptanceOverRealNATS -count=1` from `substrate/go` -> real embedded NATS request/reply on `tb.app.browser.command` returns canonical `command.acceptance` accepted and rejected statuses validated by the shared schema.
+- `bun run test:frontend` -> `4 pass`, `0 fail`, `19 expect() calls`; includes real Chrome service-worker proof for exact scope and broader `Service-Worker-Allowed` denial.
+- `agent-browser open http://127.0.0.1:5173/ && agent-browser eval 'window.__tinkabotProof'` -> trusted shell still reports sandbox `allow-scripts`, leased source `true`, accepted `1`, and denied raw authority `1`; current `agent-browser` runtime is Lightpanda and has no `navigator.serviceWorker`, so service-worker browser behavior is covered by the Chrome test.
+- `go test ./... -count=1` from `substrate/go` -> Go packages `contract`, `core`, `edge`, `embednats`, and `frontend` passed.
+- `bun run test` -> `56 pass`, `0 fail`, `393 expect() calls`.
+- `bun run typecheck` -> frontend, SDK, and orchestrator typecheck passed.
+- `bun run build` -> frontend Vite build and SDK tsdown build passed.
+- `bun run schema:parity` -> endgame contract tests `21 pass`, Go packages `contract`, `core`, `edge`, `embednats`, and `frontend` passed.
+- `bun run test:e2e` -> `1 pass`, `0 fail`, `16 expect() calls`.
+- `bun run pack:dry` -> SDK package dry-run includes `6 files`, unpacked size `188.70KB`.
+- `bun run validate:layers` -> `Layer validation passed: docs/matched-abstraction`.
+- `bun run test:layers` -> `Ran 10 tests ... OK`.
+- `git diff --check` -> `clean`.
+
 ## Wrap-Up Announcement
 
 The browser isolation proof is complete when a real browser proves generated content is opaque, leased, credentialless, and unable to bypass the trusted shell, while accepted typed intents still reach backend Command Acceptance and service-worker setup remains server-owned, scoped, token-free, and denial-tested.

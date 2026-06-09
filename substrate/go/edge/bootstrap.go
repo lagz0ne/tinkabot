@@ -11,14 +11,24 @@ import (
 type ErrorKind string
 
 const (
-	ContractInvalid              ErrorKind = "ContractInvalid"
-	RevokedLease                 ErrorKind = "RevokedLease"
-	ExpiredLease                 ErrorKind = "ExpiredLease"
-	StaleRevision                ErrorKind = "StaleRevision"
-	ArtifactDigestMismatch       ErrorKind = "ArtifactDigestMismatch"
-	ArtifactGatewayPolicyInvalid ErrorKind = "ArtifactGatewayPolicyInvalid"
-	CredentialDescriptorInvalid  ErrorKind = "CredentialDescriptorInvalid"
-	SubstrateEdgeCritical        ErrorKind = "SubstrateEdgeCritical"
+	ContractInvalid                 ErrorKind = "ContractInvalid"
+	RevokedLease                    ErrorKind = "RevokedLease"
+	ExpiredLease                    ErrorKind = "ExpiredLease"
+	StaleRevision                   ErrorKind = "StaleRevision"
+	ArtifactDigestMismatch          ErrorKind = "ArtifactDigestMismatch"
+	ArtifactGatewayPolicyInvalid    ErrorKind = "ArtifactGatewayPolicyInvalid"
+	CredentialDescriptorInvalid     ErrorKind = "CredentialDescriptorInvalid"
+	GatewaySessionDenied            ErrorKind = "GatewaySessionDenied"
+	CSRFDenied                      ErrorKind = "CSRFDenied"
+	OriginDenied                    ErrorKind = "OriginDenied"
+	FetchMetadataDenied             ErrorKind = "FetchMetadataDenied"
+	CredentialedCORSDenied          ErrorKind = "CredentialedCORSDenied"
+	ServiceWorkerScriptDenied       ErrorKind = "ServiceWorkerScriptDenied"
+	ServiceWorkerScopeDenied        ErrorKind = "ServiceWorkerScopeDenied"
+	ServiceWorkerAllowedDenied      ErrorKind = "ServiceWorkerAllowedDenied"
+	ServiceWorkerRevisionDenied     ErrorKind = "ServiceWorkerRevisionDenied"
+	ServiceWorkerRegistrationDenied ErrorKind = "ServiceWorkerRegistrationDenied"
+	SubstrateEdgeCritical           ErrorKind = "SubstrateEdgeCritical"
 )
 
 type EdgeError struct {

@@ -29,8 +29,8 @@ Reach the Tinkabot endgame with matched-abstraction docs, inside-out ownership p
 8. DONE: `activation-ledger-durability`: durable activation records, source cursors, duplicate resolution, loop suppression, replay/catch-up, and restart behavior.
 9. DONE: `activation-source-authority`: source-scoped NATS auth, permissions, imports, exports, bounded responses, revocation, and denied-neighbor proof.
 10. DONE: `frontend-isolation-layer`: Vite shell, opaque generated iframe fixture, leased source-window message path, raw-authority denial, and Go-embedded frontend build.
-11. NEXT: `browser-isolation-proof`: gateway Command Acceptance smoke proof plus service-worker scope/header denial.
-12. `activation-router-live-sources`: request/reply, subject subscriptions, KV/Object/Stream watches, and accepted activation normalization over live NATS.
+11. DONE: `browser-isolation-proof`: gateway Command Acceptance smoke proof plus service-worker scope/header denial.
+12. NEXT: `activation-router-live-sources`: request/reply, subject subscriptions, KV/Object/Stream watches, and accepted activation normalization over live NATS.
 13. `activation-schedule-engine`: durable schedule state, lease/leadership, fake-clock tests, catch-up, restart recovery, tick dedupe, and loop safety.
 14. `activation-release-proof`: outside-in real NATS activation scenarios tied back to inside-out contract, ledger, source authority, router, and schedule proof.
 15. `script-materializer-loop`: mediated script execution, accepted effects, materialized projections/artifacts, cleanup.
@@ -68,29 +68,29 @@ Reach the Tinkabot endgame with matched-abstraction docs, inside-out ownership p
 
 ## Next Slice
 
-Task layer next: `browser-isolation-proof`.
+Task layer next: `activation-router-live-sources`.
 
 Assumption:
 - `browser-isolation` triage-three converged on the v1 model: generated artifacts run in `iframe sandbox="allow-scripts"` without `allow-same-origin`; trusted shell/dedicated worker owns leased IPC; gateway and Command Acceptance own mutation.
 - Frontend isolation layer is complete after subagent hardening: Vite shell uses a blob-backed generated artifact fixture, exact script-only sandbox, source-window message lease, nonce/revision/capability/expected-revision checks, structured-clone raw-authority denial, and Go-embedded build output.
-- Current substrate-edge proof splits worker credentials from content-safe bootstrap and enforces artifact policy shape, but it does not prove browser runtime isolation.
+- Browser isolation proof is complete: Go Browser Edge denies gateway CSRF/origin/fetch-metadata/CORS/stale/revoked cases; service-worker setup denies unsafe scope/header/revision/generated-registration cases; Chrome proves exact service-worker scope and broad-scope denial; embedded NATS request/reply proves canonical `command.acceptance` accepted and rejected statuses at the NATS seam.
 - Current embedded NATS auth users are static at server start. Direct browser NATS WebSocket remains deferred until live credential reload and post-connection revocation are proven.
 - Service worker is server-owned scoped bootstrap/cache/material facade only. It must not hold NATS credentials, bearer tokens, raw subjects, permission material, or independent mutation authority.
-- Activation router remains the next activation foundation task after the browser isolation proof is established.
+- Activation router is now the next activation foundation task.
 
 RED:
-- Write failing gateway/browser-edge tests for bad CSRF, bad Origin, bad Fetch-Metadata, revoked lease, generated-origin credentialed CORS, wrong service-worker scope, broad `Service-Worker-Allowed`, stale worker revision, and missing attribution.
-- RED must prove that the completed frontend isolation layer is not enough to claim release-ready browser isolation without gateway and service-worker proof.
+- Write failing live source router tests for request/reply, subject subscription, KV watch, Object Store watch, and stream source adapters over embedded NATS.
+- RED must prove that activation source authority and ledger durability are not enough to claim live reactive activation without router-owned normalization, cursor, authorization, dedupe, and attributed failure handling.
 
 GREEN:
-- Attach accepted generated-content typed intent to the gateway/Command Acceptance smoke path while preserving backend-owned mutation authority.
-- Add service-worker setup denial proof for exact scope and safe allowed scope without adding service-worker NATS credentials or generated-content registration authority.
-- Do not add direct browser NATS WebSocket, per-app origin fleet, schedule activation, script execution, materializer implementation, or product UI beyond the proof fixture.
+- Attach live request/reply, subject, KV, Object Store, and stream source adapters to embedded NATS through source-scoped authority and durable ledger acceptance.
+- Normalize accepted source events into activation records while preserving source principal, lease, concrete observed subject/store coordinate, cursor, chain, dedupe, and denial attribution.
+- Do not add schedule activation, script execution, materializer implementation, product UI, direct browser NATS WebSocket, or sandboxing in this router slice.
 
 VERIFY:
-- browser automation proof for gateway denial and service-worker scope/header denial
-- targeted gateway/browser-edge isolation tests pass
-- Command Acceptance smoke path proves accepted typed intent and denied raw authority
+- outside-in real embedded NATS proof for request/reply, subject, KV, Object Store, and stream source activation
+- targeted live router inside-out tests pass with typed router failures
+- denied-neighbor, malformed source frame, duplicate, stale cursor, revoked lease, and attributed failure cases
 - `bun run schema:parity`
 - `go test ./...` from `substrate/go`
 - `bun run test`
@@ -162,6 +162,7 @@ Evidence gathered:
 - Browser Isolation layer docs: `docs/matched-abstraction/approach/browser-isolation.md`, `docs/matched-abstraction/plan/browser-isolation.md`, and `docs/matched-abstraction/task/browser-isolation-proof.md` now define the v1 model and proof gate. Verification: `bun run validate:layers`, `bun run test:layers`, and `git diff --check` passed.
 - Frontend Isolation Layer: Vite app and proof shell under `apps/frontend`, Go embed package under `substrate/go/frontend`, and task doc `docs/matched-abstraction/task/frontend-isolation-layer.md`. Verification: `bun run test:frontend`, `bun run --cwd apps/frontend typecheck`, `bun run build:frontend`, `go test ./frontend -count=1`, `agent-browser` smoke, `bun run test`, `bun run typecheck`, `bun run build`, `bun run schema:parity`, `bun run test:e2e`, `bun run pack:dry`, `bun run validate:layers`, `bun run test:layers`, and `git diff --check` passed.
 - Frontend Isolation subagent verification: layer reviewer GO; browser/runtime reviewer found blockers in structured-clone raw-authority denial, `expectedRevision` binding, and cookie-proof overclaim; Go/release reviewer found source-archive readiness NO-GO until frontend and Go embed files are tracked/committed or a clean-checkout regeneration proof exists. Runtime blockers were patched, then source distribution was sealed in commit `c3c3649`; `git ls-files --error-unmatch` and `git archive HEAD apps/frontend substrate/go/frontend package.json` prove the frontend workspace and Go embed site are in committed source.
+- Browser Isolation Proof: Go Browser Edge now owns gateway mutation policy and service-worker setup policy; embedded NATS proves browser command acceptance over real request/reply; Chrome proves service-worker exact scope and broad-scope denial; agent-browser proves trusted shell command/denial smoke. Verification: `go test ./edge -run 'TestGatewayMutation|TestServiceWorker' -count=1`, `go test ./embednats -run TestBrowserGatewayCommandAcceptanceOverRealNATS -count=1`, `bun run test:frontend`, agent-browser smoke, `go test ./... -count=1`, `bun run test`, `bun run typecheck`, `bun run build`, `bun run schema:parity`, `bun run test:e2e`, `bun run pack:dry`, `bun run validate:layers`, `bun run test:layers`, and `git diff --check` passed.
 
 ## Current Verification Commands
 
