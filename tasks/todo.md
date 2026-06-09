@@ -30,8 +30,8 @@ Reach the Tinkabot endgame with matched-abstraction docs, inside-out ownership p
 9. DONE: `activation-source-authority`: source-scoped NATS auth, permissions, imports, exports, bounded responses, revocation, and denied-neighbor proof.
 10. DONE: `frontend-isolation-layer`: Vite shell, opaque generated iframe fixture, leased source-window message path, raw-authority denial, and Go-embedded frontend build.
 11. DONE: `browser-isolation-proof`: gateway Command Acceptance smoke proof plus service-worker scope/header denial.
-12. NEXT: `activation-router-live-sources`: request/reply, subject subscriptions, KV/Object/Stream watches, and accepted activation normalization over live NATS.
-13. `activation-schedule-engine`: durable schedule state, lease/leadership, fake-clock tests, catch-up, restart recovery, tick dedupe, and loop safety.
+12. DONE: `activation-router-live-sources`: request/reply, subject subscriptions, KV/Object/Stream watches, and accepted activation normalization over live NATS.
+13. NEXT: `activation-schedule-engine`: durable schedule state, lease/leadership, fake-clock tests, catch-up, restart recovery, tick dedupe, and loop safety.
 14. `activation-release-proof`: outside-in real NATS activation scenarios tied back to inside-out contract, ledger, source authority, router, and schedule proof.
 15. `script-materializer-loop`: mediated script execution, accepted effects, materialized projections/artifacts, cleanup.
 16. `release-spine`: centralized ops evidence manifest with outside-in real NATS proof and inside-out ownership proof.
@@ -68,7 +68,7 @@ Reach the Tinkabot endgame with matched-abstraction docs, inside-out ownership p
 
 ## Next Slice
 
-Task layer next: `activation-router-live-sources`.
+Task layer next: `activation-schedule-engine`.
 
 Assumption:
 - `browser-isolation` triage-three converged on the v1 model: generated artifacts run in `iframe sandbox="allow-scripts"` without `allow-same-origin`; trusted shell/dedicated worker owns leased IPC; gateway and Command Acceptance own mutation.
@@ -76,21 +76,22 @@ Assumption:
 - Browser isolation proof is complete: Go Browser Edge denies gateway CSRF/origin/fetch-metadata/CORS/stale/revoked cases; service-worker setup denies unsafe scope/header/revision/generated-registration cases; Chrome proves exact service-worker scope and broad-scope denial; embedded NATS request/reply proves canonical `command.acceptance` accepted and rejected statuses at the NATS seam.
 - Current embedded NATS auth users are static at server start. Direct browser NATS WebSocket remains deferred until live credential reload and post-connection revocation are proven.
 - Service worker is server-owned scoped bootstrap/cache/material facade only. It must not hold NATS credentials, bearer tokens, raw subjects, permission material, or independent mutation authority.
-- Activation router is now the next activation foundation task.
+- Live source router is complete: request/reply, subject, KV, Object Store meta-stream, and stream observations normalize through source authority into the durable activation ledger over real embedded NATS.
+- Schedule engine is now the next activation foundation task.
 
 RED:
-- Write failing live source router tests for request/reply, subject subscription, KV watch, Object Store watch, and stream source adapters over embedded NATS.
-- RED must prove that activation source authority and ledger durability are not enough to claim live reactive activation without router-owned normalization, cursor, authorization, dedupe, and attributed failure handling.
+- Write failing durable schedule engine tests before implementation.
+- RED must prove that schedule activation cannot be a best-effort timer: it needs durable schedule state, lease/leadership/fencing, deterministic clock input, catch-up, restart recovery, tick dedupe, loop safety, and attributed failures.
 
 GREEN:
-- Attach live request/reply, subject, KV, Object Store, and stream source adapters to embedded NATS through source-scoped authority and durable ledger acceptance.
-- Normalize accepted source events into activation records while preserving source principal, lease, concrete observed subject/store coordinate, cursor, chain, dedupe, and denial attribution.
-- Do not add schedule activation, script execution, materializer implementation, product UI, direct browser NATS WebSocket, or sandboxing in this router slice.
+- Add a schedule engine that consumes canonical schedule activation shape and emits accepted activation records only after durable lease/fencing and clock-position checks pass.
+- Prove duplicate ticks, stale/rewound clock positions, lost/revoked lease, exhausted chain, catch-up after restart, and attributed failures.
+- Do not add script execution, materializer implementation, product UI, direct browser NATS WebSocket, or sandboxing in this schedule slice.
 
 VERIFY:
-- outside-in real embedded NATS proof for request/reply, subject, KV, Object Store, and stream source activation
-- targeted live router inside-out tests pass with typed router failures
-- denied-neighbor, malformed source frame, duplicate, stale cursor, revoked lease, and attributed failure cases
+- targeted schedule engine inside-out tests with fake clock and typed schedule failures
+- embedded NATS durable store proof for schedule state, lease/fencing, restart catch-up, and accepted schedule activation records
+- duplicate, stale cursor/clock, revoked lease, loop-suppressed, and attributed failure cases
 - `bun run schema:parity`
 - `go test ./...` from `substrate/go`
 - `bun run test`
@@ -163,6 +164,10 @@ Evidence gathered:
 - Frontend Isolation Layer: Vite app and proof shell under `apps/frontend`, Go embed package under `substrate/go/frontend`, and task doc `docs/matched-abstraction/task/frontend-isolation-layer.md`. Verification: `bun run test:frontend`, `bun run --cwd apps/frontend typecheck`, `bun run build:frontend`, `go test ./frontend -count=1`, `agent-browser` smoke, `bun run test`, `bun run typecheck`, `bun run build`, `bun run schema:parity`, `bun run test:e2e`, `bun run pack:dry`, `bun run validate:layers`, `bun run test:layers`, and `git diff --check` passed.
 - Frontend Isolation subagent verification: layer reviewer GO; browser/runtime reviewer found blockers in structured-clone raw-authority denial, `expectedRevision` binding, and cookie-proof overclaim; Go/release reviewer found source-archive readiness NO-GO until frontend and Go embed files are tracked/committed or a clean-checkout regeneration proof exists. Runtime blockers were patched, then source distribution was sealed in commit `c3c3649`; `git ls-files --error-unmatch` and `git archive HEAD apps/frontend substrate/go/frontend package.json` prove the frontend workspace and Go embed site are in committed source.
 - Browser Isolation Proof: Go Browser Edge now owns gateway mutation policy and service-worker setup policy; embedded NATS proves browser command acceptance over real request/reply; Chrome proves service-worker exact scope and broad-scope denial; agent-browser proves trusted shell command/denial smoke. Verification: `go test ./edge -run 'TestGatewayMutation|TestServiceWorker' -count=1`, `go test ./embednats -run TestBrowserGatewayCommandAcceptanceOverRealNATS -count=1`, `bun run test:frontend`, agent-browser smoke, `go test ./... -count=1`, `bun run test`, `bun run typecheck`, `bun run build`, `bun run schema:parity`, `bun run test:e2e`, `bun run pack:dry`, `bun run validate:layers`, `bun run test:layers`, and `git diff --check` passed.
+- Activation Router Live Sources task doc: `docs/matched-abstraction/task/activation-router-live-sources.md`; diagram `https://diashort.apps.quickable.co/d/0ab25edc`.
+- Activation Router Live Sources RED: `go test ./embednats -run 'TestSourceRouter' -count=1` failed before implementation with missing `HeaderRequestID`, `HeaderMessageID`, `NewSourceRouter`, `RequestReplyListenFailed`, `SubjectSubscribeFailed`, `KVWatchFailed`, `ObjectWatchFailed`, `SourceRouter`, `RouterResult`, and `Route`.
+- Activation Router Live Sources GREEN: Go embedded-NATS now has `SourceRouter`, `Route`, `RouterResult`, router-owned typed failures, live request/reply, subject, KV, Object Store meta-stream, and stream router paths, explicit source identity headers, Object Store meta-sequence preservation, source-authority-before-ledger acceptance, and request/reply proof through real `nats` CLI.
+- Activation Router Live Sources verification: `go test ./embednats -run 'TestSourceRouter' -count=1`, `go test ./embednats -count=1`, `go test ./... -count=1` from `substrate/go`, `bun run schema:parity`, `bun run test`, `bun run typecheck`, `bun run test:e2e`, `bun run build`, `bun run pack:dry`, `bun run validate:layers`, `bun run test:layers`, and `git diff --check` passed.
 
 ## Current Verification Commands
 
@@ -206,6 +211,7 @@ Evidence gathered:
 - Activation foundation is one program with task-owned proofs: contract authority, ledger durability, source authority, live router, schedule engine, and release proof.
 - Activation ledger durability stays below source authority and live routing: it records accepted attempts, source cursor state, duplicate/loop/replay outcomes, lease binding, and durable failures, but it does not decide whether a source principal may observe a subject, bucket, object, stream, or schedule. Durable proofs should use embedded NATS/JetStream where available; mocks/fakes are only for narrow branch forcing.
 - Activation source authority is complete below live routing: it authorizes source observation with NATS-shaped permissions/imports/exports/exposure, source lease lifecycle/revision checks, bounded request/reply responses, denied-neighbor checks, and typed attribution. Ordinary `subject` sources currently reject `>` apertures as overreach; bounded `*` aperture is allowed.
+- Live source router is complete below schedule activation: it turns real embedded-NATS request/reply, subject, KV, Object Store meta-stream, and stream observations into source-authorized durable activation records. Object Store routing uses the meta stream instead of `ObjectStore.Watch()` so the source position preserves JetStream sequence metadata.
 - Script-side outside-in proof is driven by real `nats` CLI commands against embedded NATS. CLI proves caller/platform behavior; it does not give default scripts raw NATS authority.
 - Release gates must include allowed, denied-neighbor, malformed, duplicate, stale-revision, revoked-credential, and attributed-failure cases over NATS-mediated behavior.
 

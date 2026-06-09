@@ -17,16 +17,24 @@ import (
 type Kind string
 
 const (
-	AdapterConfigInvalid Kind = "AdapterConfigInvalid"
-	ServerStartFailed    Kind = "ServerStartFailed"
-	ClientConnectFailed  Kind = "ClientConnectFailed"
-	JetStreamUnavailable Kind = "JetStreamUnavailable"
-	AuthLoadFailed       Kind = "AuthLoadFailed"
-	WebSocketUnavailable Kind = "WebSocketUnavailable"
-	TopologyProbeFailed  Kind = "TopologyProbeFailed"
-	DrainTimedOut        Kind = "DrainTimedOut"
-	ShutdownFailed       Kind = "ShutdownFailed"
-	AdapterCritical      Kind = "AdapterCritical"
+	AdapterConfigInvalid     Kind = "AdapterConfigInvalid"
+	ServerStartFailed        Kind = "ServerStartFailed"
+	ClientConnectFailed      Kind = "ClientConnectFailed"
+	JetStreamUnavailable     Kind = "JetStreamUnavailable"
+	AuthLoadFailed           Kind = "AuthLoadFailed"
+	WebSocketUnavailable     Kind = "WebSocketUnavailable"
+	TopologyProbeFailed      Kind = "TopologyProbeFailed"
+	DrainTimedOut            Kind = "DrainTimedOut"
+	ShutdownFailed           Kind = "ShutdownFailed"
+	AdapterCritical          Kind = "AdapterCritical"
+	RouterConfigInvalid      Kind = "RouterConfigInvalid"
+	RequestReplyListenFailed Kind = "RequestReplyListenFailed"
+	SubjectSubscribeFailed   Kind = "SubjectSubscribeFailed"
+	KVWatchFailed            Kind = "KVWatchFailed"
+	ObjectWatchFailed        Kind = "ObjectWatchFailed"
+	StreamConsumeFailed      Kind = "StreamConsumeFailed"
+	SourceMalformed          Kind = "SourceMalformed"
+	RouterCritical           Kind = "RouterCritical"
 )
 
 type Error struct {
