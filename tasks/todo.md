@@ -32,8 +32,8 @@ Reach the Tinkabot endgame with matched-abstraction docs, inside-out ownership p
 11. DONE: `browser-isolation-proof`: gateway Command Acceptance smoke proof plus service-worker scope/header denial.
 12. DONE: `activation-router-live-sources`: request/reply, subject subscriptions, KV/Object/Stream watches, and accepted activation normalization over live NATS.
 13. DONE: `activation-schedule-engine`: durable schedule state, lease/leadership, fake-clock tests, catch-up, restart recovery, tick dedupe, and loop safety.
-14. NEXT: `activation-release-proof`: outside-in real NATS activation scenarios tied back to inside-out contract, ledger, source authority, router, and schedule proof.
-15. `script-materializer-loop`: mediated script execution, accepted effects, materialized projections/artifacts, cleanup.
+14. DONE: `activation-release-proof`: outside-in real NATS activation scenarios tied back to inside-out contract, ledger, source authority, router, command-acceptance peer evidence, and schedule proof.
+15. NEXT: `script-materializer-loop`: mediated script execution, accepted effects, materialized projections/artifacts, cleanup.
 16. `release-spine`: centralized ops evidence manifest with outside-in real NATS proof and inside-out ownership proof.
 
 ## Operating Rules
@@ -68,7 +68,7 @@ Reach the Tinkabot endgame with matched-abstraction docs, inside-out ownership p
 
 ## Next Slice
 
-Task layer next: `activation-release-proof`.
+Task layer next: `script-materializer-loop`.
 
 Assumption:
 - `browser-isolation` triage-three converged on the v1 model: generated artifacts run in `iframe sandbox="allow-scripts"` without `allow-same-origin`; trusted shell/dedicated worker owns leased IPC; gateway and Command Acceptance own mutation.
@@ -78,21 +78,21 @@ Assumption:
 - Service worker is server-owned scoped bootstrap/cache/material facade only. It must not hold NATS credentials, bearer tokens, raw subjects, permission material, or independent mutation authority.
 - Live source router is complete: request/reply, subject, KV, Object Store meta-stream, and stream observations normalize through source authority into the durable activation ledger over real embedded NATS.
 - Schedule engine is complete: deterministic schedule ticks now pass through durable schedule state, source authority, and durable activation ledger with real embedded-NATS KV restart/catch-up proof.
-- Activation release proof is now the next activation foundation task.
+- Activation release proof is complete: live router sources are proven over real embedded NATS, command acceptance is cited as peer outside-in evidence, schedule is proven over real embedded-NATS KV stores, and owned failures remain attributed.
 
 RED:
-- Write failing release-proof scenarios that compose contract authority, source authority, live router, schedule engine, and durable ledger behavior over real NATS-mediated surfaces.
-- RED must prove that inside-out proofs alone are insufficient for release confidence without outside-in real-NATS acceptance, denial, duplicate, stale, revoked, malformed, loop-suppressed, and attributed-failure scenarios.
+- Write failing script-materializer-loop scenarios that start from accepted activation and prove the script boundary, mediated NATS effects, materialized projections/artifacts, and cleanup are missing.
+- RED must prove scripts stay NATS-agnostic by default, can only emit effects through the runtime facade, and cannot bypass activation/source authority or mutate materialized state directly.
 
 GREEN:
-- Add release-proof scenarios that exercise request/reply, subject, KV, Object Store, stream, and schedule activation through embedded NATS and inspect accepted activation records or attributed failures.
-- Tie each outside-in result back to the owning inside-out proof layer so failures remain diagnosable.
-- Do not add script execution, materializer implementation, product UI, direct browser NATS WebSocket, wall-clock scheduler loops, or sandboxing in this release-proof slice.
+- Add the smallest complete script-materializer loop that consumes accepted activations, executes managed scripts, accepts mediated facade effects, writes materialized projections/artifacts, and records cleanup/failure attribution.
+- Use real embedded NATS and durable stores for outside-in proof. Use fakes only for narrow process/error branch forcing.
+- Do not add product UI, direct browser NATS WebSocket, wall-clock scheduler loops, Docker sandboxing, or broad convenience features in this slice.
 
 VERIFY:
-- outside-in embedded NATS release-proof scenarios for request/reply, subject, KV, Object Store, stream, and schedule activation
-- inside-out ownership links for contract, source authority, ledger, router, and schedule failures
-- denied-neighbor, malformed, duplicate, stale cursor/clock, revoked lease, loop-suppressed, and attributed failure cases
+- outside-in embedded NATS script-materializer scenarios from accepted activation to projection/artifact update
+- inside-out ownership links for process config/protocol/resource failures, facade-denied effects, materializer writes, cleanup, and replay/idempotency
+- script success, script failure, malformed effect, denied effect, duplicate/replay, projection revision conflict, artifact write, cleanup failure, and attributed failure cases
 - `bun run schema:parity`
 - `go test ./...` from `substrate/go`
 - `bun run test`
@@ -173,6 +173,11 @@ Evidence gathered:
 - Activation Schedule Engine RED: `go test ./core -run 'TestSchedule|TestDurableLedgerAcceptsAllSourceCursors' -count=1` failed before implementation with missing schedule engine/store symbols; `go test ./embednats -run TestEmbeddedSchedule -count=1` failed before implementation with missing `NewKVScheduleStore`, `core.NewScheduleEngine`, `core.ScheduleTick`, and schedule source fields.
 - Activation Schedule Engine GREEN: Go core now has deterministic `ScheduleEngine`, `ScheduleTick`, `ScheduleStore`, `ScheduleState`, memory schedule store, schedule-owned typed failures, clock-position schedule cursoring, catch-up, restart recovery, malformed tick denial, duplicate tick denial, leader/fencing denial, missing lease denial, loop-suppression terminal tick handling, and source-authority/ledger delegation. Embedded NATS now has `KVScheduleStore` backed by real JetStream KV.
 - Activation Schedule Engine verification: `go test ./core -run 'TestSchedule|TestDurableLedgerAcceptsAllSourceCursors' -count=1`, `go test ./embednats -run TestEmbeddedSchedule -count=1`, `go test ./core -count=1`, `go test ./embednats -count=1`, `go test ./... -count=1` from `substrate/go`, `bun run schema:parity`, `bun run test`, `bun run typecheck`, `bun run test:e2e`, `bun run build`, `bun run pack:dry`, `bun run validate:layers`, `bun run test:layers`, and `git diff --check` passed.
+- Activation Release Proof task doc: `docs/matched-abstraction/task/activation-release-proof.md`; diagram `https://diashort.apps.quickable.co/d/2e24d446`.
+- Activation Release Proof RED: `go test ./embednats -run TestActivationReleaseProof -count=1` from `substrate/go` failed before implementation with missing `ReleaseOutcome` and `ProofOutcome` symbols.
+- Activation Release Proof GREEN: embedded-NATS release proof now covers request/reply via real `nats` CLI, subject, KV, Object Store, stream, NATS-backed schedule stores, malformed frames, live denied-neighbor, duplicate, stale cursor through the live stream router after high-water seeding, revoked lease via live request/reply CLI, loop suppression, command-acceptance peer evidence, and test-only owner/kind normalization.
+- Activation Release Proof verification: `go test ./embednats -run TestActivationReleaseProof -count=1`, `go test ./... -count=1` from `substrate/go`, `bun run schema:parity`, `bun run test`, `bun run typecheck`, `bun run test:e2e`, `bun run build`, `bun run pack:dry`, `bun run validate:layers`, `bun run test:layers`, `git diff --check`, and focused no-slop scan passed.
+- Activation Release Proof handoff: `bun run orchestrate:codex -- --dry-run --allow-dirty` now selects topic `script-materializer-loop`.
 
 ## Current Verification Commands
 
@@ -218,6 +223,7 @@ Evidence gathered:
 - Activation source authority is complete below live routing: it authorizes source observation with NATS-shaped permissions/imports/exports/exposure, source lease lifecycle/revision checks, bounded request/reply responses, denied-neighbor checks, and typed attribution. Ordinary `subject` sources currently reject `>` apertures as overreach; bounded `*` aperture is allowed.
 - Live source router is complete below schedule activation: it turns real embedded-NATS request/reply, subject, KV, Object Store meta-stream, and stream observations into source-authorized durable activation records. Object Store routing uses the meta stream instead of `ObjectStore.Watch()` so the source position preserves JetStream sequence metadata.
 - Schedule engine is complete below activation release proof: schedule source position now uses deterministic clock position rather than leader epoch; leader epoch and fencing remain authority identity, while clock position is tick progress. Embedded NATS KV stores schedule state for restart catch-up.
+- Activation release proof is complete below script-materializer-loop: live router source kinds are release-proven through real embedded NATS, command acceptance remains peer-owned by Browser Isolation Proof, schedule is proven over NATS-backed durable stores rather than a NATS tick facade, and failure attribution is normalized only inside tests.
 - Script-side outside-in proof is driven by real `nats` CLI commands against embedded NATS. CLI proves caller/platform behavior; it does not give default scripts raw NATS authority.
 - Release gates must include allowed, denied-neighbor, malformed, duplicate, stale-revision, revoked-credential, and attributed-failure cases over NATS-mediated behavior.
 
