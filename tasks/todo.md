@@ -87,15 +87,19 @@ RED-GREEN-TDD result:
 
 ## Next Slice
 
-Program layer next: `quality-v1`.
+Task layer next: `quality-gate-infrastructure`, first slice of the `quality-v1` program.
+
+The Quality V1 Plan is the program decomposition authority: `docs/matched-abstraction/plan/quality-v1.md`. Five slices in order: `quality-gate-infrastructure` (harness factory, parallel-safe corpus, fakes allowlist, dual coverage measurement) -> `typed-exposure-posture` -> `operator-jwt-authority` -> `tinkabot-binary` (assembly only) -> `quality-release` (extends `bun run release:evidence` with gate results and the manual-verbatim check). Gate infrastructure goes first so the single structural pass over the test corpus lands once; exposure and auth then change only the harness factory seam.
 
 Assumption:
-- V1 is closed: all sixteen milestones DONE, `bun run release:evidence` passes as the single release gate, and the release-spine changes await a commit on `main`.
-- Deferred scope is unchanged and named in `release/v1.json`: direct browser NATS WebSocket, Docker sandboxing, product UI rendering, live auth reload, wall-clock scheduler loops, broad script CRUD UI, live multi-node HA/scale, package publication.
+- V1 is closed, committed, and pushed: all sixteen milestones DONE, `bun run release:evidence` passes as the single release gate.
+- Deferred scope is named in `release/v1.json`; this program takes on live auth reload and the product entry surface, the rest stays deferred.
+- Manual-verbatim reconciliation is pre-decided in the Plan: behavior commands in `docs/manual/v1.md` must run unchanged through the program; the CLI connection preamble (`--user/--password`) is the one manual surface `operator-jwt-authority` owns revising for JWT creds, re-verifying every behavior command verbatim under the new preamble.
+- Run each slice through the `quality-slice` workflow (`.claude/workflows/quality-slice.js`).
 
 Direction (from Current Direction, quality-v1 entry):
 - Deliver a usable, high-quality v1 with four enforced gates: all tests over real embedded NATS with an explicit fakes allowlist, parallel test execution with isolated servers, dual coverage (inside-out per-layer measurement plus outside-in scenario-matrix completeness), and `be-lazy` style enforced by a diff-scoped reviewer gate per slice.
-- First step at resume: push `main`, then write the quality-v1 Plan decomposition under matched-abstraction before any code slice.
+- New stable gate operations named by the Plan: `gate:parallel`, `gate:fakes`, `gate:coverage`, `gate:scenarios`, later `gate:manual`.
 - The v1 user manual is `docs/manual/v1.md` (commit `0ebe749`): usage over the NATS seam, quoted from executed proofs, three runnable proof commands re-verified verbatim. It is the usage contract the quality-v1 single binary must satisfy unchanged; a "manual commands run verbatim" gate belongs in the quality-v1 plan.
 - Quality-v1 auth backbone is decided: NATS operator/JWT mode, verified against pinned nats-server v2.14.2 (`TrustedOperators` opts.go:518, `AccountResolver`/`MemAccResolver` accounts.go:4089, live `UpdateAccountClaims` accounts.go:3300). Master operator key is substrate-held and generated at first start; accounts split along control-plane/app-plane authority domains; principals become short-lived user JWTs carrying the existing lease fields; rolling permission/account updates push through the resolver and apply to live connections; revocation disconnects. This closes the deferred live-auth-reload item when proven. The substrate-callback alternative (`CustomClientAuthentication`) was considered and rejected as bespoke where NATS has native semantics.
 - Quality-v1 exposure is a typed posture, not a port number: in-process default (`server.Options.DontListen` + `Server.InProcessConn()` + `nats.InProcessServer(...)`, verified in nats.go v1.52.0), loopback opt-in (what `nats` CLI usage and outside-in proofs construct explicitly), external opt-in (NATS port/WebSocket/HTTP gateway, each tier requiring matching auth posture, TLS beyond loopback). Tests are not compromised: proofs declare loopback exposure through the same API.
