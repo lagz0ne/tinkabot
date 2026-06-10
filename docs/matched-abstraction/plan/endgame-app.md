@@ -154,6 +154,14 @@ No release gate passes on inside-out proof alone. It passes when inside-out owne
 
 No script-side release gate passes on process output alone. It passes when a `nats` CLI caller can trigger the behavior and inspect the resulting platform reaction through NATS-visible surfaces.
 
+## Current Position
+
+The endgame program is complete through `script-materializer-loop`. Contract authority, managed auth, Go substrate, browser isolation, activation foundation, activation release proof, and script materialization now have task-owned evidence, and the current seam proof runs through real embedded NATS where behavior crosses actors.
+
+The next Plan unit is `release-spine`. It must not add new runtime features. Its job is to package release authority: one evidence manifest that connects the completed Approach/Plan/Task docs, schema and SDK parity, Go substrate proof, frontend isolation proof, real-NATS outside-in scenarios, package shape, and explicit deferred scope.
+
+If release-spine finds an unsupported claim, the fix returns to the owning completed Task or Plan lane with a concrete missing proof. It does not reopen Approach unless the authority model itself is wrong.
+
 ## Capability Proof Matrix
 
 Every capability surface carries the same proof shape:

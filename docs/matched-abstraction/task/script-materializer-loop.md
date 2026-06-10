@@ -90,4 +90,6 @@ GREEN evidence:
 
 ## Wrap-Up
 
-When complete, announce that accepted activation can drive managed script execution and materialized projection/artifact writes through NATS-visible stores. Also state that Docker sandboxing, product UI rendering, direct browser NATS WebSocket, wall-clock scheduler loops, and broad script CRUD UI remain later work.
+Accepted activation now drives managed script execution and materialized projection/artifact writes through NATS-visible stores. The proof covers real `nats` CLI trigger/observation, scoped caller/router/runtime/observer authority, strict script record and frame decoding, durable run claims, canonical projection/artifact materialization, and attributed failures.
+
+This Task is closed in `f93b705 feat: add script materializer loop`. Docker sandboxing, product UI rendering, direct browser NATS WebSocket, wall-clock scheduler loops beyond the schedule engine proof, and broad script CRUD UI remain later work.

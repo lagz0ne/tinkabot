@@ -4,8 +4,8 @@
 
 - Repo: `lagz0ne/tinkabot`, private, branch `main`.
 - Remote: `origin git@github.com:lagz0ne/tinkabot.git`.
-- Latest pushed commit: `5c30a1f chore: add terse coding skill`.
-- Worktree baseline before this cleanup: clean against `origin/main`.
+- Last completed feature commit: `f93b705 feat: add script materializer loop`, pushed to `origin/main`.
+- Worktree status at closeout start: clean after `f93b705`.
 - Root role: orchestration only.
 - Current implementation lives in `packages/sdk` and `substrate/go`.
 - Active/future lanes:
@@ -16,6 +16,13 @@
 ## Active Goal
 
 Reach the Tinkabot endgame with matched-abstraction docs, inside-out ownership proof, outside-in real-NATS proof, and NATS as the system seam for release confidence.
+
+## Closeout Snapshot
+
+- Completed through `script-materializer-loop`; the next resume point is `release-spine`.
+- The current system can prove browser isolation, activation release behavior, and script materialization through real embedded NATS where the seam matters.
+- No active implementation blocker is recorded. The remaining work is release authority: one evidence manifest tying Approach/Plan/Task docs, schemas, SDK, Go substrate, frontend isolation, real-NATS proofs, package shape, and deferred scope.
+- Do not reopen completed feature slices unless release-spine evidence exposes a concrete unsupported claim or missing proof.
 
 ## Milestone Workflow
 
@@ -265,6 +272,7 @@ Historical details live in matched-abstraction docs and git history. Do not expa
 - `99cc3c1 chore: establish tinkabot workspace baseline`.
 - `42d44fe chore: record git baseline`.
 - `5c30a1f chore: add terse coding skill`.
+- `f93b705 feat: add script materializer loop`.
 
 ## Cleanup Note
 
