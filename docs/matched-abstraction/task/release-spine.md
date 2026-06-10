@@ -11,13 +11,13 @@ references:
 
 ## Objective
 
-Package one centralized release authority for endgame v1: a machine-checkable evidence manifest at `release/endgame-v1.json` plus the centralized operation `bun run release:evidence` that validates it. The manifest maps all sixteen endgame milestones, including this one, onto the eleven Release Verification Spine steps and records the Plan-owned deferred-scope list and the doc authority map. This slice consumes the `Release-Spine Decomposition` handoff in `docs/matched-abstraction/plan/endgame-app.md`; it does not invent gate rules.
+Package one centralized release authority for endgame v1: a machine-checkable evidence manifest at `release/v1.json` plus the centralized operation `bun run release:evidence` that validates it. The manifest maps all sixteen endgame milestones, including this one, onto the eleven Release Verification Spine steps and records the Plan-owned deferred-scope list and the doc authority map. This slice consumes the `Release-Spine Decomposition` handoff in `docs/matched-abstraction/plan/endgame-app.md`; it does not invent gate rules.
 
 ## Scope
 
 This task owns:
 
-- `release/endgame-v1.json`: the v1 evidence manifest with one entry per milestone naming its owning Task doc, covered spine steps, RED citation, inside-out proof commands, outside-in proof commands or an explicit not-applicable reason, negative-case coverage, and scope guards.
+- `release/v1.json`: the v1 evidence manifest with one entry per milestone naming its owning Task doc, covered spine steps, RED citation, inside-out proof commands, outside-in proof commands or an explicit not-applicable reason, negative-case coverage, and scope guards.
 - `scripts/release-evidence.ts`: the checker behind `bun run release:evidence`, owning the four failure families from the Plan: manifest-incomplete, citation-unresolved, scope-overclaim, and evidence-stale.
 - `tests/release-evidence.test.ts`: unit proof that each failure family is genuinely detected, so the checker cannot rubber-stamp.
 - Routed evidence fixes in owning Task/Plan docs for the concrete gaps the checker surfaces.
@@ -93,7 +93,7 @@ GREEN (checker passes on the corrected corpus):
 - After routing fixes to the owning docs, intermediate `bun run release:evidence` -> `1 findings (evidence-stale=1)`: only this doc's own template wrap-up remained, proving the routed fixes closed exactly the contracted gaps and nothing else.
 - `bun run release:evidence` -> `release evidence check passed: 16 milestones over 11 spine steps`, exit `0`.
 - `bun test tests/release-evidence.test.ts` -> `21 pass`, `0 fail` (all four failure families still genuinely detected on synthetic corpora).
-- Operational denial path: with `release/endgame-v1.json` temporarily absent, `bun run release:evidence` -> `FAILED: 1 findings (manifest-incomplete=1)`, exit `1`; restored, the gate passes again.
+- Operational denial path: with `release/v1.json` temporarily absent, `bun run release:evidence` -> `FAILED: 1 findings (manifest-incomplete=1)`, exit `1`; restored, the gate passes again.
 
 Full verification suite (release-shaped closeout, all executed):
 
@@ -120,4 +120,4 @@ Gate results:
 
 ## Wrap-Up
 
-Release-spine is done. One centralized release authority — `bun run release:evidence` over `release/endgame-v1.json` — validates the endgame v1 evidence corpus across all sixteen milestones and eleven spine steps, with deferred scope named, the four Plan scope guards enforced, the doc authority map recorded, and every RED finding routed to and fixed in its owning Task/Plan doc. The gate passes on the corrected corpus, fails on a missing manifest, and is itself proven against all four failure families. This closes the sixteenth and final endgame v1 milestone; the next program is `quality-endgame`.
+Release-spine is done. One centralized release authority — `bun run release:evidence` over `release/v1.json` — validates the endgame v1 evidence corpus across all sixteen milestones and eleven spine steps, with deferred scope named, the four Plan scope guards enforced, the doc authority map recorded, and every RED finding routed to and fixed in its owning Task/Plan doc. The gate passes on the corrected corpus, fails on a missing manifest, and is itself proven against all four failure families. This closes the sixteenth and final endgame v1 milestone; the next program is `quality-endgame`.
