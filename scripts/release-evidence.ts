@@ -12,7 +12,10 @@ export type Family =
   | "manifest-incomplete"
   | "citation-unresolved"
   | "scope-overclaim"
-  | "evidence-stale";
+  | "evidence-stale"
+  | "gate-result-missing"
+  | "gate-overclaim"
+  | "manual-divergence";
 
 export type Finding = { family: Family; milestone?: string; detail: string };
 
@@ -34,10 +37,23 @@ export type Entry = {
 
 export type Authority = { domain: string; docs: string[]; superseded?: string[] };
 
+// A standing gate's landed result (quality-v1.md:79,94): the cited doc must
+// carry the result line; gate:manual additionally cites the manual and the
+// verbatim commands it held against the running binary.
+export type GateResult = {
+  gate: string;
+  command: string;
+  result: string;
+  doc: string;
+  manual?: string;
+  verbatim?: string[];
+};
+
 export type Manifest = {
   milestones: Entry[];
   deferredScope: string[];
   docAuthority: Authority[];
+  gateResults?: GateResult[];
 };
 
 export type Repo = {
@@ -51,6 +67,7 @@ export type Gates = {
   deferred: string[];
   requiredGuards: Record<string, string[]>;
   requiredCases: string[];
+  requiredGates?: string[];
 };
 
 // endgame-app.md:173 — gate list is all sixteen endgame milestones.
@@ -127,12 +144,24 @@ export const REQUIRED_CASES = [
   "attributed_failure",
 ];
 
+// quality-v1.md:93-94 — the four standing gates plus the manual-verbatim
+// gate, hardcoded like MILESTONES so the manifest cannot weaken its own
+// gates (tasks/todo.md:244).
+export const REQUIRED_GATES = [
+  "gate:fakes",
+  "gate:parallel",
+  "gate:coverage",
+  "gate:scenarios",
+  "gate:manual",
+];
+
 export const PLAN_GATES: Gates = {
   milestones: MILESTONES,
   spine: SPINE,
   deferred: DEFERRED,
   requiredGuards: REQUIRED_GUARDS,
   requiredCases: REQUIRED_CASES,
+  requiredGates: REQUIRED_GATES,
 };
 
 // Capability Proof Matrix (endgame-app.md:183-198): a negative-case citation
@@ -321,6 +350,51 @@ export function check(manifest: Manifest, repo: Repo, gates: Gates = PLAN_GATES)
     if (!cited.has(c)) add("manifest-incomplete", `pinned case family ${c} has no covering case in any milestone`);
   }
 
+  // quality-v1.md:79,94 — every required standing gate needs a landed result:
+  // the cited doc must exist and carry the recorded result line, the result
+  // must be a pass (quality-v1.md:61 — no gate presented as passing before
+  // the owning slice landed its proof), and gate:manual's verbatim commands
+  // must appear in the cited manual.
+  const gateResults = new Map((manifest.gateResults ?? []).map((g) => [g.gate, g]));
+  for (const name of gates.requiredGates ?? []) {
+    const g = gateResults.get(name);
+    if (!g) {
+      add("gate-result-missing", `required gate ${name} has no landed result entry`);
+      continue;
+    }
+    const gdoc = repo.read(g.doc);
+    if (gdoc === null) {
+      add("citation-unresolved", `gate ${name} cites missing doc ${g.doc}`);
+    } else if (!g.result || !gdoc.includes(g.result)) {
+      add("gate-overclaim", `gate ${name} is presented as passing with no landed result line in ${g.doc}`);
+    } else if (!g.result.includes(`${name} passed`)) {
+      add("gate-overclaim", `gate ${name} recorded result is not a pass: ${g.result}`);
+    } else {
+      // quality-release.md:24 — the evidence-stale discipline extends to gate
+      // results: the landed result line must sit inside executed verification
+      // evidence, not a RED/template section (mirrors the negative-case check).
+      const ev = gdoc.search(/^## Verification/m);
+      if (ev < 0 || gdoc.lastIndexOf(g.result) < ev) {
+        add("evidence-stale", `gate ${name} result line sits outside executed verification evidence in ${g.doc}`);
+      }
+    }
+    if (name !== "gate:manual") continue;
+    if (!g.manual || !g.verbatim?.length) {
+      add("gate-result-missing", "gate:manual result names no manual doc or verbatim commands");
+      continue;
+    }
+    const man = repo.read(g.manual);
+    if (man === null) {
+      add("citation-unresolved", `gate:manual cites missing manual doc ${g.manual}`);
+      continue;
+    }
+    for (const cmd of g.verbatim) {
+      if (!man.includes(cmd)) {
+        add("manual-divergence", `manual-verbatim command not found in ${g.manual}: ${cmd}`);
+      }
+    }
+  }
+
   for (const d of gates.deferred) {
     if (!manifest.deferredScope?.includes(d)) {
       add("scope-overclaim", `deferred scope item ${d} is not named in the manifest`);
@@ -385,11 +459,21 @@ if (import.meta.main) {
   }
 
   if (findings.length === 0) {
-    console.log(`release evidence check passed: ${MILESTONES.length} milestones over ${SPINE.length} spine steps`);
+    console.log(
+      `release evidence check passed: ${MILESTONES.length} milestones over ${SPINE.length} spine steps, ${REQUIRED_GATES.length} gate results`,
+    );
     process.exit(0);
   }
 
-  const order: Family[] = ["manifest-incomplete", "citation-unresolved", "scope-overclaim", "evidence-stale"];
+  const order: Family[] = [
+    "manifest-incomplete",
+    "citation-unresolved",
+    "scope-overclaim",
+    "evidence-stale",
+    "gate-result-missing",
+    "gate-overclaim",
+    "manual-divergence",
+  ];
   for (const family of order) {
     const group = findings.filter((f) => f.family === family);
     if (!group.length) continue;

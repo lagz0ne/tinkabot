@@ -224,3 +224,129 @@ describe("evidence-stale", () => {
     expect(found.some((f) => f.family === "evidence-stale" && f.detail.includes("no supersession marker"))).toBe(true);
   });
 });
+
+// quality-release extension (plan/quality-v1.md:79,93-94): the checker must
+// validate the four standing gate results plus the manual-verbatim result as
+// part of the one centralized release gate. The required gate list is
+// hardcoded like MILESTONES so the manifest cannot weaken its own gates
+// (tasks/todo.md:244); in these synthetic corpora it rides the gates fixture.
+
+const MANUAL = "docs/manual/m1.md";
+
+const manualDoc = `# M1 Manual
+
+\`\`\`bash
+nats request tb.m1.execute ping
+# -> Accepted
+\`\`\`
+`;
+
+const gateLines = `Gates:
+
+- \`bun run gate:fakes\` -> \`gate:fakes passed\`.
+- \`bun run gate:parallel\` -> \`gate:parallel passed\`.
+- \`bun run gate:coverage\` -> \`gate:coverage passed\`.
+- \`bun run gate:scenarios\` -> \`gate:scenarios passed\`.
+- \`bun run gate:manual\` -> \`gate:manual passed\`.
+`;
+
+// goodDoc plus per-gate executed result lines inside Verification Evidence.
+const gateDoc = goodDoc.replace("## Wrap-Up", `${gateLines}\n## Wrap-Up`);
+
+const gateResults = [
+  { gate: "gate:fakes", command: "bun run gate:fakes", result: "gate:fakes passed", doc: TASK },
+  { gate: "gate:parallel", command: "bun run gate:parallel", result: "gate:parallel passed", doc: TASK },
+  { gate: "gate:coverage", command: "bun run gate:coverage", result: "gate:coverage passed", doc: TASK },
+  { gate: "gate:scenarios", command: "bun run gate:scenarios", result: "gate:scenarios passed", doc: TASK },
+  {
+    gate: "gate:manual",
+    command: "bun run gate:manual",
+    result: "gate:manual passed",
+    doc: TASK,
+    manual: MANUAL,
+    verbatim: ["nats request tb.m1.execute ping"],
+  },
+];
+
+const qGates = {
+  ...gates,
+  requiredGates: ["gate:fakes", "gate:parallel", "gate:coverage", "gate:scenarios", "gate:manual"],
+};
+
+const qRepo = (extra: Record<string, string> = {}) => repo({ [TASK]: gateDoc, [MANUAL]: manualDoc, ...extra });
+
+const qFamilies = (m: Manifest, r: Repo = qRepo()) => check(m, r, qGates).map((f) => f.family);
+
+describe("gate-result-missing", () => {
+  test("manifest carries no gate results block at all", () => {
+    expect(qFamilies(manifest)).toContain("gate-result-missing");
+  });
+
+  test("a required standing gate has no result entry", () => {
+    const m = { ...manifest, gateResults: gateResults.filter((g) => g.gate !== "gate:coverage") };
+    expect(qFamilies(m)).toContain("gate-result-missing");
+  });
+
+  test("gate:manual entry stripped of manual doc and verbatim commands", () => {
+    const m = {
+      ...manifest,
+      gateResults: gateResults.map((g) =>
+        g.gate === "gate:manual" ? { gate: g.gate, command: g.command, result: g.result, doc: g.doc } : g,
+      ),
+    };
+    const found = check(m, qRepo(), qGates);
+    expect(
+      found.some((f) => f.family === "gate-result-missing" && f.detail.includes("names no manual doc or verbatim commands")),
+    ).toBe(true);
+  });
+});
+
+describe("gate-overclaim", () => {
+  test("gate presented as passing with no landed result in the cited doc", () => {
+    // plan/quality-v1.md:61 — the checker cannot present a gate as passing
+    // before the owning slice landed its proof; goodDoc has no gate lines.
+    const m = { ...manifest, gateResults };
+    expect(qFamilies(m, repo({ [TASK]: goodDoc, [MANUAL]: manualDoc }))).toContain("gate-overclaim");
+  });
+
+  test("gate presented as passing while its recorded result is a failure", () => {
+    const doc = gateDoc.replace("`gate:coverage passed`", "`gate:coverage FAILED: 2 findings (coverage-gap=2)`");
+    const m = {
+      ...manifest,
+      gateResults: gateResults.map((g) =>
+        g.gate === "gate:coverage" ? { ...g, result: "gate:coverage FAILED: 2 findings (coverage-gap=2)" } : g,
+      ),
+    };
+    expect(qFamilies(m, qRepo({ [TASK]: doc }))).toContain("gate-overclaim");
+  });
+});
+
+describe("evidence-stale over gate results", () => {
+  test("gate result line cited from claim text outside executed verification evidence", () => {
+    // The result lines land only in the RED section; the gates block must
+    // reject them the way negative-case quotes outside evidence are rejected.
+    const doc = goodDoc.replace("## RED Artifact", `${gateLines}\n## RED Artifact`);
+    const m = { ...manifest, gateResults };
+    const found = check(m, repo({ [TASK]: doc, [MANUAL]: manualDoc }), qGates);
+    expect(
+      found.some((f) => f.family === "evidence-stale" && f.detail.includes("outside executed verification evidence")),
+    ).toBe(true);
+  });
+});
+
+describe("manual-divergence", () => {
+  test("manual-verbatim evidence cites a command the manual does not contain", () => {
+    const m = {
+      ...manifest,
+      gateResults: gateResults.map((g) =>
+        g.gate === "gate:manual" ? { ...g, verbatim: ["nats request tb.m1.execute pong"] } : g,
+      ),
+    };
+    expect(qFamilies(m)).toContain("manual-divergence");
+  });
+
+  test("manual-verbatim result citing a missing manual doc is unresolved", () => {
+    const m = { ...manifest, gateResults };
+    expect(qFamilies(m, repo({ [TASK]: gateDoc }))).toContain("citation-unresolved");
+  });
+});

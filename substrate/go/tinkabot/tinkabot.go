@@ -110,12 +110,16 @@ const (
 	eventsStream = "tb_events"
 )
 
+// wiring names the served surfaces. The caller-facing literals are quoted
+// from docs/manual/v1.md, which the binary must satisfy unchanged
+// (docs/matched-abstraction/plan/quality-v1.md:24); gate:manual holds the
+// manual's commands verbatim against this surface.
 func wiring() Wiring {
 	return Wiring{
-		TriggerSubject: "tb.app.trigger.main",
-		EventsSubject:  "tb.app.events.main",
-		ConfigBucket:   "tb_config",
-		UploadBucket:   "tb_upload",
+		TriggerSubject: "tb.proof.runtime.execute",
+		EventsSubject:  "tb.proof.events.main",
+		ConfigBucket:   "config_bucket",
+		UploadBucket:   "artifacts",
 		ScriptBucket:   "tb_scripts",
 		LedgerBucket:   "tb_ledger",
 		MaterialBucket: "tb_material",

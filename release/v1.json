@@ -699,5 +699,43 @@
         "docs/matched-abstraction/plan/code-structure.md"
       ]
     }
+  ],
+  "gateResults": [
+    {
+      "gate": "gate:fakes",
+      "command": "bun run gate:fakes",
+      "result": "gate:fakes passed",
+      "doc": "docs/matched-abstraction/task/quality-release.md"
+    },
+    {
+      "gate": "gate:parallel",
+      "command": "bun run gate:parallel",
+      "result": "gate:parallel passed",
+      "doc": "docs/matched-abstraction/task/quality-release.md"
+    },
+    {
+      "gate": "gate:coverage",
+      "command": "bun run gate:coverage",
+      "result": "gate:coverage passed",
+      "doc": "docs/matched-abstraction/task/quality-release.md"
+    },
+    {
+      "gate": "gate:scenarios",
+      "command": "bun run gate:scenarios",
+      "result": "gate:scenarios passed",
+      "doc": "docs/matched-abstraction/task/quality-release.md"
+    },
+    {
+      "gate": "gate:manual",
+      "command": "bun run gate:manual",
+      "result": "gate:manual passed",
+      "doc": "docs/matched-abstraction/task/quality-release.md",
+      "manual": "docs/manual/v1.md",
+      "verbatim": [
+        "nats request --raw -H Tinkabot-Request-Id:req-rel-001 tb.proof.runtime.execute ping",
+        "nats kv get \"$MATERIAL_BUCKET\" p.main --raw",
+        "nats kv get \"$MATERIAL_BUCKET\" a.YXJ0aWZhY3QvbWFpbi5qcw --raw"
+      ]
+    }
   ]
 }

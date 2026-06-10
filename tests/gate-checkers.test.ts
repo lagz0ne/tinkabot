@@ -13,6 +13,7 @@ import { check as fakes } from "../scripts/gate-fakes";
 import { check as parallel } from "../scripts/gate-parallel";
 import { check as coverage } from "../scripts/gate-coverage";
 import { check as scenarios } from "../scripts/gate-scenarios";
+import { check as manual } from "../scripts/gate-manual";
 
 const dirs: string[] = [];
 
@@ -173,5 +174,34 @@ func TestReal(t *testing.T) { t.Parallel() }
     const f = scenarios();
     expect(has(f, "measurement-stale", '"TestGhost" does not resolve')).toBe(true);
     expect(has(f, "measurement-stale", "unknown case family bogus")).toBe(true);
+  });
+});
+
+// gate:manual (quality-release, plan/quality-v1.md:93): manual commands run
+// verbatim against the running binary and produce the documented outcomes.
+// The unit seam is manual text plus a live-output transcript — the same
+// committed-text seam release-evidence.test.ts uses — while the real-binary
+// seam proof is `bun run gate:manual` itself. Denial oracles are output
+// text, never exit codes (nats CLI v0.3.0 exits 0 on permission errors).
+describe("gate:manual", () => {
+  const doc = `# Manual
+
+\`\`\`bash
+nats request --raw -H Tinkabot-Request-Id:req-rel-001 tb.proof.runtime.execute ping
+# -> Accepted
+\`\`\`
+`;
+
+  test("measurement-stale: manual yielding no command/outcome pairs", () => {
+    expect(has(manual("# no bash blocks", () => ""), "measurement-stale", "no command/outcome pairs")).toBe(true);
+  });
+
+  test("manual-divergence: live output diverges from the documented outcome", () => {
+    const f = manual(doc, () => "LeaseRevoked");
+    expect(has(f, "manual-divergence", "Accepted")).toBe(true);
+  });
+
+  test("verbatim manual commands with matching live outcomes pass", () => {
+    expect(manual(doc, () => "Accepted")).toEqual([]);
   });
 });

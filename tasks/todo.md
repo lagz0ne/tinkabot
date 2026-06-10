@@ -19,20 +19,19 @@ Reach the Tinkabot v1 platform target with matched-abstraction docs, inside-out 
 
 ## Active Session
 
-Current slice: `tinkabot-binary` — DONE (fourth slice of `quality-v1`); the carried KV/Object/publish behavior-commands creds-mode sweep from `operator-jwt-authority` is closed.
+Current slice: `quality-release` — DONE (fifth and final slice; the `quality-v1` program is closed).
 
 RED-GREEN-TDD result:
 
-- RED: test-only package `substrate/go/tinkabot` (8 parallel-safe tests, real embedded runtime via `boot(t, cfg)`) failed to build on exactly the missing assembly symbols (37 `undefined:` under `-gcflags=-e`, zero syntax errors); `go build ./cmd/tinkabot` -> directory not found; rest of the corpus green.
-- GREEN: `substrate/go/tinkabot/tinkabot.go` (assembly only — consumes operator/JWT, typed exposure, embedded shell, materializer loop; invents no header/auth/loop vocabulary) + thin `substrate/go/cmd/tinkabot/main.go`. First start materializes `operator.nk` + caller/observer/author creds (0600); restart reloads byte-identical; shell served with `Service-Worker-Allowed=/__tinkabot_session/` + `no-store` + worker-rev headers; loopback posture == served surface; drain-by-revocation shutdown, idempotent second `Stop`; five typed failure families (`StartupMaterializationFailed`, `FrontendServeFailed`, `WiringMismatch`, `ManualDivergence`, `ShutdownFailed`). All 8 tests pass; `TestBinaryManual` runs the manual flows over the real `nats` CLI in creds mode including the carried sweep, all denial oracles output-parsed; `docs/manual/v1.md` gained "Starting the binary" validated by `CheckManual`, and the `--hdr` -> `-H` manual divergence was corrected.
-- Known wart: verbatim `go build ./cmd/tinkabot` compiles but its default output name collides with the `./tinkabot` package directory; `go build -o /tmp/tinkabot-bin ./cmd/tinkabot` exits 0.
-- Verified (full battery, 2026-06-10): `bun run test` 85 pass/427 expects, `test:e2e` 1 pass, `typecheck`, `build`, `pack:dry`, `schema:parity`, `go test ./... -count=1` (7 packages ok uncached, shuffle-stable `-count=2 -shuffle=on`), `release:evidence` (16 milestones/11 spine steps), `validate:layers`, `test:layers` (10 tests OK), all four `gate:*` (coverage: cmd 70.8%>=65, tinkabot 81.2%>=75, prior layers unchanged-green), `git diff --check` — all pass. Gates real-nats, parallel-safety, coverage, be-lazy, security, no-slop all pass. Evidence in `docs/matched-abstraction/task/tinkabot-binary.md` (status complete).
+- RED: `bun run gate:manual` -> `error: Script not found "gate:manual"` (the Plan-named operation did not exist); `bun run release:evidence` passed while validating zero gate results and no manual-verbatim claim (the detection gap on the real corpus); `bun test tests/release-evidence.test.ts` 21 pass / 6 fail — all six new failure-family tests failed with `Received: []`; `bun test tests/gate-checkers.test.ts` 8 pass / 2 fail on `Cannot find module '../scripts/gate-manual'`; rest of the corpus green.
+- GREEN: `scripts/gate-manual.ts` (`bun run gate:manual`) builds the binary (`go build -o`, Known-wart form), starts it on an isolated store, and runs the manual's three documented command/outcome pairs verbatim in creds mode — trigger reply `accepted`, projection `p.main`, manifest `a.YXJ0aWZhY3QvbWFpbi5qcw` — all oracles output-parsed; a live tampered outcome fails `manual-divergence` against the running binary. `scripts/release-evidence.ts` hardcodes the five required gates (`gate:fakes`, `gate:parallel`, `gate:coverage`, `gate:scenarios`, `gate:manual`) next to the milestones; `release/v1.json` gains `gateResults`; new families `gate-result-missing`, `gate-overclaim`, `manual-divergence` plus gate-result `evidence-stale` are genuinely detected — checker self-proof 29 pass, gate-checker tests 11 pass, synthetic negatives over the real corpus each fail then the restored corpus passes. Two manual divergences routed to and fixed in `tinkabot-binary` surfaces: served wiring now uses the manual's literals (`tb.proof.runtime.execute`, `tb.proof.events.main`, `config_bucket`, `artifacts`) and trigger-reply statuses are the executed lowercase wire forms. Manual-example JSON drift (`"key"`/`"revision"` vs `"scriptKey"`/`"scriptRevision"`) noted, outside the pair-bound verbatim surface, not fixed here.
+- Verified (full battery, 2026-06-10): `bun run test` 96 pass/438 expects, `test:e2e` 1 pass, `typecheck`, `build`, `pack:dry`, `schema:parity`, `go test ./... -count=1` (7 packages ok uncached), `release:evidence` (16 milestones / 11 spine steps / 5 gate results), `validate:layers`, `test:layers` (10 tests OK), all five `gate:*` (coverage: tinkabot 82.3%>=75, frontend 100%>=95, all layers at threshold), `git diff --check` — all pass. Gates real-nats, parallel-safety, no-slop, security, coverage, be-lazy all pass. Evidence in `docs/matched-abstraction/task/quality-release.md` (status complete).
 
 ## Closeout Snapshot
 
-- Completed through `release-spine`; all sixteen v1 milestones are DONE. `quality-v1` slices 1-4 of 5 are DONE including the carried creds-mode behavior-commands sweep (closed by `TestBinaryManual`); the next resume point is `quality-release` (slice 5).
-- `bun run release:evidence` over `release/v1.json` is the single passing release gate: 16 milestones over 11 spine steps, deferred scope named, four Plan scope guards enforced, doc authority map recorded.
-- No active implementation blocker is recorded. Endgame v1 closeout and the quality-v1 plan are pushed through `bb30c70`; quality-gate-infrastructure, typed-exposure-posture, operator-jwt-authority, and tinkabot-binary await commit.
+- All sixteen v1 milestones and all five `quality-v1` slices are DONE. The v1 platform target is reached; the next resume point is committing and pushing the five uncommitted quality-v1 slices (quality-gate-infrastructure, typed-exposure-posture, operator-jwt-authority, tinkabot-binary, quality-release), then choosing the next program.
+- `bun run release:evidence` over `release/v1.json` is the single passing release gate for both programs: 16 milestones over 11 spine steps plus 5 gate results, deferred scope named, four Plan scope guards enforced, doc authority map recorded, manual-verbatim claim validated.
+- No active implementation blocker is recorded. Endgame v1 closeout and the quality-v1 plan are pushed through `bb30c70`; the five quality-v1 slices await commit.
 - Do not reopen completed feature slices unless the release gate exposes a concrete unsupported claim or missing proof.
 
 ## Milestone Workflow
@@ -57,6 +56,7 @@ RED-GREEN-TDD result:
 18. DONE: `typed-exposure-posture` (quality-v1 slice 2/5): typed exposure posture through the harness seam — in-process default with no TCP endpoint, explicit loopback opt-in carrying the `nats` CLI proofs unchanged, typed denied-by-default external tier, four typed failure families (`ExposureUndeclared`, `ExposureDenied`, `ExposureMismatch`, `InProcessConnFailed`), pre-bind denial of exposure widening, whole corpus on declared postures.
 19. DONE: `operator-jwt-authority` (quality-v1 slice 3/5): real embedded NATS in operator/JWT mode through the harness seam — substrate-held operator key with first-start generation and reload, control/app account split, user-JWT minting carrying `core.Capability` lease provenance, live `UpdateAccountClaims` push and supersession, revocation disconnecting live + denying reconnect (closes the deferred live-auth-reload item), six typed failure families (`OperatorKeyFailed`, `AccountCompileFailed`, `JWTMintFailed`, `AccountUpdateFailed`, `RevocationFailed`, `ProvenanceLost`). The manual connection preamble is revised to JWT creds and proven by `TestOperatorCLIRequestWithCreds` (real CLI, minted creds, allowed reply verbatim, denied neighbor output-parsed); KV/Object/publish behavior commands run creds-mode with the slice-4 binary.
 20. DONE: `tinkabot-binary` (quality-v1 slice 4/5): the v1 product entry surface — `substrate/go/tinkabot` assembly + thin `cmd/tinkabot` entry point assembling operator/JWT auth, typed exposure, embedded frontend shell, and the script materializer loop into one startable, restartable, CLI-operable binary. First-start materialization (operator key + caller/observer/author creds) vs byte-identical restart reload, shell with proven policy headers, posture==served-surface wiring, drain-by-revocation idempotent shutdown, five typed failure families. `TestBinaryManual` closes the carried creds-mode behavior-commands sweep over the real `nats` CLI (all denial oracles output-parsed); `docs/manual/v1.md` gained "Starting the binary" validated by `CheckManual`.
+21. DONE: `quality-release` (quality-v1 slice 5/5, program close): `bun run gate:manual` runs the manual's documented command/outcome pairs verbatim against the running binary (creds mode, output-parsed oracles, live divergence detection); `bun run release:evidence` extended with a hardcoded five-gate list and `release/v1.json` `gateResults`; three new failure families (`gate-result-missing`, `gate-overclaim`, `manual-divergence`) plus gate-result `evidence-stale`, each genuinely detected on synthetic corpora and synthetic negatives over the real corpus; two manual divergences fixed in `tinkabot-binary` surfaces (served wiring literals, lowercase wire statuses); deferred list and scope guards intact.
 
 ## Operating Rules
 
@@ -92,9 +92,9 @@ RED-GREEN-TDD result:
 
 ## Next Slice
 
-Resume point: `quality-release` (slice 5, final). It extends `bun run release:evidence` with gate results and the manual-verbatim check (`gate:manual`), consuming the creds-mode evidence produced by `tinkabot-binary` (`TestBinaryManual`, `CheckManual`, the "Starting the binary" section in `docs/manual/v1.md`). Slice-4 inputs it can cite: all four standing gates green with the new `tinkabot` (75 floor, 81.2% measured) and `cmd` (65 floor, 70.8%) coverage layers; the binary's Known wart (`go build ./cmd/tinkabot` output-name collision; use `-o`).
+Resume point: commit and push the five quality-v1 slices (quality-gate-infrastructure, typed-exposure-posture, operator-jwt-authority, tinkabot-binary, quality-release) — the working tree carries them all, verified green on the final tree. No further quality-v1 slice exists; after the push, the next program is an open product decision (deferred scope remains named in `release/v1.json`: direct browser NATS WebSocket, Docker sandboxing, product UI rendering beyond the shell, broad script CRUD UI, multi-node HA, package publication).
 
-The Quality V1 Plan is the program decomposition authority: `docs/matched-abstraction/plan/quality-v1.md`. Five slices in order: `quality-gate-infrastructure` (DONE) -> `typed-exposure-posture` (DONE) -> `operator-jwt-authority` (DONE) -> `tinkabot-binary` (DONE, carried sweep closed) -> `quality-release`.
+The Quality V1 Plan is the program decomposition authority: `docs/matched-abstraction/plan/quality-v1.md`. Five slices, all DONE: `quality-gate-infrastructure` -> `typed-exposure-posture` -> `operator-jwt-authority` -> `tinkabot-binary` -> `quality-release`.
 
 Assumption:
 - V1 is closed, committed, and pushed: all sixteen milestones DONE, `bun run release:evidence` passes as the single release gate.
@@ -200,10 +200,10 @@ Evidence gathered:
 - `bun run build` -> builds frontend into `substrate/go/frontend/site` and SDK into `packages/sdk/dist`.
 - `bun run pack:dry` -> dry package check.
 - `bun run orchestrate:codex -- --dry-run --allow-dirty` -> smoke-test the Codex endgame orchestration plan without launching agents.
-- `bun run release:evidence` -> centralized release gate over `release/v1.json`.
+- `bun run release:evidence` -> centralized release gate over `release/v1.json` (16 milestones, 11 spine steps, 5 gate results, manual-verbatim claim).
 - `bun run validate:layers` -> matched-abstraction docs.
 - `bun run test:layers` -> layer validator unit tests.
-- `bun run gate:fakes` / `gate:parallel` / `gate:coverage` / `gate:scenarios` -> standing quality-v1 gates; all four must stay green per slice. `gate:parallel` runs the full shuffled Go suite.
+- `bun run gate:fakes` / `gate:parallel` / `gate:coverage` / `gate:scenarios` / `gate:manual` -> standing quality-v1 gates; all five must stay green per slice. `gate:parallel` runs the full shuffled Go suite; `gate:manual` runs the manual's documented command/outcome pairs verbatim against the running binary.
 
 ## Pinned Decisions
 
@@ -285,6 +285,7 @@ Historical details live in matched-abstraction docs and git history. Do not expa
 - Typed exposure posture task: `docs/matched-abstraction/task/typed-exposure-posture.md`.
 - Operator JWT authority task: `docs/matched-abstraction/task/operator-jwt-authority.md`.
 - Tinkabot binary task: `docs/matched-abstraction/task/tinkabot-binary.md`.
+- Quality release task: `docs/matched-abstraction/task/quality-release.md`.
 
 ## Recent Git
 
