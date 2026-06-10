@@ -1,117 +1,68 @@
 # Tinkabot
 
-Tinkabot v1 is a local platform proof for running generated work through a trusted substrate instead of handing raw authority to generated code. The current checkout proves the platform contracts, Go-owned embedded NATS substrate, browser isolation boundary, activation sources, script materializer loop, and release evidence gate.
+Tinkabot runs scripts and generated web UI without trusting them. Scripts are plain processes that talk to the platform over stdin/stdout; generated UI runs in a locked-down iframe. Neither ever holds credentials, picks message subjects, or writes data directly. The platform sits in the middle: it checks who asked, runs the work, and stores the results durably. Everything rides on an embedded NATS server, so you can watch and drive the whole system with the standard `nats` CLI.
 
-This is not a published package or finished product UI. It is a verified source checkout with a release evidence manifest at `release/v1.json`.
+**Start here:** `docs/manual/v1.md` — how to define a script, trigger it, and read the results. Every command in it is copied from a test that actually ran.
 
-User manual: `docs/manual/v1.md` — how to operate v1 (scripts, triggers, materials, authority, browser path), with every command quoted from executed proofs.
+## What's here today
 
-## Current Runnable Surface
-
-The v1 target is a single Go-owned platform entry surface: embedded NATS, embedded frontend shell, activation, and the script materializer loop operated through the `nats` CLI. This checkout does not yet contain a `package main` entrypoint or installable binary, so the runnable surface today is the verified source-level evidence commands below.
+This is a verified source checkout, not an installable tool yet. There is no `tinkabot` binary — the platform currently runs embedded inside Go, and its behavior is proven by tests that drive it end to end with the real `nats` CLI. The single-binary version is the next program of work, and the manual is the contract it has to satisfy.
 
 Flow diagram: https://diashort.apps.quickable.co/d/bb63b165
 
-## What v1 Proves
+## How it works
 
-- Shared contracts: JSON Schema is the neutral source for the base v1 contracts, with TypeScript/Zod and Go validation parity.
-- Substrate: Go owns embedded NATS lifecycle, JetStream-backed stores, auth rendering, credentials, process boundaries, activation ledger, schedule store, and script materialization.
-- Browser edge: the trusted Vite shell is embedded into Go build output; generated browser content stays in an opaque sandboxed iframe and can only emit leased intents.
-- Activation: request/reply, subject, KV, Object Store, stream, command acceptance, and schedule sources normalize into durable activation records.
-- Script runtime: scripts run through a mediated framed process contract; accepted effects materialize projections and artifacts through substrate-owned stores.
-- Release gate: `bun run release:evidence` validates the sixteen v1 milestones over the eleven release-spine steps and rejects incomplete, stale, unresolved, or overclaimed evidence.
+- **Scripts are records.** A script is a JSON document in a key-value store: which command to run, with what limits and cleanup. The process emits results as framed JSON on stdout; the platform decides what gets stored.
+- **Triggers are explicit.** Work starts from a request, a published message, a key-value change, a file/object upload, a stream message, or a schedule tick. Each trigger is checked against its credentials, deduplicated, and recorded durably before anything runs.
+- **Results are durable.** Accepted outputs become projections and artifacts in NATS-backed stores, with full attribution: who triggered it, with which credential, in which causal chain. A script's raw output is never the source of truth — only what the platform accepts.
+- **Credentials are leases.** Every actor (caller, script, browser session, observer) gets a scoped, revocable lease, not a permanent key. Denials beat grants, and being one subject away from your grant means rejection.
+- **The browser is split in two.** A trusted shell talks to the server; generated content is sandboxed, sees no credentials, and can only propose typed commands the shell forwards. The server accepts or rejects each command durably.
 
-## Deferred Scope
+## Try it
 
-The v1 manifest names these as not proven:
-
-- direct browser NATS WebSocket
-- Docker sandboxing
-- product UI rendering
-- live auth reload
-- wall-clock scheduler loops
-- broad script CRUD UI
-- live multi-node HA/scale
-- package publication
-
-Do not treat dry package output, frontend shell proof, or HA/scale contract shape as those deferred features.
-
-## Prerequisites
-
-- Bun
-- Go
-- `nats` CLI for the real-NATS CLI proof tests
-- `agent-browser` for browser smoke checks when working on frontend behavior
-
-The repository already records local evidence with `nats` CLI v0.3.0. Permission-denial CLI checks parse command output because that CLI can report permission errors while returning success.
-
-## Verify v1
-
-Install dependencies, then run the release evidence gate:
+You need Bun, Go, and the `nats` CLI.
 
 ```bash
 bun install
+
+# Check that every claim in this repo is backed by a test that ran
 bun run release:evidence
-```
+# -> release evidence check passed: 16 milestones over 11 spine steps
 
-Expected shape:
-
-```text
-release evidence check passed: 16 milestones over 11 spine steps
-```
-
-For a fuller local closeout, run:
-
-```bash
-bun run schema:parity
-bun run test
-bun run test:e2e
-bun run typecheck
-bun run build
-bun run pack:dry
-bun run validate:layers
-bun run test:layers
-```
-
-For Go-only substrate checks:
-
-```bash
+# Watch the whole loop: CLI request -> script runs -> stored projection,
+# artifact, and status -- plus blocked writes and duplicate rejection
 cd substrate/go
-go test ./...
+go test ./embednats -run TestScriptMaterializerLoopFromNATSCLI -count=1 -v
 ```
 
-## Useful Focused Proofs
-
-Run these from `substrate/go`:
+More checks:
 
 ```bash
-go test ./embednats -run TestActivationReleaseProof -count=1
-go test ./embednats -run 'TestScriptMaterializerLoopFromNATSCLI|TestLocalScriptRunner|TestKVScriptStoreRejectsUnknownRecordField|TestScriptLoopDurableRunClaimRejectsAcceptedReplay|TestScriptLoopAttributesStatusWriteFailure' -count=1 -v
-go test ./embednats -run TestBrowserGatewayCommandAcceptanceOverRealNATS -count=1
-go test ./edge -run 'TestGatewayMutation|TestServiceWorker' -count=1
+bun run test          # TypeScript + frontend tests
+bun run schema:parity # same contracts validate identically in TS and Go
+cd substrate/go && go test ./...   # full Go suite over real embedded NATS
 ```
 
-These prove the main outside-in surfaces over real embedded NATS or browser-edge policy. They are proof commands, not a user-facing product CLI.
+Note: `nats` CLI v0.3.0 prints permission errors but still exits 0, so denial checks read the output text, not the exit code.
 
-## Project Map
+## Not done yet
 
-- `release/v1.json`: machine-checkable v1 evidence manifest.
-- `scripts/release-evidence.ts`: release evidence checker behind `bun run release:evidence`.
-- `schemas/base/v1`: canonical v1 JSON Schema contracts and fixtures.
-- `packages/sdk`: TypeScript SDK and contract validation lane.
-- `substrate/go`: Go substrate packages for contracts, core behavior, embedded NATS, browser edge, and frontend embed.
-- `apps/frontend`: trusted Vite shell used by the browser isolation proof.
-- `docs/matched-abstraction`: Approach, Plan, and Task evidence docs.
-- `tasks/todo.md`: current handoff and next-session state.
+- No installable binary or published package (this checkout is the product)
+- No real product UI (the browser shell is a proof page)
+- Browsers don't connect to NATS directly yet
+- Scripts run as trusted local processes — no Docker/sandbox isolation yet
+- Credentials load at server start — no live reload or mid-session revocation push
+- Schedules need the host to feed clock ticks — no built-in wall-clock loop
+- Single node only — no clustering
+- No script management UI
 
-## Authority Docs
+## Where things live
 
-The current release authority is `release/v1.json`, backed by these matched-abstraction docs:
-
-- Endgame app: `docs/matched-abstraction/approach/endgame-app.md`, `docs/matched-abstraction/plan/endgame-app.md`
-- Go substrate: `docs/matched-abstraction/approach/go-substrate.md`, `docs/matched-abstraction/plan/go-substrate.md`
-- Browser isolation: `docs/matched-abstraction/approach/browser-isolation.md`, `docs/matched-abstraction/plan/browser-isolation.md`
-- Activation foundation: `docs/matched-abstraction/plan/activation-foundation.md`
-- Script CLI proof: `docs/matched-abstraction/plan/script-nats-cli-proof.md`
-
-Historical docs may still use "endgame" wording because the closeout renamed live surfaces to base/v1 while preserving executed evidence names.
+- `docs/manual/v1.md` — user manual
+- `release/v1.json` — the evidence map: every feature claim linked to the test that proves it (`bun run release:evidence` checks it)
+- `schemas/base/v1` — the JSON contracts everything validates against, plus fixtures
+- `substrate/go` — the Go platform: embedded NATS, stores, auth, script runner, browser gateway
+- `packages/sdk` — TypeScript side of the contracts
+- `apps/frontend` — the trusted browser shell (Vite)
+- `docs/matched-abstraction` — design and evidence documents (some use the project's old internal name "endgame"; live code was renamed to base/v1)
+- `tasks/todo.md` — current working state and next steps
