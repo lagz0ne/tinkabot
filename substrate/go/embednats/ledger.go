@@ -22,6 +22,13 @@ func NewKVLedgerStore(ctx context.Context, rt *Runtime, bucket string) (*KVLedge
 	if err != nil {
 		return nil, err
 	}
+	return OpenKVLedgerStore(nc, bucket)
+}
+
+// OpenKVLedgerStore opens the ledger bucket over a caller-supplied connection
+// (operator-mode assemblies connect with minted creds, where the static
+// rt.Connect path does not exist). The store owns nc from here on.
+func OpenKVLedgerStore(nc *nats.Conn, bucket string) (*KVLedgerStore, error) {
 	js, err := nc.JetStream()
 	if err != nil {
 		nc.Close()

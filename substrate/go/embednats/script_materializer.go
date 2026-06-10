@@ -70,6 +70,13 @@ func NewKVScriptStoreFor(ctx context.Context, rt *Runtime, auth core.Auth, bucke
 	if err != nil {
 		return nil, err
 	}
+	return OpenKVScriptStore(nc, bucket)
+}
+
+// OpenKVScriptStore opens the script bucket over a caller-supplied connection
+// (operator-mode assemblies connect with minted creds, where the static
+// rt.Connect path does not exist). The store owns nc from here on.
+func OpenKVScriptStore(nc *nats.Conn, bucket string) (*KVScriptStore, error) {
 	js, err := nc.JetStream()
 	if err != nil {
 		nc.Close()
@@ -127,6 +134,13 @@ func NewKVMaterialStoreFor(ctx context.Context, rt *Runtime, auth core.Auth, buc
 	if err != nil {
 		return nil, err
 	}
+	return OpenKVMaterialStore(nc, bucket, artifactBucket)
+}
+
+// OpenKVMaterialStore opens the material and artifact buckets over a
+// caller-supplied connection (operator-mode assemblies connect with minted
+// creds, where the static rt.Connect path does not exist). The store owns nc.
+func OpenKVMaterialStore(nc *nats.Conn, bucket, artifactBucket string) (*KVMaterialStore, error) {
 	js, err := nc.JetStream()
 	if err != nil {
 		nc.Close()

@@ -1,7 +1,9 @@
 {
+  "cmd": 65,
   "contract": 70,
   "core": 78,
   "edge": 78,
   "embednats": 72,
-  "frontend": 95
+  "frontend": 95,
+  "tinkabot": 75
 }
