@@ -180,5 +180,5 @@ func manifest(t *testing.T, edit func(map[string]any)) []byte {
 }
 
 func schemaDir() string {
-	return filepath.Join("..", "..", "..", "schemas", "endgame", "v1")
+	return filepath.Join("..", "..", "..", "schemas", "base", "v1")
 }

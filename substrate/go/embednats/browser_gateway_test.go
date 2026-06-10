@@ -191,7 +191,7 @@ func status(commandID, state, kind, layer, op string) []byte {
 
 func registry(t *testing.T) *contract.Registry {
 	t.Helper()
-	reg, err := contract.Open(filepath.Join("..", "..", "..", "schemas", "endgame", "v1"))
+	reg, err := contract.Open(filepath.Join("..", "..", "..", "schemas", "base", "v1"))
 	if err != nil {
 		t.Fatal(err)
 	}

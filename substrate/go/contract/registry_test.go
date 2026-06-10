@@ -17,7 +17,7 @@ type parityCase struct {
 
 func TestEndgameContractParity(t *testing.T) {
 	root := filepath.Join("..", "..", "..")
-	dir := filepath.Join(root, "schemas", "endgame", "v1")
+	dir := filepath.Join(root, "schemas", "base", "v1")
 
 	reg, err := Open(dir)
 	if err != nil {
@@ -44,7 +44,7 @@ func TestEndgameContractParity(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			err = reg.Validate("tb.schema.endgame.contract_authority.v1", doc)
+			err = reg.Validate("tb.schema.base.contract_authority.v1", doc)
 			if c.Expect.Valid && err != nil {
 				t.Fatalf("expected valid fixture: %v", err)
 			}

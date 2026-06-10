@@ -166,7 +166,7 @@ If release-spine finds an unsupported claim, the fix returns to the owning compl
 
 This section is the Plan-level handoff for the `release-spine` Task. The Task doc consumes these decisions; it does not invent them.
 
-The evidence manifest is one machine-checkable JSON document at `release/endgame-v1.json`. Each milestone entry names the milestone, its owning Task doc, the spine steps it covers, its RED citation, its inside-out proof commands, its outside-in proof commands or an explicit not-applicable reason, its negative-case coverage, and any scope guards. Citations must resolve: the cited doc must exist, the cited command string must appear in the owning Task doc, and cited Go tests must resolve as `go test -run` prefix patterns against committed test files.
+The evidence manifest is one machine-checkable JSON document at `release/v1.json`. Each milestone entry names the milestone, its owning Task doc, the spine steps it covers, its RED citation, its inside-out proof commands, its outside-in proof commands or an explicit not-applicable reason, its negative-case coverage, and any scope guards. Citations must resolve: the cited doc must exist, the cited command string must appear in the owning Task doc, and cited Go tests must resolve as `go test -run` prefix patterns against committed test files.
 
 The centralized operation is `bun run release:evidence`. It validates the manifest against the rules above and fails on any incomplete, unresolved, overclaiming, or stale entry. This is the "one centralized operation produces the evidence manifest" gate from the Release Verification Spine.
 

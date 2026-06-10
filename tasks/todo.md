@@ -15,12 +15,12 @@
 
 ## Active Goal
 
-Reach the Tinkabot endgame with matched-abstraction docs, inside-out ownership proof, outside-in real-NATS proof, and NATS as the system seam for release confidence.
+Reach the Tinkabot v1 platform target with matched-abstraction docs, inside-out ownership proof, outside-in real-NATS proof, and NATS as the system seam for release confidence.
 
 ## Closeout Snapshot
 
-- Completed through `release-spine`; all sixteen endgame v1 milestones are DONE. The next resume point is the `quality-endgame` program.
-- `bun run release:evidence` over `release/endgame-v1.json` is the single passing release gate: 16 milestones over 11 spine steps, deferred scope named, four Plan scope guards enforced, doc authority map recorded.
+- Completed through `release-spine`; all sixteen v1 milestones are DONE. The next resume point is the `quality-v1` program.
+- `bun run release:evidence` over `release/v1.json` is the single passing release gate: 16 milestones over 11 spine steps, deferred scope named, four Plan scope guards enforced, doc authority map recorded.
 - No active implementation blocker is recorded. Endgame v1 work is closed; release-spine changes are uncommitted on `main` pending commit.
 - Do not reopen completed feature slices unless the release gate exposes a concrete unsupported claim or missing proof.
 
@@ -65,27 +65,27 @@ Reach the Tinkabot endgame with matched-abstraction docs, inside-out ownership p
 - Vite owns the trusted browser shell. Generated browser content remains an opaque sandboxed receiver and intent emitter.
 - Schema/SDK owns shared contract shape. JSON Schema is the first neutral source; generated or checked Zod, TS types, Go validators/types, and fixtures follow it.
 - Existing Bun/TypeScript runtime and `@lagz0ne/nats-embedded` work is regression evidence and SDK material, not current substrate authority.
-- NATS is the system seam. Inside-out tests localize ownership; outside-in tests must prove cross-lane behavior through real NATS-mediated surfaces before a release-shaped slice counts as endgame-ready.
+- NATS is the system seam. Inside-out tests localize ownership; outside-in tests must prove cross-lane behavior through real NATS-mediated surfaces before a release-shaped slice counts as release-ready.
 - Default scripts stay NATS-agnostic process contracts. Runtime facade mediates NATS publish/progress/import requests.
 - Script-side outside-in proof uses real `nats` CLI commands against embedded NATS to trigger behavior and observe replies, statuses, streams, KV/Object Store records, or materialized projections.
 - Activation is a first-class layer above substrate; request/reply is only one activation source.
 - Browser edge owns session bootstrap, service-worker setup, browser credential mint/revoke, artifact serving, cache/CSP/sandbox policy, and missing browser control-plane behavior.
 - Service-worker setup is substrate-owned: the server issues an HttpOnly/Secure/SameSite cookie session, serves the worker script under a controlled scope, and exposes a scoped substrate surface without handing generated content tokens, NATS credentials, subjects, permissions, cookies, or registration authority.
 - Control plane and app plane are separate authority domains.
-- After `release-spine`, the next program is `quality-endgame`: deliver a usable, high-quality endgame with four enforced gates — all tests over real embedded NATS with an explicit fakes allowlist, parallel test execution with isolated servers, dual coverage (inside-out per-layer measurement plus outside-in scenario-matrix completeness), and `be-lazy` style enforced by a diff-scoped reviewer gate per slice.
+- After `release-spine`, the next program is `quality-v1`: deliver a usable, high-quality v1 with four enforced gates — all tests over real embedded NATS with an explicit fakes allowlist, parallel test execution with isolated servers, dual coverage (inside-out per-layer measurement plus outside-in scenario-matrix completeness), and `be-lazy` style enforced by a diff-scoped reviewer gate per slice.
 - The v1 user entry surface is a single Go binary: embedded NATS plus embedded frontend shell plus the script materializer loop, operated through the `nats` CLI. Product UI rendering stays deferred.
 
 ## Next Slice
 
-Program layer next: `quality-endgame`.
+Program layer next: `quality-v1`.
 
 Assumption:
-- Endgame v1 is closed: all sixteen milestones DONE, `bun run release:evidence` passes as the single release gate, and the release-spine changes await a commit on `main`.
-- Deferred scope is unchanged and named in `release/endgame-v1.json`: direct browser NATS WebSocket, Docker sandboxing, product UI rendering, live auth reload, wall-clock scheduler loops, broad script CRUD UI, live multi-node HA/scale, package publication.
+- V1 is closed: all sixteen milestones DONE, `bun run release:evidence` passes as the single release gate, and the release-spine changes await a commit on `main`.
+- Deferred scope is unchanged and named in `release/v1.json`: direct browser NATS WebSocket, Docker sandboxing, product UI rendering, live auth reload, wall-clock scheduler loops, broad script CRUD UI, live multi-node HA/scale, package publication.
 
-Direction (from Current Direction, quality-endgame entry):
-- Deliver a usable, high-quality endgame with four enforced gates: all tests over real embedded NATS with an explicit fakes allowlist, parallel test execution with isolated servers, dual coverage (inside-out per-layer measurement plus outside-in scenario-matrix completeness), and `be-lazy` style enforced by a diff-scoped reviewer gate per slice.
-- First step at resume: commit the release-spine work, then write the quality-endgame Plan decomposition under matched-abstraction before any code slice.
+Direction (from Current Direction, quality-v1 entry):
+- Deliver a usable, high-quality v1 with four enforced gates: all tests over real embedded NATS with an explicit fakes allowlist, parallel test execution with isolated servers, dual coverage (inside-out per-layer measurement plus outside-in scenario-matrix completeness), and `be-lazy` style enforced by a diff-scoped reviewer gate per slice.
+- First step at resume: commit the release-spine work, then write the quality-v1 Plan decomposition under matched-abstraction before any code slice.
 
 Evidence gathered:
 - Orchestrated command-acceptance worker patch was applied to the primary checkout after the first generated worktree failed full verification due dependency path placement.
@@ -178,7 +178,7 @@ Evidence gathered:
 - `bun run build` -> builds frontend into `substrate/go/frontend/site` and SDK into `packages/sdk/dist`.
 - `bun run pack:dry` -> dry package check.
 - `bun run orchestrate:codex -- --dry-run --allow-dirty` -> smoke-test the Codex endgame orchestration plan without launching agents.
-- `bun run release:evidence` -> centralized release gate over `release/endgame-v1.json`.
+- `bun run release:evidence` -> centralized release gate over `release/v1.json`.
 - `bun run validate:layers` -> matched-abstraction docs.
 - `bun run test:layers` -> layer validator unit tests.
 
@@ -218,7 +218,8 @@ Evidence gathered:
 - Activation release proof is complete below script-materializer-loop: live router source kinds are release-proven through real embedded NATS, command acceptance remains peer-owned by Browser Isolation Proof, schedule is proven over NATS-backed durable stores rather than a NATS tick facade, and failure attribution is normalized only inside tests.
 - Script-side outside-in proof is driven by real `nats` CLI commands against embedded NATS. CLI proves caller/platform behavior; it does not give default scripts raw NATS authority.
 - Release gates must include allowed, denied-neighbor, malformed, duplicate, stale-revision, revoked-credential, and attributed-failure cases over NATS-mediated behavior.
-- `bun run release:evidence` over `release/endgame-v1.json` is the single endgame v1 release gate. The checker hardcodes the Plan gate list (sixteen milestones, eleven spine steps, eight deferred items, four scope guards, seven pinned case families) so the manifest cannot weaken its own gates; negative-case citations must name their case inside executed verification evidence, and denial oracles must be output-parsed, never exit-code.
+- `bun run release:evidence` over `release/v1.json` is the single v1 release gate. The checker hardcodes the Plan gate list (sixteen milestones, eleven spine steps, eight deferred items, four scope guards, seven pinned case families) so the manifest cannot weaken its own gates; negative-case citations must name their case inside executed verification evidence, and denial oracles must be output-parsed, never exit-code.
+- Post-closeout rename, "endgame" -> "base"/"v1" on live surfaces only: `tb.schema.base.*` wire ids, `schemas/base/v1`, `packages/sdk/{src,tests}/base-contract`, `release/v1.json`, and the `quality-slice` workflow. Historical doc evidence and milestone names keep the original "endgame" wording verbatim; executed commands recorded before the rename are not re-runnable at their old paths by design.
 
 ## Milestone Index
 

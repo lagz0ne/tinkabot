@@ -113,7 +113,7 @@ func embeddedLedger(t *testing.T, bucket string) (*core.DurableLedger, *KVLedger
 
 func read(t *testing.T, fixture string) []byte {
 	t.Helper()
-	doc, err := os.ReadFile(filepath.Join("..", "..", "..", "schemas", "endgame", "v1", fixture))
+	doc, err := os.ReadFile(filepath.Join("..", "..", "..", "schemas", "base", "v1", fixture))
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -14,7 +14,7 @@
     "test:frontend": "bun run --cwd apps/frontend test",
     "test:sdk": "bun test packages/sdk/tests",
     "test:orchestrator": "bun test tests/codex-orchestrator.test.ts",
-    "test:contracts": "bun test packages/sdk/tests/endgame-contract",
+    "test:contracts": "bun test packages/sdk/tests/base-contract",
     "test:go": "bun run build:frontend && cd substrate/go && go test ./...",
     "test:schema": "bun run schema:parity",
     "schema:parity": "bun run test:contracts && bun run test:go",

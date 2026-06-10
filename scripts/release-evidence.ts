@@ -1,4 +1,4 @@
-// Centralized release authority checker for release/endgame-v1.json.
+// Centralized release authority checker for release/v1.json.
 // Gate rules come from docs/matched-abstraction/plan/endgame-app.md
 // (Release-Spine Decomposition, lines 165-181): sixteen milestones over the
 // eleven Release Verification Spine steps, resolvable citations, Plan-owned
@@ -372,15 +372,15 @@ export function fsRepo(root: string): Repo {
 if (import.meta.main) {
   const root = join(import.meta.dir, "..");
   const repo = fsRepo(root);
-  const raw = repo.read("release/endgame-v1.json");
+  const raw = repo.read("release/v1.json");
   let findings: Finding[];
   if (raw === null) {
-    findings = [{ family: "manifest-incomplete", detail: "release/endgame-v1.json does not exist" }];
+    findings = [{ family: "manifest-incomplete", detail: "release/v1.json does not exist" }];
   } else {
     try {
       findings = check(JSON.parse(raw), repo);
     } catch (err) {
-      findings = [{ family: "manifest-incomplete", detail: `release/endgame-v1.json is not valid JSON: ${err}` }];
+      findings = [{ family: "manifest-incomplete", detail: `release/v1.json is not valid JSON: ${err}` }];
     }
   }
 

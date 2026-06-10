@@ -1,0 +1,61 @@
+{
+  "kind": "activation.intent",
+  "activationId": "act:scripts.proof.observe:schedule:expired",
+  "triggerId": "tick-expired",
+  "scriptKey": "scripts.proof.observe",
+  "scriptRevision": 7,
+  "sourcePrincipal": {
+    "principalId": "principal.source.schedule",
+    "sourceId": "src-schedule-daily",
+    "sourceKind": "schedule",
+    "authorityRef": "auth.source.schedule.daily"
+  },
+  "sourceLease": {
+    "leaseId": "lease-source-schedule-expired",
+    "leaseStatus": "expired",
+    "appRevision": "app.rev.1",
+    "schemaVersion": "v1",
+    "scriptRevision": 7
+  },
+  "source": {
+    "kind": "schedule",
+    "activationName": "daily_tick",
+    "scheduleId": "sched-daily",
+    "tickId": "tick-expired",
+    "dueAt": "2026-06-08T00:01:00.000Z",
+    "ownerPrincipalId": "principal.source.schedule",
+    "leaderEpoch": 2,
+    "fencingToken": "fence-002",
+    "acquiredAt": "2026-06-08T00:00:58.000Z",
+    "expiresAt": "2026-06-08T00:00:59.000Z",
+    "clockId": "clock-main",
+    "clock": "clock-main:0001"
+  },
+  "headers": {
+    "tb-chain-id": "chain-001"
+  },
+  "observedAt": "2026-06-08T00:01:09.000Z",
+  "chain": {
+    "chainId": "chain-001",
+    "rootId": "root-001",
+    "hop": 1,
+    "maxHops": 5
+  },
+  "dedupeKey": "schedule:scripts.proof.observe:sched-daily:tick-expired",
+  "provenance": {
+    "schemaId": "tb.schema.base.contract_authority.v1",
+    "schemaVersion": "v1",
+    "appRevision": "app.rev.1",
+    "createdAt": "2026-06-08T00:00:00.000Z",
+    "producer": "activation"
+  },
+  "capability": {
+    "principalId": "principal.caller.001",
+    "sessionId": "session-001",
+    "capabilityId": "cap-001",
+    "leaseId": "lease-001",
+    "leaseStatus": "active",
+    "appRevision": "app.rev.1",
+    "schemaVersion": "v1"
+  }
+}

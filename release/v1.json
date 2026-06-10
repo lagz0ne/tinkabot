@@ -1,0 +1,703 @@
+{
+  "release": "v1",
+  "planAuthority": "docs/matched-abstraction/plan/endgame-app.md",
+  "milestones": [
+    {
+      "milestone": "endgame-contract-authority",
+      "taskDoc": "docs/matched-abstraction/task/endgame-contract-authority.md",
+      "spineSteps": [
+        "contract"
+      ],
+      "red": {
+        "doc": "docs/matched-abstraction/task/endgame-contract-authority.md",
+        "command": "bun test packages/sdk/tests/endgame-contract/contract-authority.test.ts",
+        "result": "Export named 'parseContract' not found"
+      },
+      "insideOut": [
+        "bun run test:contracts",
+        "bun run schema:parity"
+      ],
+      "outsideIn": [],
+      "outsideInNA": "Contract authority is pure schema/SDK/Go parity; the NATS seam proof is owned by downstream activation and browser milestones.",
+      "negativeCases": [
+        {
+          "case": "denied_neighbor",
+          "doc": "docs/matched-abstraction/task/endgame-contract-authority.md",
+          "quote": "Denied-neighbor fixture result: `fixtures/valid/attributed-denial.json` is schema-valid and carries `PermissionDeniedByDenyRule`"
+        },
+        {
+          "case": "malformed",
+          "doc": "docs/matched-abstraction/task/endgame-contract-authority.md",
+          "quote": "Malformed fixture result: `fixtures/invalid/subject-placeholder.json`, `fixtures/invalid/subject-wildcard.json`, and `fixtures/invalid/missing-provenance.json` are rejected by both targets."
+        },
+        {
+          "case": "stale_revision",
+          "doc": "docs/matched-abstraction/task/endgame-contract-authority.md",
+          "quote": "Stale/revoked fixture result: `fixtures/valid/command-stale-revision.json` and `fixtures/valid/revoked-capability.json` are schema-valid policy-denial fixtures."
+        }
+      ],
+      "scopeGuards": []
+    },
+    {
+      "milestone": "managed-auth-subjects",
+      "taskDoc": "docs/matched-abstraction/task/managed-auth-subjects.md",
+      "spineSteps": [
+        "auth-subjects"
+      ],
+      "red": {
+        "doc": "docs/matched-abstraction/task/managed-auth-subjects.md",
+        "command": "bun test packages/sdk/tests/endgame-contract/managed-auth-subjects.test.ts",
+        "result": "Export named 'assertSubscribe' not found"
+      },
+      "insideOut": [
+        "bun test packages/sdk/tests/endgame-contract/managed-auth-subjects.test.ts",
+        "bun run schema:parity"
+      ],
+      "outsideIn": [],
+      "outsideInNA": "Managed auth is proven at policy-compile level by design; live NATS denial is owned by the activation-source-authority CLI proof.",
+      "negativeCases": [
+        {
+          "case": "denied_neighbor",
+          "doc": "docs/matched-abstraction/task/managed-auth-subjects.md",
+          "quote": "`assertPublish` returns `PermissionDeniedByDenyRule` for the denied family and `PermissionDenied` for adjacent runtime publish"
+        },
+        {
+          "case": "revoked_lease",
+          "doc": "docs/matched-abstraction/task/managed-auth-subjects.md",
+          "quote": "`auth-policy-revoked-lease.json` is schema-valid and compile-denied with `RevokedLease`"
+        },
+        {
+          "case": "stale_revision",
+          "doc": "docs/matched-abstraction/task/managed-auth-subjects.md",
+          "quote": "`auth-policy-provenance-mismatch.json` is schema-valid and compile-denied with `StaleRevision`"
+        }
+      ],
+      "scopeGuards": [
+        "managed-auth-policy-compile-only"
+      ]
+    },
+    {
+      "milestone": "command-acceptance",
+      "taskDoc": "docs/matched-abstraction/task/command-acceptance.md",
+      "spineSteps": [
+        "command-acceptance"
+      ],
+      "red": {
+        "doc": "docs/matched-abstraction/task/command-acceptance.md",
+        "command": "bun test packages/sdk/tests/endgame-contract/command-acceptance.test.ts",
+        "result": "`0 pass`, `1 fail`, missing `createCommandAcceptance` export"
+      },
+      "insideOut": [
+        "bun test packages/sdk/tests/endgame-contract/command-acceptance.test.ts"
+      ],
+      "outsideIn": [],
+      "outsideInNA": "Live NATS command acceptance is owned by browser-isolation-proof peer evidence over real request/reply.",
+      "negativeCases": [
+        {
+          "case": "duplicate",
+          "doc": "docs/matched-abstraction/task/command-acceptance.md",
+          "quote": "`bun test packages/sdk/tests/endgame-contract/command-acceptance.test.ts -t T-CMD-IDEMPOTENCY` -> `2 pass`, `0 fail`: duplicate commands resolve without a second activation handoff, atomically under concurrency."
+        },
+        {
+          "case": "stale_revision",
+          "doc": "docs/matched-abstraction/task/command-acceptance.md",
+          "quote": "`bun test packages/sdk/tests/endgame-contract/command-acceptance.test.ts -t T-CMD-DENY` -> `1 pass`, `0 fail`: stale revision and unknown commands are denied as command-acceptance statuses."
+        },
+        {
+          "case": "malformed",
+          "doc": "docs/matched-abstraction/task/command-acceptance.md",
+          "quote": "`bun test packages/sdk/tests/endgame-contract/command-acceptance.test.ts -t T-CMD-CONTRACT` -> `1 pass`, `0 fail`: raw-authority intent is rejected before status materialization."
+        }
+      ],
+      "scopeGuards": []
+    },
+    {
+      "milestone": "substrate-edge-bootstrap",
+      "taskDoc": "docs/matched-abstraction/task/substrate-edge-bootstrap.md",
+      "spineSteps": [
+        "browser-edge"
+      ],
+      "red": {
+        "doc": "docs/matched-abstraction/task/substrate-edge-bootstrap.md",
+        "command": "bun test packages/sdk/tests/endgame-contract/substrate-edge-bootstrap.test.ts",
+        "result": "failed with missing `createBrowserEdgeBootstrap` export"
+      },
+      "insideOut": [
+        "bun test packages/sdk/tests/endgame-contract/substrate-edge-bootstrap.test.ts",
+        "go test ./edge"
+      ],
+      "outsideIn": [],
+      "outsideInNA": "Substrate edge derivation is pure/fakeable by design; live gateway behavior is owned by browser-isolation-proof.",
+      "negativeCases": [
+        {
+          "case": "denied_neighbor",
+          "doc": "docs/matched-abstraction/task/substrate-edge-bootstrap.md",
+          "quote": "`--- PASS: TestSubstrateDeniesLeaseBeforeCredentialDescriptor` with named subtests `revoked`, `expired`, and `provenance`: the substrate denies the lease before any credential descriptor is returned to a neighbor."
+        },
+        {
+          "case": "revoked_lease",
+          "doc": "docs/matched-abstraction/task/substrate-edge-bootstrap.md",
+          "quote": "`--- PASS: TestSubstrateDeniesLeaseBeforeCredentialDescriptor` with named subtests `revoked`, `expired`, and `provenance`: the substrate denies the lease before any credential descriptor is returned to a neighbor."
+        }
+      ],
+      "scopeGuards": []
+    },
+    {
+      "milestone": "go-substrate-core",
+      "taskDoc": "docs/matched-abstraction/task/go-substrate-core.md",
+      "spineSteps": [
+        "activation",
+        "script-runtime"
+      ],
+      "red": {
+        "doc": "docs/matched-abstraction/task/go-substrate-core.md",
+        "command": "go test ./core",
+        "result": "failed with missing `BuildPlan`, `HAScale`, `BrowserLease`, `ScriptLease`, `Accepted`, and `FramedStdio`"
+      },
+      "insideOut": [
+        "go test ./core"
+      ],
+      "outsideIn": [],
+      "outsideInNA": "Go substrate core is a pure contract package by design; live NATS behavior is owned by embedded-nats-adapter.",
+      "negativeCases": [
+        {
+          "case": "denied_neighbor",
+          "doc": "docs/matched-abstraction/task/go-substrate-core.md",
+          "quote": "`--- PASS: TestBuildPlanDeniesBeforeAuthority`: neighbor authority is denied before any substrate plan is built."
+        },
+        {
+          "case": "revoked_lease",
+          "doc": "docs/matched-abstraction/task/go-substrate-core.md",
+          "quote": "`--- PASS: TestCredentialLeaseBookRevokesIdempotently`: revoked leases deny credential reuse idempotently."
+        },
+        {
+          "case": "attributed_failure",
+          "doc": "docs/matched-abstraction/task/go-substrate-core.md",
+          "quote": "`--- PASS: TestErrorAttribution`: auth, ledger, process, gateway, and cleanup failures are attributed as typed events."
+        }
+      ],
+      "scopeGuards": [
+        "ha-scale-contract-shape-only"
+      ]
+    },
+    {
+      "milestone": "embedded-nats-adapter",
+      "taskDoc": "docs/matched-abstraction/task/embedded-nats-adapter.md",
+      "spineSteps": [
+        "activation"
+      ],
+      "red": {
+        "doc": "docs/matched-abstraction/task/embedded-nats-adapter.md",
+        "command": "go test ./embednats",
+        "result": "failed with missing adapter symbols: `Start`, `Config`, `Kind`, and `Runtime`"
+      },
+      "insideOut": [
+        "go test ./embednats"
+      ],
+      "outsideIn": [
+        "go test ./embednats"
+      ],
+      "negativeCases": [
+        {
+          "case": "denied_neighbor",
+          "doc": "docs/matched-abstraction/task/embedded-nats-adapter.md",
+          "quote": "limiting probe permissions to JetStream readiness subjects plus reply inboxes, adding a probe denial test"
+        },
+        {
+          "case": "malformed",
+          "doc": "docs/matched-abstraction/task/embedded-nats-adapter.md",
+          "quote": "auth missing/expired/mismatch/malformed tests"
+        },
+        {
+          "case": "revoked_lease",
+          "doc": "docs/matched-abstraction/task/embedded-nats-adapter.md",
+          "quote": "auth missing/expired/mismatch/malformed tests"
+        }
+      ],
+      "scopeGuards": []
+    },
+    {
+      "milestone": "frontend-isolation-layer",
+      "taskDoc": "docs/matched-abstraction/task/frontend-isolation-layer.md",
+      "spineSteps": [
+        "browser-isolation"
+      ],
+      "red": {
+        "doc": "docs/matched-abstraction/task/frontend-isolation-layer.md",
+        "command": "bun run test:frontend",
+        "result": "error: Cannot find module '../src/isolation'"
+      },
+      "insideOut": [
+        "bun run test:frontend",
+        "go test ./frontend -count=1"
+      ],
+      "outsideIn": [
+        "agent-browser open http://127.0.0.1:5173/ && agent-browser eval 'window.__tinkabotProof'"
+      ],
+      "negativeCases": [
+        {
+          "case": "denied_neighbor",
+          "doc": "docs/matched-abstraction/task/frontend-isolation-layer.md",
+          "quote": "accepted `1`, denied `1`, no credential material provided by the shell"
+        }
+      ],
+      "scopeGuards": []
+    },
+    {
+      "milestone": "browser-isolation-proof",
+      "taskDoc": "docs/matched-abstraction/task/browser-isolation-proof.md",
+      "spineSteps": [
+        "browser-edge",
+        "browser-isolation",
+        "service-worker-setup",
+        "command-acceptance",
+        "frontend-rendering"
+      ],
+      "red": {
+        "doc": "docs/matched-abstraction/task/browser-isolation-proof.md",
+        "command": "go test ./edge -run 'TestGatewayMutation|TestServiceWorker' -count=1",
+        "result": "RED failed before implementation with missing browser gateway and service-worker policy symbols"
+      },
+      "insideOut": [
+        "go test ./edge -run 'TestGatewayMutation|TestServiceWorker' -count=1"
+      ],
+      "outsideIn": [
+        "go test ./embednats -run TestBrowserGatewayCommandAcceptanceOverRealNATS -count=1",
+        "bun run test:frontend",
+        "agent-browser open http://127.0.0.1:5173/ && agent-browser eval 'window.__tinkabotProof'"
+      ],
+      "negativeCases": [
+        {
+          "case": "denied_neighbor",
+          "doc": "docs/matched-abstraction/task/browser-isolation-proof.md",
+          "quote": "gateway denies bad CSRF, bad Origin, bad Fetch-Metadata, credentialed generated-origin CORS, stale artifact revision, and revoked lease"
+        },
+        {
+          "case": "stale_revision",
+          "doc": "docs/matched-abstraction/task/browser-isolation-proof.md",
+          "quote": "gateway denies bad CSRF, bad Origin, bad Fetch-Metadata, credentialed generated-origin CORS, stale artifact revision, and revoked lease"
+        },
+        {
+          "case": "revoked_lease",
+          "doc": "docs/matched-abstraction/task/browser-isolation-proof.md",
+          "quote": "gateway denies bad CSRF, bad Origin, bad Fetch-Metadata, credentialed generated-origin CORS, stale artifact revision, and revoked lease"
+        },
+        {
+          "case": "session_scope_mismatch",
+          "doc": "docs/matched-abstraction/task/browser-isolation-proof.md",
+          "quote": "service-worker setup denies wrong scope, broad `Service-Worker-Allowed`, stale worker revision, generated-content registration, and generated-artifact scope overlap"
+        },
+        {
+          "case": "frame_lease_mismatch",
+          "doc": "docs/matched-abstraction/task/browser-isolation-proof.md",
+          "quote": "trusted shell still reports sandbox `allow-scripts`, leased source `true`, accepted `1`, and denied raw authority `1`"
+        }
+      ],
+      "scopeGuards": []
+    },
+    {
+      "milestone": "activation-contract-authority",
+      "taskDoc": "docs/matched-abstraction/task/activation-contract-authority.md",
+      "spineSteps": [
+        "contract",
+        "activation"
+      ],
+      "red": {
+        "doc": "docs/matched-abstraction/task/activation-contract-authority.md",
+        "command": "bun test packages/sdk/tests/endgame-contract/contract-authority.test.ts",
+        "result": "failed because new schema-valid activation source fixtures were rejected as `ContractInvalid`"
+      },
+      "insideOut": [
+        "bun test packages/sdk/tests/endgame-contract/contract-authority.test.ts",
+        "go test ./contract -count=1"
+      ],
+      "outsideIn": [],
+      "outsideInNA": "Activation contract authority is schema/parity work; live source behavior is owned by activation-router-live-sources.",
+      "negativeCases": [
+        {
+          "case": "malformed",
+          "doc": "docs/matched-abstraction/task/activation-contract-authority.md",
+          "quote": "failed because new schema-valid activation source fixtures were rejected as `ContractInvalid`"
+        }
+      ],
+      "scopeGuards": []
+    },
+    {
+      "milestone": "activation-ledger-durability",
+      "taskDoc": "docs/matched-abstraction/task/activation-ledger-durability.md",
+      "spineSteps": [
+        "activation"
+      ],
+      "red": {
+        "doc": "docs/matched-abstraction/task/activation-ledger-durability.md",
+        "command": "go test ./core -count=1",
+        "result": "failed before implementation with missing `NewMemoryLedgerStore`, missing `NewDurableLedger`, and missing durable `StaleCursor` path"
+      },
+      "insideOut": [
+        "go test ./core -count=1"
+      ],
+      "outsideIn": [
+        "go test ./embednats -run 'TestEmbeddedLedger' -count=1"
+      ],
+      "negativeCases": [
+        {
+          "case": "duplicate",
+          "doc": "docs/matched-abstraction/task/activation-ledger-durability.md",
+          "quote": "duplicate, replay, unknown replay cursor, restart replay/cursor state, loop suppression, stale cursor, lease denial with no write"
+        },
+        {
+          "case": "stale_revision",
+          "doc": "docs/matched-abstraction/task/activation-ledger-durability.md",
+          "quote": "duplicate, replay, unknown replay cursor, restart replay/cursor state, loop suppression, stale cursor, lease denial with no write"
+        },
+        {
+          "case": "loop_suppressed",
+          "doc": "docs/matched-abstraction/task/activation-ledger-durability.md",
+          "quote": "duplicate, replay, unknown replay cursor, restart replay/cursor state, loop suppression, stale cursor, lease denial with no write"
+        },
+        {
+          "case": "denied_neighbor",
+          "doc": "docs/matched-abstraction/task/activation-ledger-durability.md",
+          "quote": "duplicate, replay, unknown replay cursor, restart replay/cursor state, loop suppression, stale cursor, lease denial with no write"
+        }
+      ],
+      "scopeGuards": []
+    },
+    {
+      "milestone": "activation-source-authority",
+      "taskDoc": "docs/matched-abstraction/task/activation-source-authority.md",
+      "spineSteps": [
+        "auth-subjects",
+        "activation"
+      ],
+      "red": {
+        "doc": "docs/matched-abstraction/task/activation-source-authority.md",
+        "command": "go test ./core -run TestSourceAuthority -count=1",
+        "result": "failed before implementation with missing `AuthorizeSource`, `SourceAuthDenied`, and related source authority symbols"
+      },
+      "insideOut": [
+        "go test ./core -run TestSourceAuthority -count=1"
+      ],
+      "outsideIn": [
+        "go test ./embednats -run TestSourceAuthorityCLIAllowedAndDeniedSubject -count=1"
+      ],
+      "negativeCases": [
+        {
+          "case": "denied_neighbor",
+          "doc": "docs/matched-abstraction/task/activation-source-authority.md",
+          "quote": "covering allowed canonical sources, denied neighbor, deny-over-allow, wildcard overreach, bounded request/reply responses, revoked/expired/stale source leases, missing exposure/export, and advanced import/exposure denial"
+        },
+        {
+          "case": "revoked_lease",
+          "doc": "docs/matched-abstraction/task/activation-source-authority.md",
+          "quote": "covering allowed canonical sources, denied neighbor, deny-over-allow, wildcard overreach, bounded request/reply responses, revoked/expired/stale source leases, missing exposure/export, and advanced import/exposure denial"
+        },
+        {
+          "case": "stale_revision",
+          "doc": "docs/matched-abstraction/task/activation-source-authority.md",
+          "quote": "covering allowed canonical sources, denied neighbor, deny-over-allow, wildcard overreach, bounded request/reply responses, revoked/expired/stale source leases, missing exposure/export, and advanced import/exposure denial"
+        }
+      ],
+      "scopeGuards": [
+        "nats-cli-denial-output-parsed-oracle"
+      ]
+    },
+    {
+      "milestone": "activation-router-live-sources",
+      "taskDoc": "docs/matched-abstraction/task/activation-router-live-sources.md",
+      "spineSteps": [
+        "activation"
+      ],
+      "red": {
+        "doc": "docs/matched-abstraction/task/activation-router-live-sources.md",
+        "command": "go test ./embednats -run 'TestSourceRouter' -count=1",
+        "result": "failed before implementation with missing `HeaderRequestID`, `HeaderMessageID`, `NewSourceRouter`"
+      },
+      "insideOut": [
+        "go test ./embednats -run 'TestSourceRouter' -count=1"
+      ],
+      "outsideIn": [
+        "go test ./embednats -run 'TestSourceRouter' -count=1"
+      ],
+      "negativeCases": [
+        {
+          "case": "malformed",
+          "doc": "docs/matched-abstraction/task/activation-router-live-sources.md",
+          "quote": "Added router tests for malformed frame, denied neighbor, duplicate, stale stream cursor, revoked lease, and router-layer attribution."
+        },
+        {
+          "case": "denied_neighbor",
+          "doc": "docs/matched-abstraction/task/activation-router-live-sources.md",
+          "quote": "Added router tests for malformed frame, denied neighbor, duplicate, stale stream cursor, revoked lease, and router-layer attribution."
+        },
+        {
+          "case": "duplicate",
+          "doc": "docs/matched-abstraction/task/activation-router-live-sources.md",
+          "quote": "Added router tests for malformed frame, denied neighbor, duplicate, stale stream cursor, revoked lease, and router-layer attribution."
+        },
+        {
+          "case": "stale_revision",
+          "doc": "docs/matched-abstraction/task/activation-router-live-sources.md",
+          "quote": "Added router tests for malformed frame, denied neighbor, duplicate, stale stream cursor, revoked lease, and router-layer attribution."
+        },
+        {
+          "case": "revoked_lease",
+          "doc": "docs/matched-abstraction/task/activation-router-live-sources.md",
+          "quote": "Added router tests for malformed frame, denied neighbor, duplicate, stale stream cursor, revoked lease, and router-layer attribution."
+        }
+      ],
+      "scopeGuards": []
+    },
+    {
+      "milestone": "activation-schedule-engine",
+      "taskDoc": "docs/matched-abstraction/task/activation-schedule-engine.md",
+      "spineSteps": [
+        "activation"
+      ],
+      "red": {
+        "doc": "docs/matched-abstraction/task/activation-schedule-engine.md",
+        "command": "go test ./core -run 'TestSchedule|TestDurableLedgerAcceptsAllSourceCursors' -count=1",
+        "result": "failed before implementation with missing `NewScheduleEngine`"
+      },
+      "insideOut": [
+        "go test ./core -run 'TestSchedule|TestDurableLedgerAcceptsAllSourceCursors' -count=1"
+      ],
+      "outsideIn": [
+        "go test ./embednats -run TestEmbeddedSchedule -count=1"
+      ],
+      "negativeCases": [
+        {
+          "case": "duplicate",
+          "doc": "docs/matched-abstraction/task/activation-schedule-engine.md",
+          "quote": "Added schedule acceptance, duplicate detection, malformed tick denial, clock rewind/malformed denial, leader/fencing denial, catch-up, restart recovery, and loop-suppression terminal tick handling."
+        },
+        {
+          "case": "malformed",
+          "doc": "docs/matched-abstraction/task/activation-schedule-engine.md",
+          "quote": "Added schedule acceptance, duplicate detection, malformed tick denial, clock rewind/malformed denial, leader/fencing denial, catch-up, restart recovery, and loop-suppression terminal tick handling."
+        },
+        {
+          "case": "loop_suppressed",
+          "doc": "docs/matched-abstraction/task/activation-schedule-engine.md",
+          "quote": "Added schedule acceptance, duplicate detection, malformed tick denial, clock rewind/malformed denial, leader/fencing denial, catch-up, restart recovery, and loop-suppression terminal tick handling."
+        }
+      ],
+      "scopeGuards": [
+        "schedule-engine-proof-no-live-tick-source"
+      ]
+    },
+    {
+      "milestone": "activation-release-proof",
+      "taskDoc": "docs/matched-abstraction/task/activation-release-proof.md",
+      "spineSteps": [
+        "activation"
+      ],
+      "red": {
+        "doc": "docs/matched-abstraction/task/activation-release-proof.md",
+        "command": "go test ./embednats -run TestActivationReleaseProof -count=1",
+        "result": "RED failed before GREEN with missing `ReleaseOutcome` and `ProofOutcome` symbols"
+      },
+      "insideOut": [
+        "go test ./embednats -run TestActivationReleaseProof -count=1"
+      ],
+      "outsideIn": [
+        "go test ./embednats -run TestActivationReleaseProof -count=1"
+      ],
+      "negativeCases": [
+        {
+          "case": "allowed",
+          "doc": "docs/matched-abstraction/task/activation-release-proof.md",
+          "quote": "`--- PASS: TestActivationReleaseProofAcceptedSources` with named subtests `request reply cli`, `subject`, `kv object stream` (`kv`, `object`, `stream`), and `schedule`: every live-router source kind and the NATS-backed schedule produce accepted durable activation records over real embedded NATS."
+        },
+        {
+          "case": "denied_neighbor",
+          "doc": "docs/matched-abstraction/task/activation-release-proof.md",
+          "quote": "`--- PASS: TestActivationReleaseProofFailureAttribution` with named scenarios `malformed`, `denied_neighbor`, `duplicate`, `stale_cursor`, `revoked_lease`, and `loop_suppressed`, each preserving owner attribution against real embedded NATS JetStream stores."
+        },
+        {
+          "case": "malformed",
+          "doc": "docs/matched-abstraction/task/activation-release-proof.md",
+          "quote": "`--- PASS: TestActivationReleaseProofFailureAttribution` with named scenarios `malformed`, `denied_neighbor`, `duplicate`, `stale_cursor`, `revoked_lease`, and `loop_suppressed`, each preserving owner attribution against real embedded NATS JetStream stores."
+        },
+        {
+          "case": "duplicate",
+          "doc": "docs/matched-abstraction/task/activation-release-proof.md",
+          "quote": "`--- PASS: TestActivationReleaseProofFailureAttribution` with named scenarios `malformed`, `denied_neighbor`, `duplicate`, `stale_cursor`, `revoked_lease`, and `loop_suppressed`, each preserving owner attribution against real embedded NATS JetStream stores."
+        },
+        {
+          "case": "stale_revision",
+          "doc": "docs/matched-abstraction/task/activation-release-proof.md",
+          "quote": "`--- PASS: TestActivationReleaseProofFailureAttribution` with named scenarios `malformed`, `denied_neighbor`, `duplicate`, `stale_cursor`, `revoked_lease`, and `loop_suppressed`, each preserving owner attribution against real embedded NATS JetStream stores."
+        },
+        {
+          "case": "revoked_lease",
+          "doc": "docs/matched-abstraction/task/activation-release-proof.md",
+          "quote": "`--- PASS: TestActivationReleaseProofFailureAttribution` with named scenarios `malformed`, `denied_neighbor`, `duplicate`, `stale_cursor`, `revoked_lease`, and `loop_suppressed`, each preserving owner attribution against real embedded NATS JetStream stores."
+        },
+        {
+          "case": "loop_suppressed",
+          "doc": "docs/matched-abstraction/task/activation-release-proof.md",
+          "quote": "`--- PASS: TestActivationReleaseProofFailureAttribution` with named scenarios `malformed`, `denied_neighbor`, `duplicate`, `stale_cursor`, `revoked_lease`, and `loop_suppressed`, each preserving owner attribution against real embedded NATS JetStream stores."
+        }
+      ],
+      "scopeGuards": [
+        "nats-cli-denial-output-parsed-oracle",
+        "schedule-engine-proof-no-live-tick-source"
+      ]
+    },
+    {
+      "milestone": "script-materializer-loop",
+      "taskDoc": "docs/matched-abstraction/task/script-materializer-loop.md",
+      "spineSteps": [
+        "script-runtime",
+        "materializer-artifact"
+      ],
+      "red": {
+        "doc": "docs/matched-abstraction/task/script-materializer-loop.md",
+        "command": "go test ./core -run TestScriptRuntime -count=1",
+        "result": "failed before implementation because core script runtime/materializer contracts were missing"
+      },
+      "insideOut": [
+        "go test ./core -run TestScriptRuntime -count=1 -v"
+      ],
+      "outsideIn": [
+        "go test ./embednats -run 'TestScriptMaterializerLoopFromNATSCLI|TestLocalScriptRunner|TestKVScriptStoreRejectsUnknownRecordField|TestScriptLoopDurableRunClaimRejectsAcceptedReplay|TestScriptLoopAttributesStatusWriteFailure' -count=1 -v"
+      ],
+      "negativeCases": [
+        {
+          "case": "denied_neighbor",
+          "doc": "docs/matched-abstraction/task/script-materializer-loop.md",
+          "quote": "real denied caller ledger write, real denied observer material/Object Store writes"
+        },
+        {
+          "case": "duplicate",
+          "doc": "docs/matched-abstraction/task/script-materializer-loop.md",
+          "quote": "durable accepted replay no-rerun"
+        },
+        {
+          "case": "malformed",
+          "doc": "docs/matched-abstraction/task/script-materializer-loop.md",
+          "quote": "duplicate no-rerun, malformed frame attribution, and status write attribution"
+        },
+        {
+          "case": "attributed_failure",
+          "doc": "docs/matched-abstraction/task/script-materializer-loop.md",
+          "quote": "duplicate no-rerun, malformed frame attribution, and status write attribution"
+        }
+      ],
+      "scopeGuards": [
+        "nats-cli-denial-output-parsed-oracle"
+      ]
+    },
+    {
+      "milestone": "release-spine",
+      "taskDoc": "docs/matched-abstraction/task/release-spine.md",
+      "spineSteps": [
+        "release-ops"
+      ],
+      "red": {
+        "doc": "docs/matched-abstraction/task/release-spine.md",
+        "command": "bun run release:evidence",
+        "result": "release evidence check FAILED"
+      },
+      "insideOut": [
+        "bun test tests/release-evidence.test.ts"
+      ],
+      "outsideIn": [],
+      "outsideInNA": "Release authority is document and manifest verification; the NATS seam is exercised by the sixteen milestones this manifest audits, not by the checker itself.",
+      "negativeCases": [
+        {
+          "case": "malformed",
+          "doc": "docs/matched-abstraction/task/release-spine.md",
+          "quote": "rejects malformed manifests and incomplete entries with `manifest-incomplete` findings"
+        },
+        {
+          "case": "stale_revision",
+          "doc": "docs/matched-abstraction/task/release-spine.md",
+          "quote": "flags stale template wrap-ups and aggregate-hidden negative-case evidence as `evidence-stale`"
+        },
+        {
+          "case": "attributed_failure",
+          "doc": "docs/matched-abstraction/task/release-spine.md",
+          "quote": "every finding is attributed to a failure family and owning milestone"
+        }
+      ],
+      "scopeGuards": [
+        "ha-scale-contract-shape-only",
+        "managed-auth-policy-compile-only",
+        "schedule-engine-proof-no-live-tick-source",
+        "nats-cli-denial-output-parsed-oracle"
+      ]
+    }
+  ],
+  "deferredScope": [
+    "direct-browser-nats-websocket",
+    "docker-sandboxing",
+    "product-ui-rendering",
+    "live-auth-reload",
+    "wall-clock-scheduler-loops",
+    "broad-script-crud-ui",
+    "live-multi-node-ha-scale",
+    "package-publication"
+  ],
+  "docAuthority": [
+    {
+      "domain": "endgame-app",
+      "docs": [
+        "docs/matched-abstraction/approach/endgame-app.md",
+        "docs/matched-abstraction/plan/endgame-app.md"
+      ]
+    },
+    {
+      "domain": "go-substrate",
+      "docs": [
+        "docs/matched-abstraction/approach/go-substrate.md",
+        "docs/matched-abstraction/plan/go-substrate.md"
+      ]
+    },
+    {
+      "domain": "browser-isolation",
+      "docs": [
+        "docs/matched-abstraction/approach/browser-isolation.md",
+        "docs/matched-abstraction/plan/browser-isolation.md"
+      ],
+      "superseded": [
+        "docs/matched-abstraction/approach/browser-frontend-mediator.md",
+        "docs/matched-abstraction/plan/browser-frontend-mediator.md"
+      ]
+    },
+    {
+      "domain": "activation-foundation",
+      "docs": [
+        "docs/matched-abstraction/plan/activation-foundation.md"
+      ]
+    },
+    {
+      "domain": "script-nats-cli-proof",
+      "docs": [
+        "docs/matched-abstraction/plan/script-nats-cli-proof.md"
+      ]
+    },
+    {
+      "domain": "nats-script-runtime",
+      "docs": [
+        "docs/matched-abstraction/approach/nats-script-runtime.md",
+        "docs/matched-abstraction/plan/nats-script-runtime.md"
+      ]
+    },
+    {
+      "domain": "platform-structure",
+      "docs": [
+        "docs/matched-abstraction/approach/platform-structure.md",
+        "docs/matched-abstraction/plan/platform-structure.md"
+      ]
+    },
+    {
+      "domain": "code-structure",
+      "docs": [
+        "docs/matched-abstraction/approach/code-structure.md",
+        "docs/matched-abstraction/plan/code-structure.md"
+      ]
+    }
+  ]
+}

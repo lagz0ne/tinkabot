@@ -333,5 +333,5 @@ func activation(t *testing.T, doc []byte) Activation {
 }
 
 func schemaDir() string {
-	return filepath.Join("..", "..", "..", "schemas", "endgame", "v1")
+	return filepath.Join("..", "..", "..", "schemas", "base", "v1")
 }

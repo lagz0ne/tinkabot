@@ -9,7 +9,7 @@ import (
 	"github.com/santhosh-tekuri/jsonschema/v6"
 )
 
-const ContractSchemaID = "tb.schema.endgame.contract_authority.v1"
+const ContractSchemaID = "tb.schema.base.contract_authority.v1"
 
 type Registry struct {
 	schemas map[string]*jsonschema.Schema
