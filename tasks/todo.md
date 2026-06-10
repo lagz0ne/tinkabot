@@ -19,19 +19,21 @@ Reach the Tinkabot v1 platform target with matched-abstraction docs, inside-out 
 
 ## Active Session
 
-Current slice: `quality-gate-infrastructure` — DONE (first slice of `quality-v1`).
+Current slice: `typed-exposure-posture` — DONE (second slice of `quality-v1`).
 
 RED-GREEN-TDD result:
 
-- RED: all four gates failed on the unmodified corpus with file-attributable findings — `gate:fakes` 4 findings (three Memory fakes, including `MemoryMaterialStore` beyond the two the contract enumerated), `gate:parallel` 55 findings (53 serialized Test funcs, `Start` in 8 test files), `gate:coverage` 6, `gate:scenarios` 1; baseline corpus green pre-refactor.
-- GREEN: `gate:fakes`, `gate:parallel`, `gate:coverage`, `gate:scenarios` all exit 0 on the migrated corpus — all 53 Test funcs `t.Parallel()`, single `Start` seam at `substrate/go/embednats/harness_test.go`, 3 allowlisted fakes with justifications + real-NATS proofs, coverage floors met (contract 73.9/core 81.7/edge 82.8/embednats 76.8/frontend 100), seven-family matrix complete for both outside-in surfaces. Injected-violation detection proven: an un-allowlisted fake and an out-of-seam server each failed their gate, then reverted clean.
-- Verified: `go test ./... -count=1 -shuffle=on` green across 4 independent shuffled runs; full suite (`bun run test` 85 pass/427 expects, `test:e2e`, `typecheck`, `build`, `pack:dry`, `release:evidence`, `validate:layers`, `test:layers`, `git diff --check`) all pass; gates real-nats, parallel-safety, coverage, be-lazy, security, no-slop all pass. Evidence in `docs/matched-abstraction/task/quality-gate-infrastructure.md` (status complete).
+- RED: `substrate/go/embednats/exposure_test.go` (parallel-safe, real embedded runtime via the `start(t, cfg)` seam) failed to build on 45 missing typed posture/denial symbols; `gate:parallel` exit 1 solely from that build failure, zero structural findings; `go test ./core` stayed green.
+- GREEN: typed posture API in `substrate/go/embednats/exposure.go` + `embednats.go` — in-process default (`DontListen` + `InProcessConn` + `nats.InProcessServer`), explicit `Loopback()`, typed denied-by-default external tier; corpus migration is one line (`valid(t)` declares `Exposure: Loopback()`), assertions unchanged. All 8 exposure tests pass (12 subtests); whole embednats corpus + all four standing gates green (coverage embednats 78.4% >= 72%).
+- Security hardening during gates: non-loopback main host or websocket host under a `Loopback()` posture is `ExposureDenied` BEFORE any server is constructed (no transient widened listener); owning tests `TestExposureLoopbackHostBeyondLoopbackDeniedBeforeBind`, `TestExposureLoopbackWebSocketBeyondLoopbackDenied`.
+- Upstream bound: auth rejection over `InProcessConn` deadlocks the `net.Pipe` handshake until the server `WriteDeadline` fires; in-process runtimes set `WriteDeadline = cfg.ReadyTimeout` so the typed denial resolves in ~2s instead of 10s.
+- Verified (full battery, 2026-06-10): `bun run test` 85 pass/427 expects, `test:e2e`, `typecheck`, `build`, `pack:dry`, `schema:parity`, `go test ./... -count=1` (5 packages ok uncached), `release:evidence` (16 milestones/11 spine steps), `validate:layers`, `test:layers`, all four `gate:*`, `git diff --check` — all pass. Gates real-nats, parallel-safety, be-lazy, coverage, no-slop, security all pass. Evidence in `docs/matched-abstraction/task/typed-exposure-posture.md` (status complete).
 
 ## Closeout Snapshot
 
-- Completed through `release-spine`; all sixteen v1 milestones are DONE. `quality-v1` slice 1 of 5 (`quality-gate-infrastructure`) is DONE; the next resume point is `typed-exposure-posture`.
+- Completed through `release-spine`; all sixteen v1 milestones are DONE. `quality-v1` slices 1-2 of 5 (`quality-gate-infrastructure`, `typed-exposure-posture`) are DONE; the next resume point is `operator-jwt-authority`.
 - `bun run release:evidence` over `release/v1.json` is the single passing release gate: 16 milestones over 11 spine steps, deferred scope named, four Plan scope guards enforced, doc authority map recorded.
-- No active implementation blocker is recorded. Endgame v1 closeout and the quality-v1 plan are pushed through `bb30c70`; quality-gate-infrastructure awaits commit.
+- No active implementation blocker is recorded. Endgame v1 closeout and the quality-v1 plan are pushed through `bb30c70`; quality-gate-infrastructure and typed-exposure-posture await commit.
 - Do not reopen completed feature slices unless the release gate exposes a concrete unsupported claim or missing proof.
 
 ## Milestone Workflow
@@ -53,6 +55,7 @@ RED-GREEN-TDD result:
 15. DONE: `script-materializer-loop`: mediated script execution, accepted effects, materialized projections/artifacts, cleanup.
 16. DONE: `release-spine`: centralized ops evidence manifest with outside-in real NATS proof and inside-out ownership proof.
 17. DONE: `quality-gate-infrastructure` (quality-v1 slice 1/5): four standing gates (`gate:fakes`, `gate:parallel`, `gate:coverage`, `gate:scenarios`), harness factory seam, fully parallel shuffled corpus, fakes allowlist, coverage floors, scenario matrix, injected-violation detection proof.
+18. DONE: `typed-exposure-posture` (quality-v1 slice 2/5): typed exposure posture through the harness seam — in-process default with no TCP endpoint, explicit loopback opt-in carrying the `nats` CLI proofs unchanged, typed denied-by-default external tier, four typed failure families (`ExposureUndeclared`, `ExposureDenied`, `ExposureMismatch`, `InProcessConnFailed`), pre-bind denial of exposure widening, whole corpus on declared postures.
 
 ## Operating Rules
 
@@ -88,9 +91,9 @@ RED-GREEN-TDD result:
 
 ## Next Slice
 
-Task layer next: `typed-exposure-posture`, second slice of the `quality-v1` program.
+Task layer next: `operator-jwt-authority`, third slice of the `quality-v1` program.
 
-The Quality V1 Plan is the program decomposition authority: `docs/matched-abstraction/plan/quality-v1.md`. Five slices in order: `quality-gate-infrastructure` (DONE — harness factory, parallel-safe corpus, fakes allowlist, dual coverage measurement) -> `typed-exposure-posture` -> `operator-jwt-authority` -> `tinkabot-binary` (assembly only) -> `quality-release` (extends `bun run release:evidence` with gate results and the manual-verbatim check). Gate infrastructure landed the single structural pass over the test corpus; exposure and auth now change only the harness factory seam (`substrate/go/embednats/harness_test.go`) and must keep all four gates green.
+The Quality V1 Plan is the program decomposition authority: `docs/matched-abstraction/plan/quality-v1.md`. Five slices in order: `quality-gate-infrastructure` (DONE) -> `typed-exposure-posture` (DONE — typed posture API on the embednats seam, in-process default, loopback opt-in, denied-by-default external tier) -> `operator-jwt-authority` -> `tinkabot-binary` (assembly only) -> `quality-release` (extends `bun run release:evidence` with gate results and the manual-verbatim check). Auth changes only the harness factory seam (`substrate/go/embednats/harness_test.go`) and must keep all four gates green; `operator-jwt-authority` also owns revising the manual CLI connection preamble (`--user/--password` -> JWT creds) and re-verifying every behavior command verbatim.
 
 Assumption:
 - V1 is closed, committed, and pushed: all sixteen milestones DONE, `bun run release:evidence` passes as the single release gate.
@@ -278,6 +281,7 @@ Historical details live in matched-abstraction docs and git history. Do not expa
 - Codex endgame orchestrator task: `docs/matched-abstraction/task/codex-endgame-orchestrator.md`.
 - Release spine task: `docs/matched-abstraction/task/release-spine.md`.
 - Quality gate infrastructure task: `docs/matched-abstraction/task/quality-gate-infrastructure.md`.
+- Typed exposure posture task: `docs/matched-abstraction/task/typed-exposure-posture.md`.
 
 ## Recent Git
 

@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"fmt"
+	"net"
 	"strings"
 	"sync"
 	"time"
@@ -18,8 +19,12 @@ type Kind string
 
 const (
 	AdapterConfigInvalid     Kind = "AdapterConfigInvalid"
+	ExposureUndeclared       Kind = "ExposureUndeclared"
+	ExposureDenied           Kind = "ExposureDenied"
+	ExposureMismatch         Kind = "ExposureMismatch"
 	ServerStartFailed        Kind = "ServerStartFailed"
 	ClientConnectFailed      Kind = "ClientConnectFailed"
+	InProcessConnFailed      Kind = "InProcessConnFailed"
 	JetStreamUnavailable     Kind = "JetStreamUnavailable"
 	AuthLoadFailed           Kind = "AuthLoadFailed"
 	WebSocketUnavailable     Kind = "WebSocketUnavailable"
@@ -61,6 +66,7 @@ type Config struct {
 	Core         core.Config
 	Auth         core.Auth
 	AuthUsers    []core.Auth
+	Exposure     Exposure
 	ServerName   string
 	Host         string
 	Port         int
@@ -98,6 +104,7 @@ type Posture struct {
 	Ready      bool
 	JetStream  bool
 	Topology   core.Topology
+	Exposure   ExposurePosture
 	WebSocket  WebSocketPosture
 	AuthUser   string
 }
@@ -128,6 +135,10 @@ func Start(cfg Config) (rt *Runtime, err error) {
 		}
 	}()
 
+	mode, err := cfg.exposure()
+	if err != nil {
+		return nil, err
+	}
 	cfg = cfg.defaults()
 
 	top, err := core.CheckTopology(cfg.Core.Topology)
@@ -158,13 +169,22 @@ func Start(cfg Config) (rt *Runtime, err error) {
 
 	opts := &natsserver.Options{
 		ServerName: cfg.ServerName,
-		Host:       cfg.Host,
-		Port:       cfg.Port,
 		NoLog:      true,
 		NoSigs:     true,
 		JetStream:  true,
 		StoreDir:   cfg.StoreDir,
 		Users:      append(users, probe),
+	}
+	if mode == ExposeInProcess {
+		opts.DontListen = true
+		// In-process conns ride synchronous net.Pipe: when the server rejects
+		// auth mid-handshake both sides can block writing, and only the server
+		// WriteDeadline (default 10s) breaks the deadlock. Bound it to the
+		// adapter's ready timeout so denial resolves promptly.
+		opts.WriteDeadline = cfg.ReadyTimeout
+	} else {
+		opts.Host = cfg.Host
+		opts.Port = cfg.Port
 	}
 	if cfg.WebSocket.Enabled {
 		opts.Websocket = natsserver.WebsocketOpts{
@@ -188,20 +208,49 @@ func Start(cfg Config) (rt *Runtime, err error) {
 		return nil, fail(ServerStartFailed, "Start", "embedded NATS server did not become ready", nil, nil)
 	}
 
+	// The declared posture must be the posture the server actually has:
+	// no socket when in-process, a bound loopback address when loopback.
+	addr := ""
+	if a := srv.Addr(); a != nil {
+		addr = a.String()
+	}
+	mismatch := mode == ExposeInProcess && addr != ""
+	if mode == ExposeLoopback {
+		host, _, err := net.SplitHostPort(addr)
+		mismatch = err != nil || host != "127.0.0.1"
+	}
+	if mismatch {
+		srv.Shutdown()
+		srv.WaitForShutdown()
+		return nil, fail(ExposureMismatch, "Start", "declared exposure posture does not match server listening state",
+			map[string]string{"mode": string(mode), "addr": addr}, nil)
+	}
+
+	clientURL := ""
+	if mode != ExposeInProcess {
+		clientURL = srv.ClientURL()
+	}
+
 	closed := make(chan struct{})
 	var once sync.Once
-	nc, err := cfg.connect(
-		srv.ClientURL(),
+	dial := []nats.Option{
 		nats.Timeout(cfg.ReadyTimeout),
 		nats.DrainTimeout(cfg.StopTimeout),
 		nats.UserInfo(probe.Username, probe.Password),
 		nats.ClosedHandler(func(*nats.Conn) {
 			once.Do(func() { close(closed) })
 		}),
-	)
+	}
+	if mode == ExposeInProcess {
+		dial = append(dial, nats.InProcessServer(srv))
+	}
+	nc, err := cfg.connect(clientURL, dial...)
 	if err != nil {
 		srv.Shutdown()
 		srv.WaitForShutdown()
+		if mode == ExposeInProcess {
+			return nil, fail(InProcessConnFailed, "Start", "owned in-process NATS client could not connect", nil, err)
+		}
 		return nil, fail(ClientConnectFailed, "Start", "owned NATS client could not connect", nil, err)
 	}
 	js, err := nc.JetStream()
@@ -228,11 +277,12 @@ func Start(cfg Config) (rt *Runtime, err error) {
 		probePw: probe.Password,
 		posture: Posture{
 			ServerName: cfg.ServerName,
-			ClientURL:  srv.ClientURL(),
+			ClientURL:  clientURL,
 			StoreDir:   cfg.StoreDir,
 			Ready:      true,
 			JetStream:  true,
 			Topology:   top,
+			Exposure:   ExposurePosture{Mode: mode, Addr: addr},
 			WebSocket: WebSocketPosture{
 				Enabled: cfg.WebSocket.Enabled,
 				Host:    cfg.WebSocket.Host,
@@ -281,32 +331,22 @@ func (r *Runtime) Posture() Posture {
 }
 
 func (r *Runtime) Connect(ctx context.Context, opts ...nats.Option) (*nats.Conn, error) {
-	if r == nil || r.posture.ClientURL == "" || r.user == "" || r.pass == "" {
+	if r == nil || r.user == "" || r.pass == "" {
 		return nil, fail(AdapterCritical, "Connect", "runtime client boundary is unavailable", nil, nil)
 	}
-	if ctx == nil {
-		ctx = context.Background()
-	}
-	if err := ctx.Err(); err != nil {
-		return nil, fail(ClientConnectFailed, "Connect", "runtime client context is closed", nil, err)
-	}
-	dial := make([]nats.Option, 0, len(opts)+2)
-	if deadline, ok := ctx.Deadline(); ok {
-		if ttl := time.Until(deadline); ttl > 0 {
-			dial = append(dial, nats.Timeout(ttl))
-		}
-	}
-	dial = append(dial, opts...)
-	dial = append(dial, nats.UserInfo(r.user, r.pass))
-	nc, err := nats.Connect(r.posture.ClientURL, dial...)
-	if err != nil {
-		return nil, fail(ClientConnectFailed, "Connect", "runtime client could not connect", nil, err)
-	}
-	return nc, nil
+	return r.dial(ctx, r.user, r.pass, opts)
 }
 
 func (r *Runtime) ConnectAs(ctx context.Context, auth core.Auth, opts ...nats.Option) (*nats.Conn, error) {
-	if r == nil || r.posture.ClientURL == "" {
+	if r == nil {
+		return nil, fail(AdapterCritical, "Connect", "runtime client boundary is unavailable", nil, nil)
+	}
+	return r.dial(ctx, auth.User, auth.Capability.LeaseID, opts)
+}
+
+func (r *Runtime) dial(ctx context.Context, user, pass string, opts []nats.Option) (*nats.Conn, error) {
+	inproc := r.posture.Exposure.Mode == ExposeInProcess
+	if inproc && r.srv == nil || !inproc && r.posture.ClientURL == "" {
 		return nil, fail(AdapterCritical, "Connect", "runtime client boundary is unavailable", nil, nil)
 	}
 	if ctx == nil {
@@ -322,9 +362,15 @@ func (r *Runtime) ConnectAs(ctx context.Context, auth core.Auth, opts ...nats.Op
 		}
 	}
 	dial = append(dial, opts...)
-	dial = append(dial, nats.UserInfo(auth.User, auth.Capability.LeaseID))
+	dial = append(dial, nats.UserInfo(user, pass))
+	if inproc {
+		dial = append(dial, nats.InProcessServer(r.srv))
+	}
 	nc, err := nats.Connect(r.posture.ClientURL, dial...)
 	if err != nil {
+		if inproc {
+			return nil, fail(InProcessConnFailed, "Connect", "in-process connection failed", nil, err)
+		}
 		return nil, fail(ClientConnectFailed, "Connect", "runtime client could not connect", nil, err)
 	}
 	return nc, nil

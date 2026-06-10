@@ -319,6 +319,7 @@ func valid(t *testing.T) Config {
 				},
 			},
 		},
+		Exposure:     Loopback(),
 		ServerName:   "tb-embedded-test",
 		Host:         "127.0.0.1",
 		Port:         -1,
