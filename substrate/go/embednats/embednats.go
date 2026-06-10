@@ -66,6 +66,7 @@ type Config struct {
 	Core         core.Config
 	Auth         core.Auth
 	AuthUsers    []core.Auth
+	Operator     bool
 	Exposure     Exposure
 	ServerName   string
 	Host         string
@@ -106,6 +107,7 @@ type Posture struct {
 	Topology   core.Topology
 	Exposure   ExposurePosture
 	WebSocket  WebSocketPosture
+	Operator   OperatorPosture
 	AuthUser   string
 }
 
@@ -114,6 +116,7 @@ type Runtime struct {
 	nc      *nats.Conn
 	js      nats.JetStreamContext
 	posture Posture
+	op      *operator
 	user    string
 	pass    string
 	probe   string
@@ -154,15 +157,25 @@ func Start(cfg Config) (rt *Runtime, err error) {
 	if cfg.StoreDir == "" {
 		return nil, fail(AdapterConfigInvalid, "Start", "store dir is required", nil, nil)
 	}
-	users, err := users(cfg.Auth, cfg.AuthUsers)
-	if err != nil {
-		return nil, err
+	var op *operator
+	var probe *natsserver.User
+	var authUsers []*natsserver.User
+	if cfg.Operator {
+		// Operator/JWT mode: the substrate-held master key is the authority;
+		// static users are not allowed alongside TrustedOperators.
+		if op, err = newOperator(cfg.StoreDir); err != nil {
+			return nil, err
+		}
+	} else {
+		if authUsers, err = users(cfg.Auth, cfg.AuthUsers); err != nil {
+			return nil, err
+		}
+		probePass, err := cfg.secret()
+		if err != nil {
+			return nil, fail(AdapterCritical, "Start", "probe credential generation failed", nil, err)
+		}
+		probe = probeUser(probePass)
 	}
-	probePass, err := cfg.secret()
-	if err != nil {
-		return nil, fail(AdapterCritical, "Start", "probe credential generation failed", nil, err)
-	}
-	probe := probeUser(probePass)
 	if cfg.WebSocket.Enabled && !cfg.WebSocket.NoTLS {
 		return nil, fail(WebSocketUnavailable, "Start", "websocket TLS config is required unless NoTLS is explicit", nil, nil)
 	}
@@ -173,7 +186,13 @@ func Start(cfg Config) (rt *Runtime, err error) {
 		NoSigs:     true,
 		JetStream:  true,
 		StoreDir:   cfg.StoreDir,
-		Users:      append(users, probe),
+	}
+	if op != nil {
+		opts.TrustedOperators = op.trusted
+		opts.AccountResolver = op.resolver
+		opts.SystemAccount = op.sysPub
+	} else {
+		opts.Users = append(authUsers, probe)
 	}
 	if mode == ExposeInProcess {
 		opts.DontListen = true
@@ -233,10 +252,16 @@ func Start(cfg Config) (rt *Runtime, err error) {
 
 	closed := make(chan struct{})
 	var once sync.Once
+	var owned nats.Option
+	if op != nil {
+		owned = nats.UserJWTAndSeed(op.probeJWT, op.probeSeed)
+	} else {
+		owned = nats.UserInfo(probe.Username, probe.Password)
+	}
 	dial := []nats.Option{
 		nats.Timeout(cfg.ReadyTimeout),
 		nats.DrainTimeout(cfg.StopTimeout),
-		nats.UserInfo(probe.Username, probe.Password),
+		owned,
 		nats.ClosedHandler(func(*nats.Conn) {
 			once.Do(func() { close(closed) })
 		}),
@@ -268,13 +293,12 @@ func Start(cfg Config) (rt *Runtime, err error) {
 	}
 
 	rt = &Runtime{
-		srv:     srv,
-		nc:      nc,
-		js:      js,
-		user:    cfg.Auth.User,
-		pass:    cfg.Auth.Capability.LeaseID,
-		probe:   probe.Username,
-		probePw: probe.Password,
+		srv:  srv,
+		nc:   nc,
+		js:   js,
+		op:   op,
+		user: cfg.Auth.User,
+		pass: cfg.Auth.Capability.LeaseID,
 		posture: Posture{
 			ServerName: cfg.ServerName,
 			ClientURL:  clientURL,
@@ -290,8 +314,12 @@ func Start(cfg Config) (rt *Runtime, err error) {
 				URL:     srv.WebsocketURL(),
 				NoTLS:   cfg.WebSocket.NoTLS,
 			},
+			Operator: op.posture(),
 			AuthUser: cfg.Auth.User,
 		},
+	}
+	if probe != nil {
+		rt.probe, rt.probePw = probe.Username, probe.Password
 	}
 	rt.drain = func(ctx context.Context) error {
 		if rt.nc == nil {
@@ -334,17 +362,17 @@ func (r *Runtime) Connect(ctx context.Context, opts ...nats.Option) (*nats.Conn,
 	if r == nil || r.user == "" || r.pass == "" {
 		return nil, fail(AdapterCritical, "Connect", "runtime client boundary is unavailable", nil, nil)
 	}
-	return r.dial(ctx, r.user, r.pass, opts)
+	return r.dial(ctx, append(opts, nats.UserInfo(r.user, r.pass)))
 }
 
 func (r *Runtime) ConnectAs(ctx context.Context, auth core.Auth, opts ...nats.Option) (*nats.Conn, error) {
 	if r == nil {
 		return nil, fail(AdapterCritical, "Connect", "runtime client boundary is unavailable", nil, nil)
 	}
-	return r.dial(ctx, auth.User, auth.Capability.LeaseID, opts)
+	return r.dial(ctx, append(opts, nats.UserInfo(auth.User, auth.Capability.LeaseID)))
 }
 
-func (r *Runtime) dial(ctx context.Context, user, pass string, opts []nats.Option) (*nats.Conn, error) {
+func (r *Runtime) dial(ctx context.Context, opts []nats.Option) (*nats.Conn, error) {
 	inproc := r.posture.Exposure.Mode == ExposeInProcess
 	if inproc && r.srv == nil || !inproc && r.posture.ClientURL == "" {
 		return nil, fail(AdapterCritical, "Connect", "runtime client boundary is unavailable", nil, nil)
@@ -355,14 +383,13 @@ func (r *Runtime) dial(ctx context.Context, user, pass string, opts []nats.Optio
 	if err := ctx.Err(); err != nil {
 		return nil, fail(ClientConnectFailed, "Connect", "runtime client context is closed", nil, err)
 	}
-	dial := make([]nats.Option, 0, len(opts)+3)
+	dial := make([]nats.Option, 0, len(opts)+2)
 	if deadline, ok := ctx.Deadline(); ok {
 		if ttl := time.Until(deadline); ttl > 0 {
 			dial = append(dial, nats.Timeout(ttl))
 		}
 	}
 	dial = append(dial, opts...)
-	dial = append(dial, nats.UserInfo(user, pass))
 	if inproc {
 		dial = append(dial, nats.InProcessServer(r.srv))
 	}

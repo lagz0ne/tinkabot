@@ -19,21 +19,20 @@ Reach the Tinkabot v1 platform target with matched-abstraction docs, inside-out 
 
 ## Active Session
 
-Current slice: `typed-exposure-posture` — DONE (second slice of `quality-v1`).
+Current slice: `operator-jwt-authority` — DONE on its authority surface (third slice of `quality-v1`); one slice-owned manual item carried (see Next Slice).
 
 RED-GREEN-TDD result:
 
-- RED: `substrate/go/embednats/exposure_test.go` (parallel-safe, real embedded runtime via the `start(t, cfg)` seam) failed to build on 45 missing typed posture/denial symbols; `gate:parallel` exit 1 solely from that build failure, zero structural findings; `go test ./core` stayed green.
-- GREEN: typed posture API in `substrate/go/embednats/exposure.go` + `embednats.go` — in-process default (`DontListen` + `InProcessConn` + `nats.InProcessServer`), explicit `Loopback()`, typed denied-by-default external tier; corpus migration is one line (`valid(t)` declares `Exposure: Loopback()`), assertions unchanged. All 8 exposure tests pass (12 subtests); whole embednats corpus + all four standing gates green (coverage embednats 78.4% >= 72%).
-- Security hardening during gates: non-loopback main host or websocket host under a `Loopback()` posture is `ExposureDenied` BEFORE any server is constructed (no transient widened listener); owning tests `TestExposureLoopbackHostBeyondLoopbackDeniedBeforeBind`, `TestExposureLoopbackWebSocketBeyondLoopbackDenied`.
-- Upstream bound: auth rejection over `InProcessConn` deadlocks the `net.Pipe` handshake until the server `WriteDeadline` fires; in-process runtimes set `WriteDeadline = cfg.ReadyTimeout` so the typed denial resolves in ~2s instead of 10s.
-- Verified (full battery, 2026-06-10): `bun run test` 85 pass/427 expects, `test:e2e`, `typecheck`, `build`, `pack:dry`, `schema:parity`, `go test ./... -count=1` (5 packages ok uncached), `release:evidence` (16 milestones/11 spine steps), `validate:layers`, `test:layers`, all four `gate:*`, `git diff --check` — all pass. Gates real-nats, parallel-safety, be-lazy, coverage, no-slop, security all pass. Evidence in `docs/matched-abstraction/task/typed-exposure-posture.md` (status complete).
+- RED: `substrate/go/embednats/operator_test.go` (9 parallel-safe tests, real embedded runtime via the `start(t, cfg)` seam) failed to build on exactly the missing operator/JWT symbols (`Config.Operator`, `UserCreds`, `MintUser`, `ConnectCreds`, `Posture().Operator`, `AppAccount`/`ControlAccount`); `gate:parallel` exit 1 solely from that build failure, zero structural findings; `go test ./core` stayed green.
+- GREEN: `substrate/go/embednats/operator.go` + factory seam — master operator key first-start generation and byte-identical reload, `TB_SYS` + control-plane/app-plane account split via `TrustedOperators` + `MemAccResolver`, `MintUser` embedding the full `core.Capability` lease vocabulary decoded back from the signed JWT, live `UpdateAccountClaims` push restricting a live connection with a second push superseding stale claims, revocation disconnecting live + denying reconnect (deferred live-auth-reload item closed by proof), six typed failure families. All 9 operator tests (24 incl. subtests) pass on both declared postures; whole embednats corpus green; flake-free (`-count=5`) and race-clean (`-race -count=2`).
+- Security hardening during gates: account-default scope seeds an explicit publish/subscribe deny `>` so a permissionless mint holds nothing before the first push (NATS empty-permissions = allow-all); `MintUser` refuses `ttl <= 0` typed `JWTMintFailed` (bounded credential TTL required).
+- Verified (full battery, 2026-06-10): `bun run test` 85 pass/427 expects, `test:e2e`, `typecheck`, `build`, `pack:dry`, `schema:parity` (contracts 21 pass), `go test ./... -count=1` (5 packages ok uncached), `release:evidence` (16 milestones/11 spine steps), `validate:layers`, `test:layers`, all four `gate:*` (coverage: contract 73.9%, core 81.7%, edge 82.8%, embednats 78.5%, frontend 100% — all floors met), `git diff --check` — all pass. Gates real-nats, parallel-safety, be-lazy, no-slop, security, coverage all pass. Evidence in `docs/matched-abstraction/task/operator-jwt-authority.md` (status complete).
 
 ## Closeout Snapshot
 
-- Completed through `release-spine`; all sixteen v1 milestones are DONE. `quality-v1` slices 1-2 of 5 (`quality-gate-infrastructure`, `typed-exposure-posture`) are DONE; the next resume point is `operator-jwt-authority`.
+- Completed through `release-spine`; all sixteen v1 milestones are DONE. `quality-v1` slices 1-3 of 5 are DONE including the carried manual phase (preamble revised to JWT creds, proven by `TestOperatorCLIRequestWithCreds`); the next resume point is `tinkabot-binary`.
 - `bun run release:evidence` over `release/v1.json` is the single passing release gate: 16 milestones over 11 spine steps, deferred scope named, four Plan scope guards enforced, doc authority map recorded.
-- No active implementation blocker is recorded. Endgame v1 closeout and the quality-v1 plan are pushed through `bb30c70`; quality-gate-infrastructure and typed-exposure-posture await commit.
+- No active implementation blocker is recorded. Endgame v1 closeout and the quality-v1 plan are pushed through `bb30c70`; quality-gate-infrastructure, typed-exposure-posture, and operator-jwt-authority await commit.
 - Do not reopen completed feature slices unless the release gate exposes a concrete unsupported claim or missing proof.
 
 ## Milestone Workflow
@@ -56,6 +55,7 @@ RED-GREEN-TDD result:
 16. DONE: `release-spine`: centralized ops evidence manifest with outside-in real NATS proof and inside-out ownership proof.
 17. DONE: `quality-gate-infrastructure` (quality-v1 slice 1/5): four standing gates (`gate:fakes`, `gate:parallel`, `gate:coverage`, `gate:scenarios`), harness factory seam, fully parallel shuffled corpus, fakes allowlist, coverage floors, scenario matrix, injected-violation detection proof.
 18. DONE: `typed-exposure-posture` (quality-v1 slice 2/5): typed exposure posture through the harness seam — in-process default with no TCP endpoint, explicit loopback opt-in carrying the `nats` CLI proofs unchanged, typed denied-by-default external tier, four typed failure families (`ExposureUndeclared`, `ExposureDenied`, `ExposureMismatch`, `InProcessConnFailed`), pre-bind denial of exposure widening, whole corpus on declared postures.
+19. DONE: `operator-jwt-authority` (quality-v1 slice 3/5): real embedded NATS in operator/JWT mode through the harness seam — substrate-held operator key with first-start generation and reload, control/app account split, user-JWT minting carrying `core.Capability` lease provenance, live `UpdateAccountClaims` push and supersession, revocation disconnecting live + denying reconnect (closes the deferred live-auth-reload item), six typed failure families (`OperatorKeyFailed`, `AccountCompileFailed`, `JWTMintFailed`, `AccountUpdateFailed`, `RevocationFailed`, `ProvenanceLost`). The manual connection preamble is revised to JWT creds and proven by `TestOperatorCLIRequestWithCreds` (real CLI, minted creds, allowed reply verbatim, denied neighbor output-parsed); KV/Object/publish behavior commands run creds-mode with the slice-4 binary.
 
 ## Operating Rules
 
@@ -91,14 +91,16 @@ RED-GREEN-TDD result:
 
 ## Next Slice
 
-Task layer next: `operator-jwt-authority`, third slice of the `quality-v1` program.
+Resume point: `tinkabot-binary` (slice 4). The carried manual phase is closed: the connection preamble in `docs/manual/v1.md` now documents JWT creds (static form noted for non-operator embedding), proven over a real `nats` CLI caller by `go test ./embednats -run TestOperatorCLIRequestWithCreds -count=1 -v` -> PASS. Remainder named in the task doc: KV/Object/publish behavior commands creds-mode sweep lands with the binary and feeds `gate:manual`.
 
-The Quality V1 Plan is the program decomposition authority: `docs/matched-abstraction/plan/quality-v1.md`. Five slices in order: `quality-gate-infrastructure` (DONE) -> `typed-exposure-posture` (DONE — typed posture API on the embednats seam, in-process default, loopback opt-in, denied-by-default external tier) -> `operator-jwt-authority` -> `tinkabot-binary` (assembly only) -> `quality-release` (extends `bun run release:evidence` with gate results and the manual-verbatim check). Auth changes only the harness factory seam (`substrate/go/embednats/harness_test.go`) and must keep all four gates green; `operator-jwt-authority` also owns revising the manual CLI connection preamble (`--user/--password` -> JWT creds) and re-verifying every behavior command verbatim.
+Task layer next after that: `tinkabot-binary`, fourth slice of the `quality-v1` program (assembly only — startup/shutdown lifecycle, first-start key/store materialization, embedded frontend serving, materializer loop wired through declared exposure and operator/JWT auth, manual "starting the binary" section).
+
+The Quality V1 Plan is the program decomposition authority: `docs/matched-abstraction/plan/quality-v1.md`. Five slices in order: `quality-gate-infrastructure` (DONE) -> `typed-exposure-posture` (DONE) -> `operator-jwt-authority` (DONE, manual preamble closed) -> `tinkabot-binary` -> `quality-release` (extends `bun run release:evidence` with gate results and the manual-verbatim check).
 
 Assumption:
 - V1 is closed, committed, and pushed: all sixteen milestones DONE, `bun run release:evidence` passes as the single release gate.
-- Deferred scope is named in `release/v1.json`; this program takes on live auth reload and the product entry surface, the rest stays deferred.
-- Manual-verbatim reconciliation is pre-decided in the Plan: behavior commands in `docs/manual/v1.md` must run unchanged through the program; the CLI connection preamble (`--user/--password`) is the one manual surface `operator-jwt-authority` owns revising for JWT creds, re-verifying every behavior command verbatim under the new preamble.
+- Deferred scope is named in `release/v1.json`; live auth reload is now closed by `operator-jwt-authority` proof; the product entry surface belongs to `tinkabot-binary`; the rest stays deferred.
+- The operator/JWT surface to build the binary on: `substrate/go/embednats/operator.go` (`Config.Operator`, `Posture().Operator`, `MintUser`, `ConnectCreds`, `UpdateAccountPerms`, `Revoke`, `ControlAccount`/`AppAccount`, `UserCreds`), uncommitted in the working tree alongside the typed-exposure and gate-infrastructure slices.
 - Run each slice through the `quality-slice` workflow (`.claude/workflows/quality-slice.js`).
 
 Direction (from Current Direction, quality-v1 entry):
@@ -282,6 +284,7 @@ Historical details live in matched-abstraction docs and git history. Do not expa
 - Release spine task: `docs/matched-abstraction/task/release-spine.md`.
 - Quality gate infrastructure task: `docs/matched-abstraction/task/quality-gate-infrastructure.md`.
 - Typed exposure posture task: `docs/matched-abstraction/task/typed-exposure-posture.md`.
+- Operator JWT authority task: `docs/matched-abstraction/task/operator-jwt-authority.md`.
 
 ## Recent Git
 
