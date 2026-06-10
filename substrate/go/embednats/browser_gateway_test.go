@@ -14,14 +14,14 @@ import (
 )
 
 func TestBrowserGatewayCommandAcceptanceOverRealNATS(t *testing.T) {
+	t.Parallel()
 	cfg := valid(t)
 	cfg.Auth.Permissions.Publish.Allow = []string{"tb.app.browser.command", "_INBOX.>"}
 	cfg.Auth.Permissions.Subscribe.Allow = []string{"tb.app.browser.command", "_INBOX.>"}
-	rt, err := Start(cfg)
+	rt, err := start(t, cfg)
 	if err != nil {
 		t.Fatal(err)
 	}
-	t.Cleanup(func() { stop(t, rt) })
 
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()

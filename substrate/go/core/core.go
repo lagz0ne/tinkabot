@@ -915,6 +915,10 @@ type LedgerStore interface {
 	Replay(string, int) ([]LedgerRecord, error)
 }
 
+// MemoryLedgerStore is a test fake (allowlisted in substrate/go/fakes-allowlist.json):
+// it exists to force the WriteConflict and CursorFailed branches that a healthy
+// embedded JetStream KV bucket cannot emit on demand. The real path is proven by
+// TestEmbeddedLedgerUsesJetStreamKV over the embednats KVLedgerStore.
 type MemoryLedgerStore struct {
 	mu            sync.Mutex
 	byDedupe      map[string]LedgerRecord

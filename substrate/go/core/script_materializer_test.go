@@ -7,6 +7,7 @@ import (
 )
 
 func TestScriptRuntimeMaterializesMediatedEffects(t *testing.T) {
+	t.Parallel()
 	act := activation(t, read(t, "fixtures/valid/activation-command-acceptance.json"))
 	store := NewMemoryMaterialStore()
 	runner := ScriptRunnerFunc(func(inv ScriptInvocation) (ScriptRun, error) {
@@ -104,6 +105,7 @@ func TestScriptRuntimeMaterializesMediatedEffects(t *testing.T) {
 }
 
 func TestScriptRuntimeAttributesFailures(t *testing.T) {
+	t.Parallel()
 	act := activation(t, read(t, "fixtures/valid/activation-command-acceptance.json"))
 
 	t.Run("revision", func(t *testing.T) {

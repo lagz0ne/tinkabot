@@ -1,0 +1,20 @@
+[
+  {
+    "fake": "MemoryLedgerStore",
+    "definedIn": "core/core.go",
+    "justification": "Forces LedgerStore failure branches a healthy embedded JetStream KV bucket cannot be made to emit deterministically: WriteConflict (concurrent-write denial) and CursorFailed (replay cursor persistence failure). The durable accept/duplicate/stale/replay path itself is proven over real JetStream KV by the realProof.",
+    "realProof": "TestEmbeddedLedgerUsesJetStreamKV"
+  },
+  {
+    "fake": "MemoryScheduleStore",
+    "definedIn": "core/schedule.go",
+    "justification": "Forces ScheduleStore failure branches impossible to force on a live embedded JetStream KV store: RecoverFailed (RestartRecoveryFailed at engine restart) and WriteFailed (CatchUpFailed on tick persistence). Restart and catch-up over real JetStream KV are proven by the realProof.",
+    "realProof": "TestEmbeddedScheduleStorePersistsRestartCatchUp"
+  },
+  {
+    "fake": "MemoryMaterialStore",
+    "definedIn": "core/script_materializer.go",
+    "justification": "Lets core materializer tests seed a newer projection sequence synchronously to force the ProjectionConflict branch and assert ExecutionStateInvalid on raw activations, branches a real KV/Object store cannot stage deterministically inside the core layer. The full projection/artifact materialization path over real JetStream KV and Object stores, read back through the nats CLI, is proven by the realProof.",
+    "realProof": "TestScriptMaterializerLoopFromNATSCLI"
+  }
+]

@@ -3,6 +3,7 @@ package core
 import "testing"
 
 func TestScheduleEngineAcceptsDueTickAndCatchUp(t *testing.T) {
+	t.Parallel()
 	act := activation(t, read(t, "fixtures/valid/activation-source-schedule.json"))
 	engine, sched, ledger := scheduleEngine(t, act)
 
@@ -45,6 +46,7 @@ func TestScheduleEngineAcceptsDueTickAndCatchUp(t *testing.T) {
 }
 
 func TestScheduleEngineDenials(t *testing.T) {
+	t.Parallel()
 	t.Run("config", func(t *testing.T) {
 		act := activation(t, read(t, "fixtures/valid/activation-source-schedule.json"))
 		engine, _, _ := scheduleEngine(t, act)
@@ -125,6 +127,7 @@ func TestScheduleEngineDenials(t *testing.T) {
 }
 
 func TestScheduleEngineStoreFailures(t *testing.T) {
+	t.Parallel()
 	act := activation(t, read(t, "fixtures/valid/activation-source-schedule.json"))
 	_, err := NewScheduleEngine(sourceAuth(act), nil, NewMemoryScheduleStore())
 	assertKind(t, err, ScheduleConfigInvalid)

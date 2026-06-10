@@ -10,6 +10,7 @@ import (
 var assetRef = regexp.MustCompile(`/(assets/[^"]+)`)
 
 func TestEmbeddedFrontendIndex(t *testing.T) {
+	t.Parallel()
 	body, err := Index()
 	if err != nil {
 		t.Fatal(err)
@@ -33,6 +34,7 @@ func TestEmbeddedFrontendIndex(t *testing.T) {
 }
 
 func TestEmbeddedFrontendFiles(t *testing.T) {
+	t.Parallel()
 	files, err := Files()
 	if err != nil {
 		t.Fatal(err)

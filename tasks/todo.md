@@ -4,7 +4,7 @@
 
 - Repo: `lagz0ne/tinkabot`, private, branch `main`.
 - Remote: `origin git@github.com:lagz0ne/tinkabot.git`.
-- Last completed feature commit: `8c9b180 feat: add release spine evidence gate`, plus `057eca5 refactor: rename endgame to base/v1 on live surfaces`; both local on `main`, push pending.
+- Last completed feature commit: `bb30c70 feat: add quality-v1 program plan`, pushed to `origin/main`.
 - Worktree status at closeout start: clean after `f93b705`.
 - Root role: orchestration only.
 - Current implementation lives in `packages/sdk` and `substrate/go`.
@@ -19,19 +19,19 @@ Reach the Tinkabot v1 platform target with matched-abstraction docs, inside-out 
 
 ## Active Session
 
-Current slice: v1 user manual/README.
+Current slice: `quality-gate-infrastructure` — DONE (first slice of `quality-v1`).
 
 RED-GREEN-TDD result:
 
-- RED: the repo had no root `README.md`; subsystem READMEs were lane notes, and release-facing docs still contained stale pre-rename manifest wording in the release-spine task.
-- GREEN: root `README.md` now describes the v1 verified checkout, current source-level runnable surface, truthful verification commands, deferred scope, focused proof commands, and authority map without claiming an installable binary or published package.
-- Verified: `bun run release:evidence`, `bun run validate:layers`, `bun run test:layers`, focused README path checks, and `git diff --check` passed after the README/manual edits.
+- RED: all four gates failed on the unmodified corpus with file-attributable findings — `gate:fakes` 4 findings (three Memory fakes, including `MemoryMaterialStore` beyond the two the contract enumerated), `gate:parallel` 55 findings (53 serialized Test funcs, `Start` in 8 test files), `gate:coverage` 6, `gate:scenarios` 1; baseline corpus green pre-refactor.
+- GREEN: `gate:fakes`, `gate:parallel`, `gate:coverage`, `gate:scenarios` all exit 0 on the migrated corpus — all 53 Test funcs `t.Parallel()`, single `Start` seam at `substrate/go/embednats/harness_test.go`, 3 allowlisted fakes with justifications + real-NATS proofs, coverage floors met (contract 73.9/core 81.7/edge 82.8/embednats 76.8/frontend 100), seven-family matrix complete for both outside-in surfaces. Injected-violation detection proven: an un-allowlisted fake and an out-of-seam server each failed their gate, then reverted clean.
+- Verified: `go test ./... -count=1 -shuffle=on` green across 4 independent shuffled runs; full suite (`bun run test` 85 pass/427 expects, `test:e2e`, `typecheck`, `build`, `pack:dry`, `release:evidence`, `validate:layers`, `test:layers`, `git diff --check`) all pass; gates real-nats, parallel-safety, coverage, be-lazy, security, no-slop all pass. Evidence in `docs/matched-abstraction/task/quality-gate-infrastructure.md` (status complete).
 
 ## Closeout Snapshot
 
-- Completed through `release-spine`; all sixteen v1 milestones are DONE. The next resume point is the `quality-v1` program.
+- Completed through `release-spine`; all sixteen v1 milestones are DONE. `quality-v1` slice 1 of 5 (`quality-gate-infrastructure`) is DONE; the next resume point is `typed-exposure-posture`.
 - `bun run release:evidence` over `release/v1.json` is the single passing release gate: 16 milestones over 11 spine steps, deferred scope named, four Plan scope guards enforced, doc authority map recorded.
-- No active implementation blocker is recorded. V1 work is closed and committed (`8c9b180`, `057eca5`); push to `origin/main` is pending.
+- No active implementation blocker is recorded. Endgame v1 closeout and the quality-v1 plan are pushed through `bb30c70`; quality-gate-infrastructure awaits commit.
 - Do not reopen completed feature slices unless the release gate exposes a concrete unsupported claim or missing proof.
 
 ## Milestone Workflow
@@ -52,6 +52,7 @@ RED-GREEN-TDD result:
 14. DONE: `activation-release-proof`: outside-in real NATS activation scenarios tied back to inside-out contract, ledger, source authority, router, command-acceptance peer evidence, and schedule proof.
 15. DONE: `script-materializer-loop`: mediated script execution, accepted effects, materialized projections/artifacts, cleanup.
 16. DONE: `release-spine`: centralized ops evidence manifest with outside-in real NATS proof and inside-out ownership proof.
+17. DONE: `quality-gate-infrastructure` (quality-v1 slice 1/5): four standing gates (`gate:fakes`, `gate:parallel`, `gate:coverage`, `gate:scenarios`), harness factory seam, fully parallel shuffled corpus, fakes allowlist, coverage floors, scenario matrix, injected-violation detection proof.
 
 ## Operating Rules
 
@@ -87,9 +88,9 @@ RED-GREEN-TDD result:
 
 ## Next Slice
 
-Task layer next: `quality-gate-infrastructure`, first slice of the `quality-v1` program.
+Task layer next: `typed-exposure-posture`, second slice of the `quality-v1` program.
 
-The Quality V1 Plan is the program decomposition authority: `docs/matched-abstraction/plan/quality-v1.md`. Five slices in order: `quality-gate-infrastructure` (harness factory, parallel-safe corpus, fakes allowlist, dual coverage measurement) -> `typed-exposure-posture` -> `operator-jwt-authority` -> `tinkabot-binary` (assembly only) -> `quality-release` (extends `bun run release:evidence` with gate results and the manual-verbatim check). Gate infrastructure goes first so the single structural pass over the test corpus lands once; exposure and auth then change only the harness factory seam.
+The Quality V1 Plan is the program decomposition authority: `docs/matched-abstraction/plan/quality-v1.md`. Five slices in order: `quality-gate-infrastructure` (DONE — harness factory, parallel-safe corpus, fakes allowlist, dual coverage measurement) -> `typed-exposure-posture` -> `operator-jwt-authority` -> `tinkabot-binary` (assembly only) -> `quality-release` (extends `bun run release:evidence` with gate results and the manual-verbatim check). Gate infrastructure landed the single structural pass over the test corpus; exposure and auth now change only the harness factory seam (`substrate/go/embednats/harness_test.go`) and must keep all four gates green.
 
 Assumption:
 - V1 is closed, committed, and pushed: all sixteen milestones DONE, `bun run release:evidence` passes as the single release gate.
@@ -198,6 +199,7 @@ Evidence gathered:
 - `bun run release:evidence` -> centralized release gate over `release/v1.json`.
 - `bun run validate:layers` -> matched-abstraction docs.
 - `bun run test:layers` -> layer validator unit tests.
+- `bun run gate:fakes` / `gate:parallel` / `gate:coverage` / `gate:scenarios` -> standing quality-v1 gates; all four must stay green per slice. `gate:parallel` runs the full shuffled Go suite.
 
 ## Pinned Decisions
 
@@ -275,6 +277,7 @@ Historical details live in matched-abstraction docs and git history. Do not expa
 - Codex endgame orchestration plan: `docs/matched-abstraction/plan/codex-endgame-orchestration.md`.
 - Codex endgame orchestrator task: `docs/matched-abstraction/task/codex-endgame-orchestrator.md`.
 - Release spine task: `docs/matched-abstraction/task/release-spine.md`.
+- Quality gate infrastructure task: `docs/matched-abstraction/task/quality-gate-infrastructure.md`.
 
 ## Recent Git
 

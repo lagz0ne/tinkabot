@@ -15,6 +15,7 @@ import (
 )
 
 func TestScriptMaterializerLoopFromNATSCLI(t *testing.T) {
+	t.Parallel()
 	h := scriptLoopHarness(t)
 	act := h.act
 	script := core.ScriptRecord{
@@ -133,6 +134,7 @@ func TestScriptMaterializerLoopFromNATSCLI(t *testing.T) {
 }
 
 func TestLocalScriptRunnerRejectsMalformedFrame(t *testing.T) {
+	t.Parallel()
 	rec := core.ScriptRecord{
 		Kind:     "script.record",
 		Key:      "script.bad.frame",
@@ -155,6 +157,7 @@ func TestLocalScriptRunnerRejectsMalformedFrame(t *testing.T) {
 }
 
 func TestLocalScriptRunnerRejectsUnknownFrameField(t *testing.T) {
+	t.Parallel()
 	for _, body := range []string{
 		`{"kind":"script.effect","effectType":"projection","projectionId":"main","snapshotRevision":"snap-001","artifactRevision":"artifact.rev.7","sequence":1,"value":{"title":"ok"},"extra":true}`,
 		`{"kind":"script.effect","effectType":"artifact","artifactName":"artifact/main.js","artifactRevision":"artifact.rev.7","mediaType":"application/javascript","body":"export default 1","projectionId":"main"}`,
@@ -186,6 +189,7 @@ func TestLocalScriptRunnerRejectsUnknownFrameField(t *testing.T) {
 }
 
 func TestKVScriptStoreRejectsUnknownRecordField(t *testing.T) {
+	t.Parallel()
 	h := scriptLoopHarness(t)
 	valid := core.ScriptRecord{
 		Kind:     "script.record",
@@ -227,6 +231,7 @@ func TestKVScriptStoreRejectsUnknownRecordField(t *testing.T) {
 }
 
 func TestScriptLoopDurableRunClaimRejectsAcceptedReplay(t *testing.T) {
+	t.Parallel()
 	h := scriptLoopHarness(t)
 	act := h.act
 	script := core.ScriptRecord{
@@ -274,6 +279,7 @@ func TestScriptLoopDurableRunClaimRejectsAcceptedReplay(t *testing.T) {
 }
 
 func TestScriptLoopAttributesStatusWriteFailure(t *testing.T) {
+	t.Parallel()
 	act := activation(t, read(t, "fixtures/valid/activation-request-reply.json"))
 	rec := core.ScriptRecord{
 		Kind:     "script.record",
@@ -345,11 +351,10 @@ func scriptLoopHarness(t *testing.T) scriptHarness {
 	cfg := valid(t)
 	cfg.Auth = routerSvc
 	cfg.AuthUsers = []core.Auth{caller, service, observer}
-	rt, err := Start(cfg)
+	rt, err := start(t, cfg)
 	if err != nil {
 		t.Fatal(err)
 	}
-	t.Cleanup(func() { stop(t, rt) })
 
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()

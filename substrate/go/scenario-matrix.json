@@ -1,0 +1,23 @@
+{
+  "activation-release-proof": {
+    "allowed": ["TestActivationReleaseProofAcceptedSources"],
+    "denied-neighbor": ["TestActivationReleaseProofFailureAttribution/denied_neighbor"],
+    "malformed": ["TestActivationReleaseProofFailureAttribution/malformed"],
+    "duplicate": ["TestActivationReleaseProofFailureAttribution/duplicate"],
+    "stale": ["TestActivationReleaseProofFailureAttribution/stale_cursor"],
+    "revoked": ["TestActivationReleaseProofFailureAttribution/revoked_lease"],
+    "attributed-failure": ["TestActivationReleaseProofFailureAttribution/loop_suppressed"]
+  },
+  "live-source-router": {
+    "allowed": [
+      "TestSourceRouterAcceptsLiveSourcesOverEmbeddedNATS",
+      "TestSourceRouterRequestReplyFromNATSCLI"
+    ],
+    "denied-neighbor": ["TestSourceRouterEdgeCases/source_authority_denial_is_propagated_with_attribution"],
+    "malformed": ["TestSourceRouterEdgeCases/malformed_request_frame"],
+    "duplicate": ["TestSourceRouterEdgeCases/duplicate_is_ledger_owned"],
+    "stale": ["TestSourceRouterEdgeCases/stale_stream_cursor_is_ledger_owned"],
+    "revoked": ["TestSourceRouterEdgeCases/revoked_source_lease_is_source-authority_owned"],
+    "attributed-failure": ["TestSourceRouterEdgeCases/router_failures_are_typed"]
+  }
+}

@@ -12,6 +12,7 @@ import (
 )
 
 func TestSourceRouterAcceptsLiveSourcesOverEmbeddedNATS(t *testing.T) {
+	t.Parallel()
 	t.Run("request reply", func(t *testing.T) {
 		act, router, nc, _ := routerHarness(t, "fixtures/valid/activation-request-reply.json")
 		route, out, err := router.RequestReply(nc, act)
@@ -130,6 +131,7 @@ func TestSourceRouterAcceptsLiveSourcesOverEmbeddedNATS(t *testing.T) {
 }
 
 func TestSourceRouterRequestReplyFromNATSCLI(t *testing.T) {
+	t.Parallel()
 	act, router, rt, nc, _ := routerRuntime(t, "fixtures/valid/activation-request-reply.json")
 	route, out, err := router.RequestReply(nc, act)
 	if err != nil {
@@ -157,6 +159,7 @@ func TestSourceRouterRequestReplyFromNATSCLI(t *testing.T) {
 }
 
 func TestSourceRouterEdgeCases(t *testing.T) {
+	t.Parallel()
 	t.Run("router failures are typed", func(t *testing.T) {
 		act := activation(t, read(t, "fixtures/valid/activation-request-reply.json"))
 		router, err := NewSourceRouter(routerAuth(act, "tb_router_edges"), core.NewDurableLedger(core.NewMemoryLedgerStore()))
@@ -308,11 +311,10 @@ func routerRuntime(t *testing.T, fixture string) (core.Activation, *SourceRouter
 	auth := routerAuth(act, bucket)
 	cfg := valid(t)
 	cfg.Auth = auth
-	rt, err := Start(cfg)
+	rt, err := start(t, cfg)
 	if err != nil {
 		t.Fatal(err)
 	}
-	t.Cleanup(func() { stop(t, rt) })
 
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()

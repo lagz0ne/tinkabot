@@ -12,6 +12,7 @@ import (
 )
 
 func TestActivationReleaseProofAcceptedSources(t *testing.T) {
+	t.Parallel()
 	t.Run("request reply cli", func(t *testing.T) {
 		act, router, rt, nc, _ := routerRuntime(t, "fixtures/valid/activation-request-reply.json")
 		route, out, err := router.RequestReply(nc, act)
@@ -75,6 +76,7 @@ func TestActivationReleaseProofAcceptedSources(t *testing.T) {
 }
 
 func TestActivationReleaseProofFailureAttribution(t *testing.T) {
+	t.Parallel()
 	t.Run("malformed", func(t *testing.T) {
 		act, router, nc, _ := routerHarness(t, "fixtures/valid/activation-request-reply.json")
 		route, out, err := router.RequestReply(nc, act)
@@ -282,11 +284,10 @@ func embeddedScheduleEngine(t *testing.T) (core.Activation, *core.ScheduleEngine
 	auth := scheduleAuth(act, bucket, ledgerBucket)
 	cfg := valid(t)
 	cfg.Auth = auth
-	rt, err := Start(cfg)
+	rt, err := start(t, cfg)
 	if err != nil {
 		t.Fatal(err)
 	}
-	t.Cleanup(func() { stop(t, rt) })
 
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
@@ -311,11 +312,10 @@ func releaseRuntime(t *testing.T, act core.Activation, rtAuth, auth core.Auth, b
 	t.Helper()
 	cfg := valid(t)
 	cfg.Auth = rtAuth
-	rt, err := Start(cfg)
+	rt, err := start(t, cfg)
 	if err != nil {
 		t.Fatal(err)
 	}
-	t.Cleanup(func() { stop(t, rt) })
 
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()

@@ -12,6 +12,7 @@ import (
 )
 
 func TestSourceAuthorityCLIAllowedAndDeniedSubject(t *testing.T) {
+	t.Parallel()
 	cfg := valid(t)
 	cfg.Auth.User = "principal.source.request"
 	cfg.Auth.Capability.PrincipalID = "principal.source.request"
@@ -26,11 +27,10 @@ func TestSourceAuthorityCLIAllowedAndDeniedSubject(t *testing.T) {
 	}
 	cfg.Auth.Permissions.AllowResponses = core.AllowResponses{Max: 1, ExpiresMs: 30000}
 
-	rt, err := Start(cfg)
+	rt, err := start(t, cfg)
 	if err != nil {
 		t.Fatal(err)
 	}
-	t.Cleanup(func() { stop(t, rt) })
 
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()

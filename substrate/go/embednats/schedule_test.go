@@ -10,17 +10,17 @@ import (
 )
 
 func TestEmbeddedScheduleStorePersistsRestartCatchUp(t *testing.T) {
+	t.Parallel()
 	act := activation(t, read(t, "fixtures/valid/activation-source-schedule.json"))
 	bucket := "tb_schedule_" + strings.NewReplacer("/", "_", " ", "_").Replace(t.Name())
 	ledgerBucket := bucket + "_ledger"
 	auth := scheduleAuth(act, bucket, ledgerBucket)
 	cfg := valid(t)
 	cfg.Auth = auth
-	rt, err := Start(cfg)
+	rt, err := start(t, cfg)
 	if err != nil {
 		t.Fatal(err)
 	}
-	t.Cleanup(func() { stop(t, rt) })
 
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()

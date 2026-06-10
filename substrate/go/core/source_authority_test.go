@@ -3,6 +3,7 @@ package core
 import "testing"
 
 func TestSourceAuthorityAllowsCanonicalSources(t *testing.T) {
+	t.Parallel()
 	cases := []struct {
 		name    string
 		fixture string
@@ -41,6 +42,7 @@ func TestSourceAuthorityAllowsCanonicalSources(t *testing.T) {
 }
 
 func TestSourceAuthorityDeniesNeighborAndDenyOverAllow(t *testing.T) {
+	t.Parallel()
 	act := activation(t, read(t, "fixtures/valid/activation-source-denied-neighbor.json"))
 	auth := sourceAuth(act)
 	_, err := AuthorizeSource(auth, act)
@@ -57,6 +59,7 @@ func TestSourceAuthorityDeniesNeighborAndDenyOverAllow(t *testing.T) {
 }
 
 func TestSourceAuthorityDeniesWildcardAndResponseDrift(t *testing.T) {
+	t.Parallel()
 	act := activation(t, read(t, "fixtures/valid/activation-source-wildcard-overreach.json"))
 	_, err := AuthorizeSource(sourceAuth(act), act)
 	assertKind(t, err, WildcardOverreach)
@@ -76,6 +79,7 @@ func TestSourceAuthorityDeniesWildcardAndResponseDrift(t *testing.T) {
 }
 
 func TestSourceAuthorityDeniesLeaseAndRevisionDrift(t *testing.T) {
+	t.Parallel()
 	cases := []struct {
 		name string
 		edit func(*Activation, *Auth)

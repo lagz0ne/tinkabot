@@ -12,6 +12,7 @@ import (
 )
 
 func TestEmbeddedLedgerUsesJetStreamKV(t *testing.T) {
+	t.Parallel()
 	ledger, store := embeddedLedger(t, "tb_ledger")
 	lease := core.Lease{ID: "lease-source-stream-001", Status: "active"}
 	act := activation(t, read(t, "fixtures/valid/activation-source-stream.json"))
@@ -64,6 +65,7 @@ func TestEmbeddedLedgerUsesJetStreamKV(t *testing.T) {
 }
 
 func TestEmbeddedLedgerAcceptsCanonicalSourceKinds(t *testing.T) {
+	t.Parallel()
 	ledger, _ := embeddedLedger(t, "tb_ledger_sources")
 	fixtures := []string{
 		"fixtures/valid/activation-request-reply.json",
@@ -95,11 +97,10 @@ func embeddedLedger(t *testing.T, bucket string) (*core.DurableLedger, *KVLedger
 	cfg.Auth.Permissions.Publish.Allow = []string{"$JS.API.>", "$KV." + bucket + ".>"}
 	cfg.Auth.Permissions.Subscribe.Allow = []string{"_INBOX.>", "$KV." + bucket + ".>"}
 
-	rt, err := Start(cfg)
+	rt, err := start(t, cfg)
 	if err != nil {
 		t.Fatal(err)
 	}
-	t.Cleanup(func() { stop(t, rt) })
 
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()

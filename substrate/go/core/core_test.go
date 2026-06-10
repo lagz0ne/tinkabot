@@ -11,6 +11,7 @@ import (
 )
 
 func TestBuildPlanConsumesContracts(t *testing.T) {
+	t.Parallel()
 	plan, err := BuildPlan(reg(t), read(t, "fixtures/valid/auth-policy.json"), read(t, "fixtures/valid/artifact-manifest.json"), read(t, "fixtures/valid/activation-command-acceptance.json"), validCfg())
 	if err != nil {
 		t.Fatal(err)
@@ -49,6 +50,7 @@ func TestBuildPlanConsumesContracts(t *testing.T) {
 }
 
 func TestBuildPlanDeniesBeforeAuthority(t *testing.T) {
+	t.Parallel()
 	cases := []struct {
 		name string
 		auth string
@@ -79,6 +81,7 @@ func TestBuildPlanDeniesBeforeAuthority(t *testing.T) {
 }
 
 func TestCredentialLeaseBookRevokesIdempotently(t *testing.T) {
+	t.Parallel()
 	book := NewLeaseBook()
 	lease, err := book.Mint(ScriptLease, "lease-script-001", "principal.script.001")
 	if err != nil {
@@ -101,6 +104,7 @@ func TestCredentialLeaseBookRevokesIdempotently(t *testing.T) {
 }
 
 func TestStoreSubstrateErrors(t *testing.T) {
+	t.Parallel()
 	cases := []struct {
 		name string
 		edit func(*Store)
@@ -125,6 +129,7 @@ func TestStoreSubstrateErrors(t *testing.T) {
 }
 
 func TestActivationLedgerDedupeLoopAndCursor(t *testing.T) {
+	t.Parallel()
 	ledger := NewLedger()
 	act := activation(t, read(t, "fixtures/valid/activation-command-acceptance.json"))
 
@@ -161,6 +166,7 @@ func TestActivationLedgerDedupeLoopAndCursor(t *testing.T) {
 }
 
 func TestProcessBoundaryRequiresSandboxReadyConfig(t *testing.T) {
+	t.Parallel()
 	cases := []struct {
 		name string
 		edit func(*Process)
@@ -186,6 +192,7 @@ func TestProcessBoundaryRequiresSandboxReadyConfig(t *testing.T) {
 }
 
 func TestGatewaySubstrateRejectsUnsafeAuthority(t *testing.T) {
+	t.Parallel()
 	cases := []struct {
 		name     string
 		artifact []byte
@@ -215,6 +222,7 @@ func TestGatewaySubstrateRejectsUnsafeAuthority(t *testing.T) {
 }
 
 func TestErrorAttribution(t *testing.T) {
+	t.Parallel()
 	_, err := CheckTopology(Topology{Mode: SingleNode})
 	var got *Error
 	if !errors.As(err, &got) {

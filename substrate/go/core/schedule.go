@@ -42,6 +42,10 @@ type ScheduleEngine struct {
 	store  ScheduleStore
 }
 
+// MemoryScheduleStore is a test fake (allowlisted in substrate/go/fakes-allowlist.json):
+// it exists to force the RecoverFailed and WriteFailed branches impossible to force
+// on a live embedded JetStream KV store. The real path is proven by
+// TestEmbeddedScheduleStorePersistsRestartCatchUp over the embednats KVScheduleStore.
 type MemoryScheduleStore struct {
 	mu            sync.Mutex
 	state         map[string]ScheduleState

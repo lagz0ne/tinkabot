@@ -166,6 +166,11 @@ type AcceptedActivation struct {
 	Record     LedgerRecord
 }
 
+// MemoryMaterialStore is a test fake (allowlisted in substrate/go/fakes-allowlist.json):
+// it exists to seed projection-conflict state synchronously and force the
+// ProjectionConflict and ExecutionStateInvalid branches inside the core layer.
+// The real path is proven by TestScriptMaterializerLoopFromNATSCLI over the
+// embednats KVMaterialStore (JetStream KV + Object Store, read via nats CLI).
 type MemoryMaterialStore struct {
 	mu          sync.Mutex
 	projections map[string]MaterialProjection

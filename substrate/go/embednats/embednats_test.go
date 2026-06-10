@@ -13,11 +13,11 @@ import (
 )
 
 func TestEmbeddedRuntimeLifecycle(t *testing.T) {
-	rt, err := Start(valid(t))
+	t.Parallel()
+	rt, err := start(t, valid(t))
 	if err != nil {
 		t.Fatal(err)
 	}
-	t.Cleanup(func() { stop(t, rt) })
 
 	p := rt.Posture()
 	if !p.Ready || !p.JetStream || p.ClientURL == "" || p.StoreDir == "" {
@@ -53,6 +53,7 @@ func TestEmbeddedRuntimeLifecycle(t *testing.T) {
 }
 
 func TestPropagatesCoreContractInvalidity(t *testing.T) {
+	t.Parallel()
 	cases := []struct {
 		name string
 		edit func(*Config)
@@ -67,7 +68,7 @@ func TestPropagatesCoreContractInvalidity(t *testing.T) {
 			cfg := valid(t)
 			tc.edit(&cfg)
 
-			rt, err := Start(cfg)
+			rt, err := start(t, cfg)
 			if rt != nil {
 				t.Fatalf("runtime started with invalid core contract: %#v", rt)
 			}
@@ -77,6 +78,7 @@ func TestPropagatesCoreContractInvalidity(t *testing.T) {
 }
 
 func TestAdapterOwnsRuntimeFailureMapping(t *testing.T) {
+	t.Parallel()
 	cases := []struct {
 		name string
 		edit func(*Config)
@@ -179,9 +181,8 @@ func TestAdapterOwnsRuntimeFailureMapping(t *testing.T) {
 			cfg := valid(t)
 			tc.edit(&cfg)
 
-			rt, err := Start(cfg)
+			rt, err := start(t, cfg)
 			if rt != nil {
-				stop(t, rt)
 				t.Fatalf("runtime started after %s failure", tc.name)
 			}
 			assertAdapter(t, err, tc.kind)
@@ -190,11 +191,11 @@ func TestAdapterOwnsRuntimeFailureMapping(t *testing.T) {
 }
 
 func TestInternalProbeUserIsLeastAuthority(t *testing.T) {
-	rt, err := Start(valid(t))
+	t.Parallel()
+	rt, err := start(t, valid(t))
 	if err != nil {
 		t.Fatal(err)
 	}
-	t.Cleanup(func() { stop(t, rt) })
 
 	errs := make(chan error, 1)
 	nc, err := nats.Connect(
@@ -226,6 +227,7 @@ func TestInternalProbeUserIsLeastAuthority(t *testing.T) {
 }
 
 func TestStopMapsTimeout(t *testing.T) {
+	t.Parallel()
 	block := make(chan struct{})
 	defer close(block)
 
@@ -241,6 +243,7 @@ func TestStopMapsTimeout(t *testing.T) {
 }
 
 func TestStopMapsShutdownFailure(t *testing.T) {
+	t.Parallel()
 	shutdown := false
 	rt := &Runtime{
 		drain:    func(context.Context) error { return errors.New("drain failed") },
@@ -254,12 +257,13 @@ func TestStopMapsShutdownFailure(t *testing.T) {
 }
 
 func TestAdapterCriticalWrapsUnknowns(t *testing.T) {
+	t.Parallel()
 	cfg := valid(t)
 	cfg.newServer = func(*natsserver.Options) (*natsserver.Server, error) {
 		panic("boom")
 	}
 
-	rt, err := Start(cfg)
+	rt, err := start(t, cfg)
 	if rt != nil {
 		t.Fatalf("runtime started after panic: %#v", rt)
 	}

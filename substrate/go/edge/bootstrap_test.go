@@ -11,6 +11,7 @@ import (
 )
 
 func TestSubstrateConsumesContractsIntoBootstrapDescriptor(t *testing.T) {
+	t.Parallel()
 	reg := registry(t)
 	boot, err := BuildBootstrap(reg, read(t, "fixtures/valid/auth-policy.json"), read(t, "fixtures/valid/artifact-manifest.json"), BootstrapOptions{
 		CredentialRef:   "credential.browser.worker.001",
@@ -48,6 +49,7 @@ func TestSubstrateConsumesContractsIntoBootstrapDescriptor(t *testing.T) {
 }
 
 func TestSubstrateDeniesLeaseBeforeCredentialDescriptor(t *testing.T) {
+	t.Parallel()
 	reg := registry(t)
 	cases := []struct {
 		name    string
@@ -81,6 +83,7 @@ func TestSubstrateDeniesLeaseBeforeCredentialDescriptor(t *testing.T) {
 }
 
 func TestSubstrateRejectsMissingCredentialDescriptorRef(t *testing.T) {
+	t.Parallel()
 	reg := registry(t)
 	boot, err := BuildBootstrap(reg, read(t, "fixtures/valid/auth-policy.json"), read(t, "fixtures/valid/artifact-manifest.json"), BootstrapOptions{
 		ObjectNamespace: "obj://frontend/",
@@ -103,6 +106,7 @@ func TestSubstrateRejectsMissingCredentialDescriptorRef(t *testing.T) {
 }
 
 func TestArtifactGatewayPolicyRejectsUnsafeManifest(t *testing.T) {
+	t.Parallel()
 	reg := registry(t)
 
 	if _, err := BuildBootstrap(reg, read(t, "fixtures/valid/auth-policy.json"), read(t, "fixtures/valid/artifact-manifest.json"), validOptions()); err != nil {

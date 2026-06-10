@@ -6,6 +6,7 @@ import (
 )
 
 func TestGatewayMutationPolicyRejectsUntrustedBrowserRequests(t *testing.T) {
+	t.Parallel()
 	pol := validGatewayMutationPolicy()
 	if err := CheckGatewayMutation(pol, validGatewayMutationRequest()); err != nil {
 		t.Fatalf("valid gateway request rejected: %v", err)
@@ -83,6 +84,7 @@ func TestGatewayMutationPolicyRejectsUntrustedBrowserRequests(t *testing.T) {
 }
 
 func TestServiceWorkerSetupRejectsUnsafeScopeAndHeaders(t *testing.T) {
+	t.Parallel()
 	pol := validServiceWorkerPolicy()
 	headers, err := CheckServiceWorkerSetup(pol, validServiceWorkerRequest())
 	if err != nil {

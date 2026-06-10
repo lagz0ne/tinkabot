@@ -16,6 +16,7 @@ type parityCase struct {
 }
 
 func TestEndgameContractParity(t *testing.T) {
+	t.Parallel()
 	root := filepath.Join("..", "..", "..")
 	dir := filepath.Join(root, "schemas", "base", "v1")
 

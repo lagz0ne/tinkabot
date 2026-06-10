@@ -3,6 +3,7 @@ package core
 import "testing"
 
 func TestDurableLedgerAcceptsAllSourceCursors(t *testing.T) {
+	t.Parallel()
 	cases := []struct {
 		name   string
 		path   string
@@ -44,6 +45,7 @@ func TestDurableLedgerAcceptsAllSourceCursors(t *testing.T) {
 }
 
 func TestDurableLedgerReplayCursorEncodingAvoidsTextCollision(t *testing.T) {
+	t.Parallel()
 	store := NewMemoryLedgerStore()
 	ledger := NewDurableLedger(store)
 	first := activation(t, edit(t, "fixtures/valid/activation-request-reply.json", func(doc map[string]any) {
@@ -90,6 +92,7 @@ func TestDurableLedgerReplayCursorEncodingAvoidsTextCollision(t *testing.T) {
 }
 
 func TestDurableLedgerAcceptDuplicateReplayAndRestart(t *testing.T) {
+	t.Parallel()
 	store := NewMemoryLedgerStore()
 	ledger := NewDurableLedger(store)
 	lease := Lease{ID: "lease-source-stream-001", Status: "active"}
@@ -157,6 +160,7 @@ func TestDurableLedgerAcceptDuplicateReplayAndRestart(t *testing.T) {
 }
 
 func TestDurableLedgerLoopCursorLeaseAndConflict(t *testing.T) {
+	t.Parallel()
 	t.Run("loop", func(t *testing.T) {
 		store := NewMemoryLedgerStore()
 		ledger := NewDurableLedger(store)

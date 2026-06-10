@@ -24,6 +24,10 @@
     "typecheck:orchestrator": "bunx @typescript/native-preview --noEmit -p tsconfig.orchestrator.json",
     "pack:dry": "cd packages/sdk && bun pm pack --dry-run",
     "release:evidence": "bun scripts/release-evidence.ts",
+    "gate:parallel": "bun scripts/gate-parallel.ts",
+    "gate:fakes": "bun scripts/gate-fakes.ts",
+    "gate:coverage": "bun scripts/gate-coverage.ts",
+    "gate:scenarios": "bun scripts/gate-scenarios.ts",
     "test:layers": "python3 -B -m unittest tests/test_validate_layers.py",
     "validate:layers": "python3 -B .codex/skills/matched-abstraction-thinking/scripts/validate_layers.py docs/matched-abstraction"
   }
