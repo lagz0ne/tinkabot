@@ -19,10 +19,10 @@ Reach the Tinkabot endgame with matched-abstraction docs, inside-out ownership p
 
 ## Closeout Snapshot
 
-- Completed through `script-materializer-loop`; the next resume point is `release-spine`.
-- The current system can prove browser isolation, activation release behavior, and script materialization through real embedded NATS where the seam matters.
-- No active implementation blocker is recorded. The remaining work is release authority: one evidence manifest tying Approach/Plan/Task docs, schemas, SDK, Go substrate, frontend isolation, real-NATS proofs, package shape, and deferred scope.
-- Do not reopen completed feature slices unless release-spine evidence exposes a concrete unsupported claim or missing proof.
+- Completed through `release-spine`; all sixteen endgame v1 milestones are DONE. The next resume point is the `quality-endgame` program.
+- `bun run release:evidence` over `release/endgame-v1.json` is the single passing release gate: 16 milestones over 11 spine steps, deferred scope named, four Plan scope guards enforced, doc authority map recorded.
+- No active implementation blocker is recorded. Endgame v1 work is closed; release-spine changes are uncommitted on `main` pending commit.
+- Do not reopen completed feature slices unless the release gate exposes a concrete unsupported claim or missing proof.
 
 ## Milestone Workflow
 
@@ -41,7 +41,7 @@ Reach the Tinkabot endgame with matched-abstraction docs, inside-out ownership p
 13. DONE: `activation-schedule-engine`: durable schedule state, lease/leadership, fake-clock tests, catch-up, restart recovery, tick dedupe, and loop safety.
 14. DONE: `activation-release-proof`: outside-in real NATS activation scenarios tied back to inside-out contract, ledger, source authority, router, command-acceptance peer evidence, and schedule proof.
 15. DONE: `script-materializer-loop`: mediated script execution, accepted effects, materialized projections/artifacts, cleanup.
-16. NEXT: `release-spine`: centralized ops evidence manifest with outside-in real NATS proof and inside-out ownership proof.
+16. DONE: `release-spine`: centralized ops evidence manifest with outside-in real NATS proof and inside-out ownership proof.
 
 ## Operating Rules
 
@@ -72,36 +72,20 @@ Reach the Tinkabot endgame with matched-abstraction docs, inside-out ownership p
 - Browser edge owns session bootstrap, service-worker setup, browser credential mint/revoke, artifact serving, cache/CSP/sandbox policy, and missing browser control-plane behavior.
 - Service-worker setup is substrate-owned: the server issues an HttpOnly/Secure/SameSite cookie session, serves the worker script under a controlled scope, and exposes a scoped substrate surface without handing generated content tokens, NATS credentials, subjects, permissions, cookies, or registration authority.
 - Control plane and app plane are separate authority domains.
+- After `release-spine`, the next program is `quality-endgame`: deliver a usable, high-quality endgame with four enforced gates — all tests over real embedded NATS with an explicit fakes allowlist, parallel test execution with isolated servers, dual coverage (inside-out per-layer measurement plus outside-in scenario-matrix completeness), and `be-lazy` style enforced by a diff-scoped reviewer gate per slice.
+- The v1 user entry surface is a single Go binary: embedded NATS plus embedded frontend shell plus the script materializer loop, operated through the `nats` CLI. Product UI rendering stays deferred.
 
 ## Next Slice
 
-Task layer next: `release-spine`.
+Program layer next: `quality-endgame`.
 
 Assumption:
-- Browser isolation proof is complete: generated artifacts run in opaque script-only iframes, trusted shell/worker owns leased IPC, service-worker setup is cookie-session-backed and server-owned, and browser command acceptance is proven over real embedded NATS.
-- Activation foundation is complete through release proof: contracts, source authority, durable ledger, live source router, schedule engine, and release scenarios are proven over real embedded NATS where the seam matters.
-- Script materializer loop is complete: accepted activation drives managed script records from KV, framed stdout facade effects, durable run claims, canonical material projections, Object Store artifacts plus manifests, unique status events, strict frame/record decoding, and split caller/router/runtime/observer authority.
-- Direct browser NATS WebSocket, Docker sandboxing, product UI rendering, live auth reload, wall-clock scheduler loops beyond the schedule engine proof, and broad script CRUD UI remain deferred.
+- Endgame v1 is closed: all sixteen milestones DONE, `bun run release:evidence` passes as the single release gate, and the release-spine changes await a commit on `main`.
+- Deferred scope is unchanged and named in `release/endgame-v1.json`: direct browser NATS WebSocket, Docker sandboxing, product UI rendering, live auth reload, wall-clock scheduler loops, broad script CRUD UI, live multi-node HA/scale, package publication.
 
-RED:
-- Write failing release-spine evidence checks that prove there is no single release authority tying Approach/Plan/Task docs, schema/SDK parity, Go substrate proofs, frontend isolation proof, real-NATS outside-in proofs, package shape, and remaining deferred work into one release manifest.
-- RED must fail when a required endgame milestone lacks a concrete command/result citation or when the release manifest claims unsupported scope.
-
-GREEN:
-- Add the smallest complete release spine that records the v1 release evidence map, links each endgame milestone to owned inside-out and outside-in proof, names deferred work without overclaiming, and keeps NATS as the system seam.
-- Do not add new runtime features in this slice. This is release authority and verification packaging, not feature expansion.
-
-VERIFY:
-- `bun run schema:parity`
-- `go test ./...` from `substrate/go`
-- `bun run test`
-- `bun run test:e2e`
-- `bun run typecheck`
-- `bun run build`
-- `bun run pack:dry`
-- `bun run validate:layers`
-- `bun run test:layers`
-- no-slop scan over browser isolation docs, frontend shell proof, gateway policy, service-worker setup, schemas, SDK validation, and Go validation
+Direction (from Current Direction, quality-endgame entry):
+- Deliver a usable, high-quality endgame with four enforced gates: all tests over real embedded NATS with an explicit fakes allowlist, parallel test execution with isolated servers, dual coverage (inside-out per-layer measurement plus outside-in scenario-matrix completeness), and `be-lazy` style enforced by a diff-scoped reviewer gate per slice.
+- First step at resume: commit the release-spine work, then write the quality-endgame Plan decomposition under matched-abstraction before any code slice.
 
 Evidence gathered:
 - Orchestrated command-acceptance worker patch was applied to the primary checkout after the first generated worktree failed full verification due dependency path placement.
@@ -181,6 +165,10 @@ Evidence gathered:
 - Script Materializer Loop GREEN: Go core now has accepted-activation-only script runtime, mediated facade effects, raw vocabulary denial, materializer-owned canonical projection/artifact manifest shaping, and typed failure attribution. Embedded NATS now has KV script store, KV/Object material store, local framed-stdio runner, strict JSON frame/record decoding, bounded stdout/frame reads, durable run claims, split caller/router/runtime/observer principals, and unique script status events.
 - Script Materializer Loop real-NATS proof: `go test ./embednats -run 'TestScriptMaterializerLoopFromNATSCLI|TestLocalScriptRunner|TestKVScriptStoreRejectsUnknownRecordField|TestScriptLoopDurableRunClaimRejectsAcceptedReplay|TestScriptLoopAttributesStatusWriteFailure' -count=1 -v` uses real `nats request`, `nats kv get`, `nats object get`, and denied CLI writes to prove accepted activation -> script -> projection/artifact/status, caller cannot write ledger KV, observer cannot write material KV/Object chunks, strict decode, and accepted replay no-rerun.
 - Script Materializer Loop verification: `go test ./core -run TestScriptRuntime -count=1 -v`, targeted embed-NATS script tests, `go test ./... -count=1` from `substrate/go`, `bun run schema:parity`, `bun run test`, `bun run typecheck`, `bun run build`, `bun run pack:dry`, `bun run test:e2e`, `bun run validate:layers`, `bun run test:layers`, `git diff --check`, and `bun run orchestrate:codex -- --dry-run --allow-dirty` passed after NO-GO review hardening. Final subagent security re-review returned GO for scoped JS API grants, mandatory durable run claims, env filtering, strict decode, and `script.record.desc`.
+- Release-spine docs review (four parallel reviewers over approach, plan, task, and repo reality): all cited commands, paths, and Go tests exist; 10 of 15 milestones citable as-is. Plan handoff gaps were closed by adding `Release-Spine Decomposition` to `docs/matched-abstraction/plan/endgame-app.md`: manifest `release/endgame-v1.json`, centralized op `bun run release:evidence`, sixteen-milestone gate list over eleven spine steps, Plan-owned deferred scope, four scope guards (HA/scale contract-only, managed-auth compile-level, schedule no live tick source, CLI denial output-parsed oracle), doc authority map, and slice failure families. `approach/browser-frontend-mediator.md` now carries a Browser Isolation supersession header; stale `status: active` on router/schedule task docs and the stale next-pointer in `plan/script-nats-cli-proof.md` were fixed.
+- Release Spine task doc: `docs/matched-abstraction/task/release-spine.md` (status complete). RED: `bun run release:evidence` failed with `27 findings (manifest-incomplete=1, evidence-stale=26)` matching the contracted gaps exactly. GREEN: every finding routed to its owning Task/Plan doc — executed frontend-isolation RED capture, named per-case re-runs for four aggregate-hidden milestones, eleven wrap-up completion records, browser-frontend-mediator supersession marker — then `bun run release:evidence` -> `release evidence check passed: 16 milestones over 11 spine steps`, exit `0`, plus a missing-manifest denial path proof.
+- Release Spine checker self-proof: `bun test tests/release-evidence.test.ts` -> `21 pass`, `0 fail`; all four failure families (manifest-incomplete, citation-unresolved, scope-overclaim, evidence-stale) genuinely detected on synthetic corpora.
+- Release Spine full closeout verification: `bun run schema:parity`, `go test ./...` from `substrate/go` (5 packages ok), `bun run test` (`77 pass`, `417 expect()`), `bun run test:e2e`, `bun run typecheck`, `bun run build`, `bun run pack:dry`, `bun run validate:layers`, `bun run test:layers`, no-slop scan, and `git diff --check` all passed; gates real-nats, parallel-safety, coverage, be-lazy, security, and no-slop all pass.
 
 ## Current Verification Commands
 
@@ -190,6 +178,7 @@ Evidence gathered:
 - `bun run build` -> builds frontend into `substrate/go/frontend/site` and SDK into `packages/sdk/dist`.
 - `bun run pack:dry` -> dry package check.
 - `bun run orchestrate:codex -- --dry-run --allow-dirty` -> smoke-test the Codex endgame orchestration plan without launching agents.
+- `bun run release:evidence` -> centralized release gate over `release/endgame-v1.json`.
 - `bun run validate:layers` -> matched-abstraction docs.
 - `bun run test:layers` -> layer validator unit tests.
 
@@ -229,6 +218,7 @@ Evidence gathered:
 - Activation release proof is complete below script-materializer-loop: live router source kinds are release-proven through real embedded NATS, command acceptance remains peer-owned by Browser Isolation Proof, schedule is proven over NATS-backed durable stores rather than a NATS tick facade, and failure attribution is normalized only inside tests.
 - Script-side outside-in proof is driven by real `nats` CLI commands against embedded NATS. CLI proves caller/platform behavior; it does not give default scripts raw NATS authority.
 - Release gates must include allowed, denied-neighbor, malformed, duplicate, stale-revision, revoked-credential, and attributed-failure cases over NATS-mediated behavior.
+- `bun run release:evidence` over `release/endgame-v1.json` is the single endgame v1 release gate. The checker hardcodes the Plan gate list (sixteen milestones, eleven spine steps, eight deferred items, four scope guards, seven pinned case families) so the manifest cannot weaken its own gates; negative-case citations must name their case inside executed verification evidence, and denial oracles must be output-parsed, never exit-code.
 
 ## Milestone Index
 
@@ -266,6 +256,7 @@ Historical details live in matched-abstraction docs and git history. Do not expa
 - Script NATS CLI proof plan: `docs/matched-abstraction/plan/script-nats-cli-proof.md`.
 - Codex endgame orchestration plan: `docs/matched-abstraction/plan/codex-endgame-orchestration.md`.
 - Codex endgame orchestrator task: `docs/matched-abstraction/task/codex-endgame-orchestrator.md`.
+- Release spine task: `docs/matched-abstraction/task/release-spine.md`.
 
 ## Recent Git
 

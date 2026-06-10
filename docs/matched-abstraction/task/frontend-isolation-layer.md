@@ -66,6 +66,7 @@ The frontend shell does not mint cookies for the proof. HttpOnly, Secure, SameSi
 
 RED/GREEN:
 
+- Executed RED (captured 2026-06-10 during the release-spine evidence audit, with `apps/frontend/src/isolation.ts` temporarily removed and then restored): `bun run test:frontend` -> `error: Cannot find module '../src/isolation'`, `1 pass`, `1 fail`, `1 error`, script exited with code 1; the isolation proof genuinely depends on the frontend isolation contract implementation. Restored -> `4 pass`, `0 fail`, `19 expect() calls`.
 - `subagent verification` -> NO-GO until structured-clone raw authority, expected revision binding, and cookie-proof overclaim were corrected.
 - `bun run test:frontend` -> `3 pass`, `0 fail`, `15 expect() calls`.
 - `bun run --cwd apps/frontend typecheck` -> `passed`.
@@ -87,4 +88,4 @@ RED/GREEN:
 
 ## Wrap-Up Announcement
 
-The frontend-owned isolation layer is complete when the Vite shell proves opaque generated-content execution, leased source-window messaging, raw-authority denial, typed browser command output, and Go embeddable build output.
+Shipped: the Vite shell proves opaque generated-content execution, leased source-window messaging, raw-authority denial, typed browser command output, and Go embeddable build output. Gateway and service-worker proofs are owned by `browser-isolation-proof`. Evidence recorded above.

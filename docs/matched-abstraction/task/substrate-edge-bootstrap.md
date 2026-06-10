@@ -93,6 +93,10 @@ GREEN:
 - `bun run test:layers` -> `Ran 10 tests ... OK`.
 - no-slop scan over substrate-edge docs, fixtures, and code -> only intentional handoff vocabulary.
 
+Named negative-case evidence (re-executed 2026-06-10 during the release-spine evidence audit):
+
+- `go test ./edge -run TestSubstrateDeniesLeaseBeforeCredentialDescriptor -v -count=1` from `substrate/go` -> `--- PASS: TestSubstrateDeniesLeaseBeforeCredentialDescriptor` with named subtests `revoked`, `expired`, and `provenance`: the substrate denies the lease before any credential descriptor is returned to a neighbor.
+
 Review passes:
 
 - No-slop pass: no live NATS WebSocket, Vite UI, HTTP serving, script execution, activation worker, materialization loop, or Docker sandboxing was added.
@@ -101,4 +105,4 @@ Review passes:
 
 ## Wrap-Up Announcement
 
-The `substrate-edge-bootstrap` milestone is complete when Go can derive scoped substrate-edge bootstrap descriptors from canonical contracts, Browser Edge can consume the bootstrap without leaking raw authority to generated content, and canonical browser commands can cross into Command Acceptance through verified contract shapes.
+Shipped: Go derives scoped substrate-edge bootstrap descriptors from canonical contracts, Browser Edge consumes the bootstrap without leaking raw authority to generated content, and canonical browser commands cross into Command Acceptance through verified contract shapes. Evidence recorded above.

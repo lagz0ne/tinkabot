@@ -117,4 +117,4 @@ Final verification:
 
 ## Wrap-Up Announcement
 
-When complete, announce that activation ledger durability now owns durable acceptance, source cursors, duplicate resolution, loop suppression records, replay/catch-up, restart recovery, lease binding, and write-conflict mapping. Also state that source-scoped auth, live source routing, schedules, scripts, materialization, and release proof remain later activation foundation tasks.
+Shipped: activation ledger durability owns durable acceptance, source cursors, duplicate resolution, loop suppression records, replay/catch-up, restart recovery, lease binding, and write-conflict mapping. Source-scoped auth, live source routing, schedules, scripts, materialization, and release proof remain later activation foundation tasks.

@@ -23,6 +23,7 @@
     "typecheck:frontend": "bun run --cwd apps/frontend typecheck",
     "typecheck:orchestrator": "bunx @typescript/native-preview --noEmit -p tsconfig.orchestrator.json",
     "pack:dry": "cd packages/sdk && bun pm pack --dry-run",
+    "release:evidence": "bun scripts/release-evidence.ts",
     "test:layers": "python3 -B -m unittest tests/test_validate_layers.py",
     "validate:layers": "python3 -B .codex/skills/matched-abstraction-thinking/scripts/validate_layers.py docs/matched-abstraction"
   }

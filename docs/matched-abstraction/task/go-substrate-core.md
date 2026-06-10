@@ -112,6 +112,12 @@ Implementation evidence:
 - `bun run pack:dry` -> `tinkabot-0.1.0.tgz`, 6 files.
 - `git diff --check` -> passed.
 
+Named negative-case evidence (re-executed 2026-06-10 during the release-spine evidence audit):
+
+- `go test ./core -run TestBuildPlanDeniesBeforeAuthority -v -count=1` from `substrate/go` -> `--- PASS: TestBuildPlanDeniesBeforeAuthority`: neighbor authority is denied before any substrate plan is built.
+- `go test ./core -run TestCredentialLeaseBookRevokesIdempotently -v -count=1` from `substrate/go` -> `--- PASS: TestCredentialLeaseBookRevokesIdempotently`: revoked leases deny credential reuse idempotently.
+- `go test ./core -run TestErrorAttribution -v -count=1` from `substrate/go` -> `--- PASS: TestErrorAttribution`: auth, ledger, process, gateway, and cleanup failures are attributed as typed events.
+
 ## Wrap-Up Announcement
 
 The `go-substrate-core` milestone is complete. Go now owns a verified, typed, fakeable substrate core contract that `embedded-nats-adapter` and later activation, script, and materializer work can consume for embedded NATS lifecycle, HA/scale topology, auth render, leases, store substrate, ledger, process boundary, gateway substrate, and attribution without relying on TypeScript runtime authority.

@@ -9,6 +9,12 @@ references:
 
 # Browser Frontend Mediator Approach
 
+## Browser Isolation Supersession
+
+`docs/matched-abstraction/approach/browser-isolation.md` is the current v1 browser authority. The proven v1 mutation path is gateway-owned Command Acceptance over cookie-backed substrate endpoints; direct browser NATS WebSocket, including the dedicated worker holding a live NATS connection, is deferred until live credential reload, post-connection revocation, denied-neighbor, stale-access, and confidentiality proofs exist.
+
+This document still owns the generated-content mediation vocabulary, the trusted shell/worker authority split, and the dedicated-worker proof history. It no longer decides the v1 browser model. Where this document names the dedicated worker as the default v1 NATS mediator shape, read that as the deferred WebSocket direction, not current authority.
+
 ## Scope
 
 Tinkabot's browser frontend mirrors the backend script runtime boundary. Generated browser content runs in an opaque sandboxed frame and does not receive raw NATS access, NATS subjects, reply subjects, credentials, substrate cookies, service-worker registration authority, or permission material. A trusted managed frontend owns the glue: a shell, a dedicated worker mediator, server-owned service-worker setup, and materializer state for rendering observed artifacts.

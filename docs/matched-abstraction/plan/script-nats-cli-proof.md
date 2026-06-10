@@ -94,7 +94,7 @@ Scenario matrix:
 
 ## Sequencing Impact
 
-`activation-source-authority` remains next because live script triggers must not exist before source-scoped authority is proven. From that point forward, the script-side path should be shaped as:
+Steps 1 through 4 below are complete: source authority, the live source router, the script execution loop, and the materializer loop all carry real embedded NATS plus `nats` CLI evidence in their owning Task docs. Step 5, the release spine, is the remaining unit. The shape stays:
 
 1. Source authority with real embedded NATS auth proof where possible.
 2. Live source router with CLI-triggered request/subject/KV/Object/stream events.

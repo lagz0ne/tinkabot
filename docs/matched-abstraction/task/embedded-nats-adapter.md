@@ -108,4 +108,4 @@ Review evidence:
 
 ## Wrap-Up Announcement
 
-When complete, announce that `embedded-nats-adapter` now attaches Go substrate core contracts to a verified live embedded NATS runtime with JetStream readiness, NATS-auth-shaped load failure handling, WebSocket posture, topology probe behavior, drain/shutdown semantics, and adapter-owned error mapping. The announcement must also state that activation routing, scripts, materialization, Docker, and full HA cluster proof remain later layers.
+Shipped: `embedded-nats-adapter` attaches Go substrate core contracts to a verified live embedded NATS runtime with JetStream readiness, NATS-auth-shaped load failure handling, WebSocket posture, topology probe behavior, drain/shutdown semantics, and adapter-owned error mapping. Activation routing, scripts, materialization, Docker, and full HA cluster proof remain later layers.

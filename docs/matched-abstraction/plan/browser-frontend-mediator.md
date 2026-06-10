@@ -11,6 +11,10 @@ references:
 
 # Browser Frontend Mediator Plan
 
+## Browser Isolation Supersession
+
+This plan is superseded for v1 browser-model decisions: `docs/matched-abstraction/plan/browser-isolation.md` is the current v1 browser plan authority, and the proven v1 mutation path is gateway-owned Command Acceptance over cookie-backed substrate endpoints. This document still records the mediator decomposition vocabulary and the dedicated-worker proof history; where it names the dedicated worker as the default v1 NATS mediator shape, read that as the deferred direct-browser NATS WebSocket direction, not current authority.
+
 ## Consumed Approach
 
 This plan consumes `docs/matched-abstraction/approach/browser-frontend-mediator.md` and `docs/matched-abstraction/approach/browser-isolation.md` as authority. The carried decisions are shell-owned browser authority, dedicated-worker mediation, opaque generated iframe execution, leased message channels, server-owned service-worker setup, generated content as receiver/intent emitter, no raw NATS subject bridge, observed materializer state, and backend-owned command effects.

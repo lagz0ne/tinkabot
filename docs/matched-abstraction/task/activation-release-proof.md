@@ -94,6 +94,11 @@ Final verification:
 - `git diff --check` -> passed.
 - Focused no-slop scan over release proof symbols, placeholder evidence, overclaiming phrases, direct-only paths, and memory-store fallback found only expected RED evidence text and existing peer inside-out tests.
 
+Named case evidence (re-executed 2026-06-10 during the release-spine evidence audit):
+
+- `go test ./embednats -run TestActivationReleaseProofAcceptedSources -v -count=1` from `substrate/go` -> `--- PASS: TestActivationReleaseProofAcceptedSources` with named subtests `request reply cli`, `subject`, `kv object stream` (`kv`, `object`, `stream`), and `schedule`: every live-router source kind and the NATS-backed schedule produce accepted durable activation records over real embedded NATS.
+- `go test ./embednats -run TestActivationReleaseProofFailureAttribution -v -count=1` from `substrate/go` -> `--- PASS: TestActivationReleaseProofFailureAttribution` with named scenarios `malformed`, `denied_neighbor`, `duplicate`, `stale_cursor`, `revoked_lease`, and `loop_suppressed`, each preserving owner attribution against real embedded NATS JetStream stores.
+
 ## Wrap-Up
 
-When complete, announce that activation foundation release proof composes contract, source authority, router, schedule, command-acceptance peer evidence, and ledger behavior through real NATS-mediated surfaces or NATS-backed durable stores as scoped above. Also state that script execution, materialization, product UI, direct browser NATS WebSocket, NATS tick adapter, and sandboxing remain later tasks.
+Shipped: activation foundation release proof composes contract, source authority, router, schedule, command-acceptance peer evidence, and ledger behavior through real NATS-mediated surfaces or NATS-backed durable stores as scoped above. Script execution, materialization, product UI, direct browser NATS WebSocket, NATS tick adapter, and sandboxing remain later tasks.

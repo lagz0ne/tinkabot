@@ -1,7 +1,7 @@
 ---
 layer: task
 topic: activation-router-live-sources
-status: active
+status: complete
 references:
   - ../approach/endgame-app.md
   - ../plan/activation-foundation.md
@@ -111,4 +111,4 @@ Final verification:
 
 ## Wrap-Up
 
-When complete, announce that live NATS request/reply, subject, KV, Object Store, and stream observations now normalize into source-authorized durable activation records, with request/reply also proven through the real `nats` CLI. Also state that schedule activation, script execution, materialization, and release proof remain later tasks.
+Shipped: live NATS request/reply, subject, KV, Object Store, and stream observations normalize into source-authorized durable activation records, with request/reply also proven through the real `nats` CLI. Schedule activation, script execution, materialization, and release proof remain later tasks.

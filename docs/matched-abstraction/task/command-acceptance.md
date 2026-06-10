@@ -85,6 +85,12 @@ GREEN:
 - `bun run validate:layers` -> `Layer validation passed: docs/matched-abstraction`.
 - `bun run test:layers` -> `Ran 10 tests ... OK`.
 
+Named negative-case evidence (re-executed 2026-06-10 during the release-spine evidence audit):
+
+- `bun test packages/sdk/tests/endgame-contract/command-acceptance.test.ts -t T-CMD-IDEMPOTENCY` -> `2 pass`, `0 fail`: duplicate commands resolve without a second activation handoff, atomically under concurrency.
+- `bun test packages/sdk/tests/endgame-contract/command-acceptance.test.ts -t T-CMD-DENY` -> `1 pass`, `0 fail`: stale revision and unknown commands are denied as command-acceptance statuses.
+- `bun test packages/sdk/tests/endgame-contract/command-acceptance.test.ts -t T-CMD-CONTRACT` -> `1 pass`, `0 fail`: raw-authority intent is rejected before status materialization.
+
 Full-suite proof:
 
 - Initial orchestrator verification failed because the generated integration worktree was nested under `.codex-runs/`, which broke the repo's relative local dependency path to `../../../nats-embedded`.
@@ -102,4 +108,4 @@ Review passes:
 
 ## Wrap-Up Announcement
 
-The `command-acceptance` milestone is complete at the contract-consumer boundary when schema-shaped browser commands can be accepted or denied with durable status semantics, atomic idempotency, stale revision denial, capability context and lease denial, raw-authority rejection, and activation handoff materialized as verified contract shapes.
+Shipped: schema-shaped browser commands are accepted or denied at the contract-consumer boundary with durable status semantics, atomic idempotency, stale revision denial, capability context and lease denial, raw-authority rejection, and activation handoff materialized as verified contract shapes. Evidence recorded above.

@@ -24,7 +24,7 @@ Peer Plans remain lane evidence. `platform-structure` carries Go substrate, Vite
 
 ## Decomposition
 
-The endgame splits into ten lanes:
+The endgame splits into eleven lanes:
 
 | Lane | Owns |
 | --- | --- |
@@ -162,6 +162,24 @@ The next Plan unit is `release-spine`. It must not add new runtime features. Its
 
 If release-spine finds an unsupported claim, the fix returns to the owning completed Task or Plan lane with a concrete missing proof. It does not reopen Approach unless the authority model itself is wrong.
 
+## Release-Spine Decomposition
+
+This section is the Plan-level handoff for the `release-spine` Task. The Task doc consumes these decisions; it does not invent them.
+
+The evidence manifest is one machine-checkable JSON document at `release/endgame-v1.json`. Each milestone entry names the milestone, its owning Task doc, the spine steps it covers, its RED citation, its inside-out proof commands, its outside-in proof commands or an explicit not-applicable reason, its negative-case coverage, and any scope guards. Citations must resolve: the cited doc must exist, the cited command string must appear in the owning Task doc, and cited Go tests must resolve as `go test -run` prefix patterns against committed test files.
+
+The centralized operation is `bun run release:evidence`. It validates the manifest against the rules above and fails on any incomplete, unresolved, overclaiming, or stale entry. This is the "one centralized operation produces the evidence manifest" gate from the Release Verification Spine.
+
+The gate list is all sixteen endgame milestones, including `release-spine` itself, mapped onto the eleven spine steps. Every spine step must be covered by at least one milestone entry. The frontend-rendering spine row is satisfied for v1 by the browser isolation proof's trusted-shell observation of materialized status over the gateway path; full product UI rendering is deferred scope, not a v1 gate.
+
+Deferred scope is Plan-owned from here on: direct browser NATS WebSocket, Docker sandboxing, product UI rendering, live auth reload, wall-clock scheduler loops beyond the schedule engine proof, broad script CRUD UI, live multi-node HA/scale proof, and package publication (the SDK package is private; `pack:dry` shape is the v1 evidence). The manifest must name this list and must not present any of it as proven.
+
+The manifest must encode four scope guards so completed milestones are not promoted beyond their evidence: HA/scale is proven at contract shape only, not live multi-node behavior; managed-auth lease/revocation is proven at policy-compile level until the source-authority CLI proof, which owns live denial; schedule activation has no live NATS tick source, its proof is engine acceptance over real JetStream KV stores; and `nats` CLI denial evidence is an output-parsed oracle because CLI v0.3.0 reports permission errors in output while exiting successfully.
+
+The manifest also records the doc authority map: which Approach and Plan doc is current authority per domain, and supersession status for historical docs, so a manifest reader never resolves authority from a superseded document.
+
+The slice owns these failure families: manifest incomplete (a required milestone or spine step lacks an entry), citation unresolved (a cited doc, command, or test cannot be found where the manifest claims), scope overclaim (an entry exceeds its guard or names deferred work as done), and evidence stale (a cited doc contradicts current status or pinned decisions). RED for the Task is the checker failing on the current doc corpus; known evidence gaps in completed Task docs are findings the checker must surface, with fixes routed to the owning doc.
+
 ## Capability Proof Matrix
 
 Every capability surface carries the same proof shape:
@@ -181,7 +199,7 @@ Every capability surface carries the same proof shape:
 
 ## First Executable Task Slice
 
-Topic: `endgame-contract-authority`.
+This slice is complete; it remains here as the original handoff record. Topic: `endgame-contract-authority`.
 
 Purpose: establish the smallest neutral contract packet every later lane must consume: provenance envelope, principal/session/revision/capability references, NATS-auth-shaped permission/exposure/import shape, subject taxonomy fixtures, browser command intent, command acceptance status, activation intent, artifact manifest, materialized projection, and attributed event/error envelope.
 

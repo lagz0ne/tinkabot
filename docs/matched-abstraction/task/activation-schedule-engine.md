@@ -1,7 +1,7 @@
 ---
 layer: task
 topic: activation-schedule-engine
-status: active
+status: complete
 references:
   - ../approach/endgame-app.md
   - ../plan/activation-foundation.md
@@ -109,4 +109,4 @@ Final verification:
 
 ## Wrap-Up
 
-When complete, announce that schedule activation is durable, deterministic, restart-safe, and integrated with source authority plus the activation ledger. Also state that wall-clock loops, script execution, materialization, and release proof remain later tasks.
+Shipped: schedule activation is durable, deterministic, restart-safe, and integrated with source authority plus the activation ledger. Wall-clock loops, script execution, materialization, and release proof remain later tasks.

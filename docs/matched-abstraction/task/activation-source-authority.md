@@ -100,4 +100,4 @@ Final verification:
 
 ## Wrap-Up Announcement
 
-When complete, announce that source authority now owns source-scoped NATS permission decisions, source lease lifecycle/revision checks, import/export/exposure preservation, bounded request/reply response authority, denied-neighbor behavior, and real embedded-NATS CLI proof. Also state that live source routing, durable schedules, script execution, materialization, live credential reload/revocation, and release proof remain later tasks.
+Shipped: source authority owns source-scoped NATS permission decisions, source lease lifecycle/revision checks, import/export/exposure preservation, bounded request/reply response authority, denied-neighbor behavior, and real embedded-NATS CLI proof. Live source routing, durable schedules, script execution, materialization, live credential reload/revocation, and release proof remain later tasks.

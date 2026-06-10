@@ -98,4 +98,4 @@ RED/GREEN:
 
 ## Wrap-Up Announcement
 
-The browser isolation proof is complete when a real browser proves generated content is opaque, leased, credentialless, and unable to bypass the trusted shell, while accepted typed intents still reach backend Command Acceptance and service-worker setup remains server-owned, scoped, token-free, and denial-tested.
+Shipped: a real browser proved generated content is opaque, leased, credentialless, and unable to bypass the trusted shell, while accepted typed intents reach backend Command Acceptance and service-worker setup remains server-owned, scoped, token-free, and denial-tested. Evidence recorded above.
