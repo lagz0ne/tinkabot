@@ -4,7 +4,7 @@
 
 - Repo: `lagz0ne/tinkabot`, private, branch `main`.
 - Remote: `origin git@github.com:lagz0ne/tinkabot.git`.
-- Last completed feature commit: `f93b705 feat: add script materializer loop`, pushed to `origin/main`.
+- Last completed feature commit: `8c9b180 feat: add release spine evidence gate`, plus `057eca5 refactor: rename endgame to base/v1 on live surfaces`; both local on `main`, push pending.
 - Worktree status at closeout start: clean after `f93b705`.
 - Root role: orchestration only.
 - Current implementation lives in `packages/sdk` and `substrate/go`.
@@ -21,7 +21,7 @@ Reach the Tinkabot v1 platform target with matched-abstraction docs, inside-out 
 
 - Completed through `release-spine`; all sixteen v1 milestones are DONE. The next resume point is the `quality-v1` program.
 - `bun run release:evidence` over `release/v1.json` is the single passing release gate: 16 milestones over 11 spine steps, deferred scope named, four Plan scope guards enforced, doc authority map recorded.
-- No active implementation blocker is recorded. Endgame v1 work is closed; release-spine changes are uncommitted on `main` pending commit.
+- No active implementation blocker is recorded. V1 work is closed and committed (`8c9b180`, `057eca5`); push to `origin/main` is pending.
 - Do not reopen completed feature slices unless the release gate exposes a concrete unsupported claim or missing proof.
 
 ## Milestone Workflow
@@ -85,7 +85,7 @@ Assumption:
 
 Direction (from Current Direction, quality-v1 entry):
 - Deliver a usable, high-quality v1 with four enforced gates: all tests over real embedded NATS with an explicit fakes allowlist, parallel test execution with isolated servers, dual coverage (inside-out per-layer measurement plus outside-in scenario-matrix completeness), and `be-lazy` style enforced by a diff-scoped reviewer gate per slice.
-- First step at resume: commit the release-spine work, then write the quality-v1 Plan decomposition under matched-abstraction before any code slice.
+- First step at resume: push `main`, then write the quality-v1 Plan decomposition under matched-abstraction before any code slice.
 
 Evidence gathered:
 - Orchestrated command-acceptance worker patch was applied to the primary checkout after the first generated worktree failed full verification due dependency path placement.
