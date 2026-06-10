@@ -1,0 +1,8 @@
+{
+  "kind": "script.effect",
+  "effectType": "artifact",
+  "artifactName": "artifact/main.js",
+  "artifactRevision": "artifact.rev.7",
+  "mediaType": "application/javascript",
+  "body": "export default 1"
+}

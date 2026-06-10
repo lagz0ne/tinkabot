@@ -1,0 +1,23 @@
+{
+  "kind": "script.record",
+  "scriptKey": "script.render.main",
+  "scriptRevision": 7,
+  "desc": "Render the main material projection from accepted activation context.",
+  "process": {
+    "command": "/bin/sh",
+    "args": ["-c", "printf ok"],
+    "cwd": "/tmp/tinkabot-script",
+    "env": {
+      "TB_MODE": "script-materializer"
+    },
+    "rpc": "framed_stdio",
+    "timeoutMs": 2000,
+    "resource": {
+      "cpuMillis": 100,
+      "memoryMB": 64
+    },
+    "kill": "process.kill",
+    "cleanup": "workdir.delete",
+    "identity": "principal.script.001"
+  }
+}

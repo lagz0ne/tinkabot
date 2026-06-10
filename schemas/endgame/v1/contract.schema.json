@@ -7,6 +7,8 @@
     { "$ref": "#/$defs/browserCommand" },
     { "$ref": "#/$defs/commandAcceptance" },
     { "$ref": "#/$defs/activationIntent" },
+    { "$ref": "#/$defs/scriptRecord" },
+    { "$ref": "#/$defs/scriptEffect" },
     { "$ref": "#/$defs/artifactManifest" },
     { "$ref": "#/$defs/materialProjection" },
     { "$ref": "#/$defs/eventEnvelope" }
@@ -34,7 +36,7 @@
           "type": "object",
           "propertyNames": {
             "not": {
-              "pattern": "([sS][uU][bB][jJ][eE][cC][tT]|[rR][eE][pP][lL][yY]|[tT][oO][kK][eE][nN]|[cC][rR][eE][dD][eE][nN][tT][iI][aA][lL]|[pP][eE][rR][mM][iI][sS][sS][iI][oO][nN]|[pP][uU][bB][lL][iI][sS][hH]|[sS][uU][bB][sS][cC][rR][iI][bB][eE]|[nN][aA][tT][sS])"
+              "pattern": "([sS][uU][bB][jJ][eE][cC][tT]|[rR][eE][pP][lL][yY]|[tT][oO][kK][eE][nN]|[cC][rR][eE][dD]|[pP][eE][rR][mM][iI][sS][sS][iI][oO][nN]|[pP][uU][bB][lL][iI][sS][hH]|[sS][uU][bB][sS][cC][rR][iI][bB][eE]|[nN][aA][tT][sS]|[nN][kK][eE][yY]|[jJ][wW][tT]|[sS][eE][eE][dD]|[sS][eE][cC][rR][eE][tT]|[pP][aA][sS][sS][wW][oO][rR][dD]|[bB][eE][aA][rR][eE][rR])"
             }
           },
           "additionalProperties": { "$ref": "#/$defs/safeValue" }
@@ -482,6 +484,118 @@
         "expiresAt": { "$ref": "#/$defs/text" },
         "clockId": { "$ref": "#/$defs/text" },
         "clock": { "$ref": "#/$defs/text" }
+      }
+    },
+    "processResource": {
+      "type": "object",
+      "required": ["cpuMillis", "memoryMB"],
+      "additionalProperties": false,
+      "properties": {
+        "cpuMillis": { "type": "integer", "minimum": 1 },
+        "memoryMB": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "scriptProcess": {
+      "type": "object",
+      "required": [
+        "command",
+        "args",
+        "cwd",
+        "rpc",
+        "timeoutMs",
+        "resource",
+        "kill",
+        "cleanup",
+        "identity"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "command": { "$ref": "#/$defs/text" },
+        "args": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/text" }
+        },
+        "cwd": { "$ref": "#/$defs/text" },
+        "env": {
+          "type": "object",
+          "propertyNames": {
+            "not": {
+              "pattern": "([sS][uU][bB][jJ][eE][cC][tT]|[rR][eE][pP][lL][yY]|[tT][oO][kK][eE][nN]|[cC][rR][eE][dD]|[pP][eE][rR][mM][iI][sS][sS][iI][oO][nN]|[pP][uU][bB][lL][iI][sS][hH]|[sS][uU][bB][sS][cC][rR][iI][bB][eE]|[nN][aA][tT][sS]|[nN][kK][eE][yY]|[jJ][wW][tT]|[sS][eE][eE][dD]|[sS][eE][cC][rR][eE][tT]|[pP][aA][sS][sS][wW][oO][rR][dD]|[bB][eE][aA][rR][eE][rR])"
+            }
+          },
+          "additionalProperties": { "$ref": "#/$defs/text" }
+        },
+        "rpc": { "const": "framed_stdio" },
+        "timeoutMs": { "type": "integer", "minimum": 1 },
+        "resource": { "$ref": "#/$defs/processResource" },
+        "kill": { "$ref": "#/$defs/text" },
+        "cleanup": { "$ref": "#/$defs/text" },
+        "identity": { "$ref": "#/$defs/text" }
+      }
+    },
+    "scriptRecord": {
+      "type": "object",
+      "required": ["kind", "scriptKey", "scriptRevision", "process"],
+      "additionalProperties": false,
+      "properties": {
+        "kind": { "const": "script.record" },
+        "scriptKey": { "$ref": "#/$defs/text" },
+        "scriptRevision": { "type": "integer", "minimum": 0 },
+        "desc": { "$ref": "#/$defs/text" },
+        "process": { "$ref": "#/$defs/scriptProcess" }
+      }
+    },
+    "scriptEffect": {
+      "oneOf": [
+        { "$ref": "#/$defs/scriptProjectionEffect" },
+        { "$ref": "#/$defs/scriptArtifactEffect" },
+        { "$ref": "#/$defs/scriptPublishEffect" }
+      ]
+    },
+    "scriptProjectionEffect": {
+      "type": "object",
+      "required": [
+        "kind",
+        "effectType",
+        "projectionId",
+        "snapshotRevision",
+        "artifactRevision",
+        "sequence",
+        "value"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "kind": { "const": "script.effect" },
+        "effectType": { "const": "projection" },
+        "projectionId": { "$ref": "#/$defs/text" },
+        "snapshotRevision": { "$ref": "#/$defs/text" },
+        "artifactRevision": { "$ref": "#/$defs/text" },
+        "sequence": { "type": "integer", "minimum": 0 },
+        "value": { "$ref": "#/$defs/safeValue" }
+      }
+    },
+    "scriptArtifactEffect": {
+      "type": "object",
+      "required": ["kind", "effectType", "artifactName", "artifactRevision", "mediaType", "body"],
+      "additionalProperties": false,
+      "properties": {
+        "kind": { "const": "script.effect" },
+        "effectType": { "const": "artifact" },
+        "artifactName": { "$ref": "#/$defs/text" },
+        "artifactRevision": { "$ref": "#/$defs/text" },
+        "mediaType": { "$ref": "#/$defs/text" },
+        "body": { "$ref": "#/$defs/text" }
+      }
+    },
+    "scriptPublishEffect": {
+      "type": "object",
+      "required": ["kind", "effectType", "subject"],
+      "additionalProperties": false,
+      "properties": {
+        "kind": { "const": "script.effect" },
+        "effectType": { "const": "publish" },
+        "subject": { "$ref": "#/$defs/subject" },
+        "body": { "$ref": "#/$defs/safeValue" }
       }
     },
     "artifactManifest": {

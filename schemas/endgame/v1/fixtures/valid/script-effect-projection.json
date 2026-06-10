@@ -1,0 +1,11 @@
+{
+  "kind": "script.effect",
+  "effectType": "projection",
+  "projectionId": "main",
+  "snapshotRevision": "snap-001",
+  "artifactRevision": "artifact.rev.7",
+  "sequence": 1,
+  "value": {
+    "title": "from-script"
+  }
+}

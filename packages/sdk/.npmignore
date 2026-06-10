@@ -1,0 +1,8 @@
+node_modules/
+src/
+tests/
+tsconfig.json
+tsdown.config.ts
+
+!dist/
+!dist/**

@@ -60,6 +60,7 @@ func (e *Error) Unwrap() error {
 type Config struct {
 	Core         core.Config
 	Auth         core.Auth
+	AuthUsers    []core.Auth
 	ServerName   string
 	Host         string
 	Port         int
@@ -142,7 +143,7 @@ func Start(cfg Config) (rt *Runtime, err error) {
 	if cfg.StoreDir == "" {
 		return nil, fail(AdapterConfigInvalid, "Start", "store dir is required", nil, nil)
 	}
-	user, err := user(cfg.Auth)
+	users, err := users(cfg.Auth, cfg.AuthUsers)
 	if err != nil {
 		return nil, err
 	}
@@ -163,7 +164,7 @@ func Start(cfg Config) (rt *Runtime, err error) {
 		NoSigs:     true,
 		JetStream:  true,
 		StoreDir:   cfg.StoreDir,
-		Users:      []*natsserver.User{user, probe},
+		Users:      append(users, probe),
 	}
 	if cfg.WebSocket.Enabled {
 		opts.Websocket = natsserver.WebsocketOpts{
@@ -304,6 +305,31 @@ func (r *Runtime) Connect(ctx context.Context, opts ...nats.Option) (*nats.Conn,
 	return nc, nil
 }
 
+func (r *Runtime) ConnectAs(ctx context.Context, auth core.Auth, opts ...nats.Option) (*nats.Conn, error) {
+	if r == nil || r.posture.ClientURL == "" {
+		return nil, fail(AdapterCritical, "Connect", "runtime client boundary is unavailable", nil, nil)
+	}
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	if err := ctx.Err(); err != nil {
+		return nil, fail(ClientConnectFailed, "Connect", "runtime client context is closed", nil, err)
+	}
+	dial := make([]nats.Option, 0, len(opts)+3)
+	if deadline, ok := ctx.Deadline(); ok {
+		if ttl := time.Until(deadline); ttl > 0 {
+			dial = append(dial, nats.Timeout(ttl))
+		}
+	}
+	dial = append(dial, opts...)
+	dial = append(dial, nats.UserInfo(auth.User, auth.Capability.LeaseID))
+	nc, err := nats.Connect(r.posture.ClientURL, dial...)
+	if err != nil {
+		return nil, fail(ClientConnectFailed, "Connect", "runtime client could not connect", nil, err)
+	}
+	return nc, nil
+}
+
 func (r *Runtime) Stop(ctx context.Context) (err error) {
 	defer func() {
 		if rec := recover(); rec != nil {
@@ -403,6 +429,24 @@ func (cfg Config) defaults() Config {
 		cfg.secret = secret
 	}
 	return cfg
+}
+
+func users(primary core.Auth, extra []core.Auth) ([]*natsserver.User, error) {
+	all := append([]core.Auth{primary}, extra...)
+	out := make([]*natsserver.User, 0, len(all))
+	seen := map[string]bool{}
+	for _, auth := range all {
+		if seen[auth.User] {
+			continue
+		}
+		user, err := user(auth)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, user)
+		seen[auth.User] = true
+	}
+	return out, nil
 }
 
 func user(auth core.Auth) (*natsserver.User, error) {

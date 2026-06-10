@@ -110,6 +110,21 @@
     "expect": { "valid": true, "policy": "allowed" }
   },
   {
+    "caseId": "allowed-script-record",
+    "fixture": "fixtures/valid/script-record.json",
+    "expect": { "valid": true, "policy": "allowed" }
+  },
+  {
+    "caseId": "allowed-script-effect-projection",
+    "fixture": "fixtures/valid/script-effect-projection.json",
+    "expect": { "valid": true, "policy": "allowed" }
+  },
+  {
+    "caseId": "allowed-script-effect-artifact",
+    "fixture": "fixtures/valid/script-effect-artifact.json",
+    "expect": { "valid": true, "policy": "allowed" }
+  },
+  {
     "caseId": "allowed-activation-source-subject",
     "fixture": "fixtures/valid/activation-source-subject.json",
     "expect": { "valid": true, "policy": "allowed", "ownerLayer": "ContractAuthority" }

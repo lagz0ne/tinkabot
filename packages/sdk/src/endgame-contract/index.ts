@@ -10,6 +10,7 @@ const rawKeys = new Set([
   "subject",
   "reply",
   "token",
+  "cred",
   "credential",
   "credentials",
   "permission",
@@ -17,6 +18,12 @@ const rawKeys = new Set([
   "publish",
   "subscribe",
   "nats",
+  "nkey",
+  "jwt",
+  "seed",
+  "secret",
+  "password",
+  "bearer",
 ]);
 
 const subject = z
@@ -242,6 +249,76 @@ const scheduleSource = z.strictObject({
   clock: text,
 });
 
+const processResource = z.strictObject({
+  cpuMillis: z.number().int().min(1),
+  memoryMB: z.number().int().min(1),
+});
+
+const scriptEnv = z.record(text, text).superRefine((env, ctx) => {
+  for (const key of Object.keys(env)) {
+    if (hasRawKey(key)) {
+      ctx.addIssue({
+        code: "custom",
+        path: [key],
+        message: `raw NATS vocabulary is not allowed: ${key}`,
+      });
+    }
+  }
+});
+
+const scriptProcess = z.strictObject({
+  command: text,
+  args: z.array(text),
+  cwd: text,
+  env: scriptEnv.optional(),
+  rpc: z.literal("framed_stdio"),
+  timeoutMs: z.number().int().min(1),
+  resource: processResource,
+  kill: text,
+  cleanup: text,
+  identity: text,
+});
+
+const scriptRecord = z.strictObject({
+  kind: z.literal("script.record"),
+  scriptKey: text,
+  scriptRevision: z.number().int().min(0),
+  desc: text.optional(),
+  process: scriptProcess,
+});
+
+const projectionEffect = z.strictObject({
+  kind: z.literal("script.effect"),
+  effectType: z.literal("projection"),
+  projectionId: text,
+  snapshotRevision: text,
+  artifactRevision: text,
+  sequence: z.number().int().min(0),
+  value: safeValue,
+});
+
+const artifactEffect = z.strictObject({
+  kind: z.literal("script.effect"),
+  effectType: z.literal("artifact"),
+  artifactName: text,
+  artifactRevision: text,
+  mediaType: text,
+  body: text,
+});
+
+const publishEffect = z.strictObject({
+  kind: z.literal("script.effect"),
+  effectType: z.literal("publish"),
+  subject,
+  body: safeValue.optional(),
+});
+
+const scriptEffect = z.discriminatedUnion("effectType", [
+  projectionEffect,
+  artifactEffect,
+  publishEffect,
+]);
+
 const activation = z.strictObject({
   kind: z.literal("activation.intent"),
   activationId: text,
@@ -310,11 +387,13 @@ const event = z.strictObject({
   error: err.optional(),
 });
 
-export const Contract = z.discriminatedUnion("kind", [
+export const Contract = z.union([
   authPolicy,
   browserCommand,
   acceptance,
   activation,
+  scriptRecord,
+  scriptEffect,
   artifact,
   projection,
   event,

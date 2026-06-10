@@ -33,8 +33,8 @@ Reach the Tinkabot endgame with matched-abstraction docs, inside-out ownership p
 12. DONE: `activation-router-live-sources`: request/reply, subject subscriptions, KV/Object/Stream watches, and accepted activation normalization over live NATS.
 13. DONE: `activation-schedule-engine`: durable schedule state, lease/leadership, fake-clock tests, catch-up, restart recovery, tick dedupe, and loop safety.
 14. DONE: `activation-release-proof`: outside-in real NATS activation scenarios tied back to inside-out contract, ledger, source authority, router, command-acceptance peer evidence, and schedule proof.
-15. NEXT: `script-materializer-loop`: mediated script execution, accepted effects, materialized projections/artifacts, cleanup.
-16. `release-spine`: centralized ops evidence manifest with outside-in real NATS proof and inside-out ownership proof.
+15. DONE: `script-materializer-loop`: mediated script execution, accepted effects, materialized projections/artifacts, cleanup.
+16. NEXT: `release-spine`: centralized ops evidence manifest with outside-in real NATS proof and inside-out ownership proof.
 
 ## Operating Rules
 
@@ -68,31 +68,23 @@ Reach the Tinkabot endgame with matched-abstraction docs, inside-out ownership p
 
 ## Next Slice
 
-Task layer next: `script-materializer-loop`.
+Task layer next: `release-spine`.
 
 Assumption:
-- `browser-isolation` triage-three converged on the v1 model: generated artifacts run in `iframe sandbox="allow-scripts"` without `allow-same-origin`; trusted shell/dedicated worker owns leased IPC; gateway and Command Acceptance own mutation.
-- Frontend isolation layer is complete after subagent hardening: Vite shell uses a blob-backed generated artifact fixture, exact script-only sandbox, source-window message lease, nonce/revision/capability/expected-revision checks, structured-clone raw-authority denial, and Go-embedded build output.
-- Browser isolation proof is complete: Go Browser Edge denies gateway CSRF/origin/fetch-metadata/CORS/stale/revoked cases; service-worker setup denies unsafe scope/header/revision/generated-registration cases; Chrome proves exact service-worker scope and broad-scope denial; embedded NATS request/reply proves canonical `command.acceptance` accepted and rejected statuses at the NATS seam.
-- Current embedded NATS auth users are static at server start. Direct browser NATS WebSocket remains deferred until live credential reload and post-connection revocation are proven.
-- Service worker is server-owned scoped bootstrap/cache/material facade only. It must not hold NATS credentials, bearer tokens, raw subjects, permission material, or independent mutation authority.
-- Live source router is complete: request/reply, subject, KV, Object Store meta-stream, and stream observations normalize through source authority into the durable activation ledger over real embedded NATS.
-- Schedule engine is complete: deterministic schedule ticks now pass through durable schedule state, source authority, and durable activation ledger with real embedded-NATS KV restart/catch-up proof.
-- Activation release proof is complete: live router sources are proven over real embedded NATS, command acceptance is cited as peer outside-in evidence, schedule is proven over real embedded-NATS KV stores, and owned failures remain attributed.
+- Browser isolation proof is complete: generated artifacts run in opaque script-only iframes, trusted shell/worker owns leased IPC, service-worker setup is cookie-session-backed and server-owned, and browser command acceptance is proven over real embedded NATS.
+- Activation foundation is complete through release proof: contracts, source authority, durable ledger, live source router, schedule engine, and release scenarios are proven over real embedded NATS where the seam matters.
+- Script materializer loop is complete: accepted activation drives managed script records from KV, framed stdout facade effects, durable run claims, canonical material projections, Object Store artifacts plus manifests, unique status events, strict frame/record decoding, and split caller/router/runtime/observer authority.
+- Direct browser NATS WebSocket, Docker sandboxing, product UI rendering, live auth reload, wall-clock scheduler loops beyond the schedule engine proof, and broad script CRUD UI remain deferred.
 
 RED:
-- Write failing script-materializer-loop scenarios that start from accepted activation and prove the script boundary, mediated NATS effects, materialized projections/artifacts, and cleanup are missing.
-- RED must prove scripts stay NATS-agnostic by default, can only emit effects through the runtime facade, and cannot bypass activation/source authority or mutate materialized state directly.
+- Write failing release-spine evidence checks that prove there is no single release authority tying Approach/Plan/Task docs, schema/SDK parity, Go substrate proofs, frontend isolation proof, real-NATS outside-in proofs, package shape, and remaining deferred work into one release manifest.
+- RED must fail when a required endgame milestone lacks a concrete command/result citation or when the release manifest claims unsupported scope.
 
 GREEN:
-- Add the smallest complete script-materializer loop that consumes accepted activations, executes managed scripts, accepts mediated facade effects, writes materialized projections/artifacts, and records cleanup/failure attribution.
-- Use real embedded NATS and durable stores for outside-in proof. Use fakes only for narrow process/error branch forcing.
-- Do not add product UI, direct browser NATS WebSocket, wall-clock scheduler loops, Docker sandboxing, or broad convenience features in this slice.
+- Add the smallest complete release spine that records the v1 release evidence map, links each endgame milestone to owned inside-out and outside-in proof, names deferred work without overclaiming, and keeps NATS as the system seam.
+- Do not add new runtime features in this slice. This is release authority and verification packaging, not feature expansion.
 
 VERIFY:
-- outside-in embedded NATS script-materializer scenarios from accepted activation to projection/artifact update
-- inside-out ownership links for process config/protocol/resource failures, facade-denied effects, materializer writes, cleanup, and replay/idempotency
-- script success, script failure, malformed effect, denied effect, duplicate/replay, projection revision conflict, artifact write, cleanup failure, and attributed failure cases
 - `bun run schema:parity`
 - `go test ./...` from `substrate/go`
 - `bun run test`
@@ -178,6 +170,10 @@ Evidence gathered:
 - Activation Release Proof GREEN: embedded-NATS release proof now covers request/reply via real `nats` CLI, subject, KV, Object Store, stream, NATS-backed schedule stores, malformed frames, live denied-neighbor, duplicate, stale cursor through the live stream router after high-water seeding, revoked lease via live request/reply CLI, loop suppression, command-acceptance peer evidence, and test-only owner/kind normalization.
 - Activation Release Proof verification: `go test ./embednats -run TestActivationReleaseProof -count=1`, `go test ./... -count=1` from `substrate/go`, `bun run schema:parity`, `bun run test`, `bun run typecheck`, `bun run test:e2e`, `bun run build`, `bun run pack:dry`, `bun run validate:layers`, `bun run test:layers`, `git diff --check`, and focused no-slop scan passed.
 - Activation Release Proof handoff: `bun run orchestrate:codex -- --dry-run --allow-dirty` now selects topic `script-materializer-loop`.
+- Script Materializer Loop task doc: `docs/matched-abstraction/task/script-materializer-loop.md`; diagram `https://diashort.apps.quickable.co/d/8e738818`.
+- Script Materializer Loop GREEN: Go core now has accepted-activation-only script runtime, mediated facade effects, raw vocabulary denial, materializer-owned canonical projection/artifact manifest shaping, and typed failure attribution. Embedded NATS now has KV script store, KV/Object material store, local framed-stdio runner, strict JSON frame/record decoding, bounded stdout/frame reads, durable run claims, split caller/router/runtime/observer principals, and unique script status events.
+- Script Materializer Loop real-NATS proof: `go test ./embednats -run 'TestScriptMaterializerLoopFromNATSCLI|TestLocalScriptRunner|TestKVScriptStoreRejectsUnknownRecordField|TestScriptLoopDurableRunClaimRejectsAcceptedReplay|TestScriptLoopAttributesStatusWriteFailure' -count=1 -v` uses real `nats request`, `nats kv get`, `nats object get`, and denied CLI writes to prove accepted activation -> script -> projection/artifact/status, caller cannot write ledger KV, observer cannot write material KV/Object chunks, strict decode, and accepted replay no-rerun.
+- Script Materializer Loop verification: `go test ./core -run TestScriptRuntime -count=1 -v`, targeted embed-NATS script tests, `go test ./... -count=1` from `substrate/go`, `bun run schema:parity`, `bun run test`, `bun run typecheck`, `bun run build`, `bun run pack:dry`, `bun run test:e2e`, `bun run validate:layers`, `bun run test:layers`, `git diff --check`, and `bun run orchestrate:codex -- --dry-run --allow-dirty` passed after NO-GO review hardening. Final subagent security re-review returned GO for scoped JS API grants, mandatory durable run claims, env filtering, strict decode, and `script.record.desc`.
 
 ## Current Verification Commands
 

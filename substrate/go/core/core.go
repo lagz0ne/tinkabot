@@ -315,21 +315,21 @@ type SourceGrant struct {
 }
 
 type Process struct {
-	Command   string
-	Args      []string
-	Cwd       string
-	Env       map[string]string
-	RPC       string
-	TimeoutMs int
-	Resource  Resource
-	Kill      string
-	Cleanup   string
-	Identity  string
+	Command   string            `json:"command"`
+	Args      []string          `json:"args"`
+	Cwd       string            `json:"cwd"`
+	Env       map[string]string `json:"env,omitempty"`
+	RPC       string            `json:"rpc"`
+	TimeoutMs int               `json:"timeoutMs"`
+	Resource  Resource          `json:"resource"`
+	Kill      string            `json:"kill"`
+	Cleanup   string            `json:"cleanup"`
+	Identity  string            `json:"identity"`
 }
 
 type Resource struct {
-	CPUMillis int
-	MemoryMB  int
+	CPUMillis int `json:"cpuMillis"`
+	MemoryMB  int `json:"memoryMB"`
 }
 
 type Gateway struct {
