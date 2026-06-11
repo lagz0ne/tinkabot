@@ -85,7 +85,7 @@ phase('Orient')
 log(`Slice: ${topic}`)
 const contract = await agent(
   `Produce the slice contract for slice "${topic}" in /home/lagz0ne/dev/tinkabot. Read tasks/todo.md (Next Slice, Pinned Decisions, Current Verification Commands), the owning Plan doc(s) under docs/matched-abstraction/plan/ for this topic (for release-spine that is endgame-app.md section "Release-Spine Decomposition"), and any peer Task docs it cites. Do NOT edit anything. Return the contract exactly per schema: every planCitation must be a real doc path with line numbers you verified; targetedCommands are the narrow RED/GREEN commands; fullVerifyCommands come from todo.md; scopeGuards are claims the slice must not make (for release-spine: HA/scale contract-only, managed-auth compile-level, schedule no live tick source, CLI denial output-parsed oracle). ${rules}`,
-  { label: `orient:${topic}`, phase: 'Orient', schema: CONTRACT },
+  { model: 'sonnet', label: `orient:${topic}`, phase: 'Orient', schema: CONTRACT },
 )
 if (!contract) throw new Error('orient agent returned nothing')
 log(`Contract: ${contract.goal}`)
@@ -96,7 +96,7 @@ phase('RED')
 const red = await agent(
   `Execute the RED step for slice "${topic}". Contract: ${JSON.stringify(contract)}.
 Write the failing artifact described in redDefinition (failing tests or failing checker — for doc/evidence slices the checker IS the test). Do NOT implement the solution. Run the targeted commands and capture concrete failure output. ok=true means the artifact exists, runs, and FAILS for the contracted reason (not a syntax error). Follow matched-abstraction Task-layer discipline: also draft docs/matched-abstraction/task/${topic}.md with frontmatter (layer: task, topic: ${topic}, status: active, references to the owning plan/approach docs), brief, acceptance contract, and the executed RED citation with real command + failure output. Run bun run validate:layers to keep the doc valid. ${rules}`,
-  { label: `red:${topic}`, phase: 'RED', schema: EVIDENCE },
+  { model: 'sonnet', label: `red:${topic}`, phase: 'RED', schema: EVIDENCE },
 )
 if (!red?.ok) return { failed: 'RED', contract, red }
 log(`RED proven: ${red.summary}`)
@@ -105,7 +105,7 @@ phase('GREEN')
 const green = await agent(
   `Execute the GREEN step for slice "${topic}". Contract: ${JSON.stringify(contract)}. RED evidence: ${JSON.stringify(red)}.
 Implement the smallest complete change that turns the RED artifact green at its boundary, including denial/failure paths. No new features beyond the contract, no scope expansion, respect nonGoals and scopeGuards. Re-run the targeted commands until they pass; capture concrete results. Update the execution-notes section of docs/matched-abstraction/task/${topic}.md as you go. ${rules}`,
-  { label: `green:${topic}`, phase: 'GREEN', schema: EVIDENCE },
+  { model: 'sonnet', label: `green:${topic}`, phase: 'GREEN', schema: EVIDENCE },
 )
 if (!green?.ok) return { failed: 'GREEN', contract, red, green }
 log(`GREEN: ${green.summary}`)
@@ -139,7 +139,7 @@ const GATES = [
 
 const runGate = (g) =>
   agent(`${g.prompt.replace('<<CONTRACT>>', JSON.stringify(contract))}\nReturn gate="${g.key}". pass=true only with zero blockers. Be adversarial; report only real findings with file:line evidence, not style nitpicks outside this gate's charter. Repo: /home/lagz0ne/dev/tinkabot. Read-only: do NOT edit files.`,
-    { label: `gate:${g.key}`, phase: 'Gates', schema: VERDICT })
+    { model: 'sonnet', label: `gate:${g.key}`, phase: 'Gates', schema: VERDICT })
 
 phase('Gates')
 let verdicts = (await parallel(GATES.map((g) => () => runGate(g)))).filter(Boolean)
@@ -155,7 +155,7 @@ while (failed.length && round < 3) {
   const fix = await agent(
     `Fix these gate blockers in /home/lagz0ne/dev/tinkabot for slice "${topic}": ${JSON.stringify(blockers)}.
 Apply the smallest fix per blocker, keep the contract intact (${JSON.stringify(contract.scopeGuards)}), then re-run the slice's targeted commands (${JSON.stringify(contract.targetedCommands)}) to prove nothing regressed. If a blocker is a false positive, do not change code — say why in the summary with file:line evidence. ${rules}`,
-    { label: `fix:round${round}`, phase: 'Fix', schema: EVIDENCE },
+    { model: 'sonnet', label: `fix:round${round}`, phase: 'Fix', schema: EVIDENCE },
   )
   if (!fix?.ok) return { failed: 'Fix', contract, red, green, verdicts, fix }
   const rerun = (await parallel(
@@ -170,7 +170,7 @@ log('All gates pass')
 phase('Verify')
 const verify = await agent(
   `Run the FULL verification suite for /home/lagz0ne/dev/tinkabot and report each command with its concrete result (pass/fail counts, ok lines): ${JSON.stringify(contract.fullVerifyCommands)}. Also run git diff --check. Do not fix anything beyond trivial formatting the suite itself flags; ok=false if anything fails. ${rules}`,
-  { label: 'verify:full', phase: 'Verify', schema: EVIDENCE },
+  { model: 'sonnet', label: 'verify:full', phase: 'Verify', schema: EVIDENCE },
 )
 if (!verify?.ok) return { failed: 'Verify', contract, red, green, verdicts, verify }
 log(`Full verification: ${verify.summary}`)
@@ -182,7 +182,7 @@ const wrapup = await agent(
 2. Update tasks/todo.md: mark the milestone DONE, add only evidence that changes the current handoff, set the next resume point.
 3. Run bun run validate:layers and bun run test:layers; both must pass.
 Do not commit. Return summary of what changed. ${rules}`,
-  { label: `wrapup:${topic}`, phase: 'Wrap-up', schema: EVIDENCE },
+  { model: 'sonnet', label: `wrapup:${topic}`, phase: 'Wrap-up', schema: EVIDENCE },
 )
 
 return {
