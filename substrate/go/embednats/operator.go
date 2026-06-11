@@ -29,6 +29,17 @@ const (
 	ProvenanceLost       Kind = "ProvenanceLost"
 )
 
+const (
+	// OverbroadMint is returned when a mint request carries a session-subtree
+	// wildcard (tb.session.-prefixed wildcard pattern) — denied by the
+	// subject-breadth check in MintUser.
+	OverbroadMint Kind = "OverbroadMint"
+	// SteerAfterRevoke is returned by ApplySteerAfterRevoke when the steerer's
+	// credential has been revoked in the TB_APP account. The apply-time
+	// revocation re-check owns this failure family.
+	SteerAfterRevoke Kind = "SteerAfterRevoke"
+)
+
 // Control-plane / app-plane account split.
 const (
 	ControlAccount = "TB_CONTROL"
@@ -279,6 +290,17 @@ func (o *operator) posture() OperatorPosture {
 	return OperatorPosture{Enabled: true, PublicKey: o.pub, KeyFile: o.keyFile}
 }
 
+// isSessionSubtreeWildcard reports whether a subject is a tb.session.-prefixed
+// wildcard pattern (e.g. "tb.session.>" or "tb.session.abc.*").  Legitimate
+// wildcards like _INBOX.>, $KV.*.>, and $JS.API.* are not tb.session.-prefixed
+// and are unaffected.
+func isSessionSubtreeWildcard(subj string) bool {
+	if !strings.HasPrefix(subj, "tb.session.") {
+		return false
+	}
+	return strings.HasSuffix(subj, ".>") || strings.HasSuffix(subj, ".*")
+}
+
 // MintUser issues a short-lived user JWT in the given account, carrying the
 // lease vocabulary of the capability. Users with explicit permissions are
 // signed by the account root key; users without ride the account-default
@@ -311,6 +333,11 @@ func (r *Runtime) MintUser(account string, auth core.Auth, ttl time.Duration) (U
 		return UserCreds{}, fail(JWTMintFailed, "MintUser", "bounded credential TTL is required", cap.Details(), nil)
 	case strings.TrimSpace(cap.PrincipalID) == "" || strings.TrimSpace(cap.SessionID) == "" || strings.TrimSpace(cap.CapabilityID) == "":
 		return UserCreds{}, fail(ProvenanceLost, "MintUser", "lease provenance is incomplete", cap.Details(), nil)
+	}
+	for _, subj := range append(auth.Permissions.Publish.Allow, auth.Permissions.Subscribe.Allow...) {
+		if isSessionSubtreeWildcard(subj) {
+			return UserCreds{}, fail(OverbroadMint, "MintUser", "session-subtree wildcard grant denied", map[string]string{"subject": subj}, nil)
+		}
 	}
 
 	kp, err := nkeys.CreateUser()
@@ -465,6 +492,69 @@ func (r *Runtime) Revoke(account, userPub string) error {
 	acc.claims.Revoke(userPub)
 	if _, _, err := r.pushAccount(acc); err != nil {
 		return fail(RevocationFailed, "Revoke", "revocation could not be enforced", map[string]string{"account": account, "user": userPub}, err)
+	}
+	return nil
+}
+
+// MintTrustedWrapper issues a leaf-scoped JWT credential in the TB_APP account
+// for a trusted wrapper principal. The credential grants:
+//   - publish allow on tb.session.<sessionID>.ingest only
+//   - subscribe allow on tb.session.<sessionID>.steer only
+//
+// No JetStream API, no output-subject publish, no steer-publish authority.
+// The synthetic lease carries the sessionID as both SessionID and CapabilityID
+// so the wrapper credential is traceable without an external lease store.
+func MintTrustedWrapper(rt *Runtime, sessionID string) (UserCreds, error) {
+	if rt == nil || rt.op == nil {
+		return UserCreds{}, fail(JWTMintFailed, "MintTrustedWrapper", "operator mode is not enabled", nil, nil)
+	}
+	id := "wrapper-" + sessionID
+	leaseID, err := secret()
+	if err != nil {
+		return UserCreds{}, fail(JWTMintFailed, "MintTrustedWrapper", "lease id could not be generated", nil, err)
+	}
+	auth := core.Auth{
+		User: id,
+		Capability: core.Capability{
+			PrincipalID:   id,
+			SessionID:     sessionID,
+			CapabilityID:  "wrapper-cap-" + sessionID,
+			LeaseID:       leaseID,
+			LeaseStatus:   "active",
+			AppRevision:   "wrapper.v1",
+			SchemaVersion: "v1",
+		},
+		Permissions: core.Permissions{
+			Publish:   core.PermList{Allow: []string{"tb.session." + sessionID + ".ingest"}},
+			Subscribe: core.PermList{Allow: []string{"tb.session." + sessionID + ".steer", "_INBOX.>"}},
+		},
+	}
+	return rt.MintUser(AppAccount, auth, time.Hour)
+}
+
+// IsRevoked reports whether userPub has been revoked in the given account.
+// Returns false if the runtime is not in operator mode or the account is unknown.
+func (r *Runtime) IsRevoked(account, userPub string) bool {
+	if r == nil || r.op == nil {
+		return false
+	}
+	r.op.mu.Lock()
+	defer r.op.mu.Unlock()
+	acc := r.op.accounts[account]
+	if acc == nil {
+		return false
+	}
+	// Use zero time so any revocation timestamp (always > epoch) matches.
+	return acc.claims.Revocations.IsRevoked(userPub, time.Time{})
+}
+
+// ApplySteerAfterRevoke re-checks the steerer's revocation status at apply
+// time. If the credential identified by userPub has been revoked in the
+// TB_APP account, a typed SteerAfterRevoke error is returned. Nil means the
+// credential is still valid and the steer may be applied.
+func ApplySteerAfterRevoke(rt *Runtime, userPub string) error {
+	if rt.IsRevoked(AppAccount, userPub) {
+		return fail(SteerAfterRevoke, "ApplySteerAfterRevoke", "steer denied: wrapper credential revoked", map[string]string{"userPub": userPub}, nil)
 	}
 	return nil
 }

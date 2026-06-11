@@ -92,6 +92,33 @@ func internalConn(ctx context.Context, rt *Runtime, username string, perms core.
 	return rt.ConnectAs(ctx, auth)
 }
 
+// mintedConn mints a JWT credential via MintUser (operator mode) and connects
+// using it.
+func mintedConn(ctx context.Context, rt *Runtime, username string, perms core.Permissions) (*nats.Conn, error) {
+	leaseID, err := secret()
+	if err != nil {
+		return nil, err
+	}
+	auth := core.Auth{
+		User: username,
+		Capability: core.Capability{
+			PrincipalID:   username,
+			SessionID:     "internal-" + username,
+			CapabilityID:  "cap-" + username,
+			LeaseID:       leaseID,
+			LeaseStatus:   "active",
+			AppRevision:   "internal.v1",
+			SchemaVersion: "v1",
+		},
+		Permissions: perms,
+	}
+	creds, err := rt.MintUser(AppAccount, auth, 24*time.Hour)
+	if err != nil {
+		return nil, err
+	}
+	return rt.ConnectCreds(ctx, creds.File)
+}
+
 // Close releases the liveness store connection.
 func (s *LivenessStore) Close() {
 	if s != nil && s.nc != nil {

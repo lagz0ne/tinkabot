@@ -56,7 +56,7 @@ func StartFrameMediator(ctx context.Context, rt *Runtime, cfg FrameMediatorConfi
 	ingestSubj := "tb.session." + cfg.SessionID + ".ingest"
 	stream := "tb-session-out-" + cfg.SessionID
 
-	nc, err := internalConn(ctx, rt, "_tb_mediator_"+cfg.SessionID, core.Permissions{
+	mediatorPerms := core.Permissions{
 		Publish: core.PermList{Allow: []string{
 			"$JS.API.INFO",
 			"$JS.API.STREAM.CREATE." + stream,
@@ -72,7 +72,15 @@ func StartFrameMediator(ctx context.Context, rt *Runtime, cfg FrameMediatorConfi
 			outSubj,
 		}},
 		Subscribe: core.PermList{Allow: []string{ingestSubj, "_INBOX.>"}},
-	})
+	}
+
+	var nc *nats.Conn
+	var err error
+	if rt.op != nil {
+		nc, err = mintedConn(ctx, rt, "_tb_mediator_"+cfg.SessionID, mediatorPerms)
+	} else {
+		nc, err = internalConn(ctx, rt, "_tb_mediator_"+cfg.SessionID, mediatorPerms)
+	}
 	if err != nil {
 		return nil, err
 	}
