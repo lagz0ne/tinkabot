@@ -297,11 +297,14 @@ func sessionCred(rt *Runtime, sessionID string) (core.Auth, error) {
 			LeaseStatus: "active",
 		},
 		Permissions: core.Permissions{
-			Publish: core.PermList{Allow: append(
-				kvWriteAPI(sessionLivenessKV, "$KV."+sessionLivenessKV+".>"),
-				kvWriteAPI(sessionRecordsKV, "$KV."+sessionRecordsKV+".>", ingest)...,
-			)},
-			Subscribe: core.PermList{Allow: []string{steer, "_INBOX.>", "$KV." + sessionLivenessKV + ".>", "$KV." + sessionRecordsKV + ".>"}},
+			Publish: core.PermList{Allow: []string{
+				"$JS.API.INFO",
+				"$JS.API.STREAM.CREATE.KV_" + sessionRecordsKV,
+				"$JS.API.STREAM.INFO.KV_" + sessionRecordsKV,
+				"$KV." + sessionRecordsKV + "." + sessionID,
+				ingest,
+			}},
+			Subscribe: core.PermList{Allow: []string{steer, "_INBOX.>"}},
 		},
 	}
 
@@ -318,9 +321,9 @@ func sessionCred(rt *Runtime, sessionID string) (core.Auth, error) {
 	return auth, nil
 }
 
-// grantPrimarySubscribe adds subj to the primary user's subscribe allow list.
-// Used to expose session ingest subjects to the control-plane observer.
-func (r *Runtime) grantPrimarySubscribe(subj string) error {
+// grantPrimaryPerm adds subj to the allow list selected by field on the primary
+// user's Permissions struct, then reloads the server options.
+func (r *Runtime) grantPrimaryPerm(subj string, field func(*natsserver.Permissions) **natsserver.SubjectPermission) error {
 	if r.opts == nil {
 		return nil // operator mode: JWT governs permissions
 	}
@@ -330,23 +333,29 @@ func (r *Runtime) grantPrimarySubscribe(subj string) error {
 			if u.Permissions == nil {
 				u.Permissions = &natsserver.Permissions{}
 			}
-			if u.Permissions.Subscribe == nil {
-				u.Permissions.Subscribe = &natsserver.SubjectPermission{}
+			perm := field(u.Permissions)
+			if *perm == nil {
+				*perm = &natsserver.SubjectPermission{}
 			}
-			// Avoid duplicates.
-			for _, allowed := range u.Permissions.Subscribe.Allow {
+			for _, allowed := range (*perm).Allow {
 				if allowed == subj {
 					r.mu.Unlock()
 					return nil
 				}
 			}
-			u.Permissions.Subscribe.Allow = append(u.Permissions.Subscribe.Allow, subj)
+			(*perm).Allow = append((*perm).Allow, subj)
 			break
 		}
 	}
 	opts := r.opts
 	r.mu.Unlock()
 	return r.srv.ReloadOptions(opts)
+}
+
+// grantPrimarySubscribe adds subj to the primary user's subscribe allow list.
+// Used to expose session ingest subjects to the control-plane observer.
+func (r *Runtime) grantPrimarySubscribe(subj string) error {
+	return r.grantPrimaryPerm(subj, func(p *natsserver.Permissions) **natsserver.SubjectPermission { return &p.Subscribe })
 }
 
 // addSessionUser registers auth as a static user on the embedded NATS server
@@ -453,7 +462,11 @@ func openRecordsBucket(ctx context.Context, nc *nats.Conn) (jetstream.KeyValue, 
 	if err != nil {
 		return nil, err
 	}
-	return js.CreateOrUpdateKeyValue(ctx, jetstream.KeyValueConfig{
+	kv, err := js.KeyValue(ctx, sessionRecordsKV)
+	if err == nil {
+		return kv, nil
+	}
+	return js.CreateKeyValue(ctx, jetstream.KeyValueConfig{
 		Bucket:  sessionRecordsKV,
 		Storage: jetstream.FileStorage,
 	})

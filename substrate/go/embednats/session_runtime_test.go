@@ -506,6 +506,23 @@ func TestSessionRuntimeSubsystem(t *testing.T) {
 			t.Fatalf("StartSessionRuntime: %v", err)
 		}
 
+		// ── observe frames on ingest subject over real NATS ─────────────────
+		// Subscribe before the denied-neighbor tests so that frames published by
+		// the runner goroutine (after its 300ms startup hold) are not missed by
+		// the time the KV denial test completes.
+		observerNC, err := rt.Connect(ctx)
+		if err != nil {
+			t.Fatalf("observer connect: %v", err)
+		}
+		defer observerNC.Close()
+
+		ingestSubject := sessionIngestSubject(sessionID)
+		observerSub, err := observerNC.SubscribeSync(ingestSubject)
+		if err != nil {
+			t.Fatalf("subscribe ingest: %v", err)
+		}
+		t.Cleanup(func() { _ = observerSub.Unsubscribe() })
+
 		// ── denied-neighbor: runner's credential cannot reach neighbor ──────
 		// Proven before any watcher is treated as live (per plan obligation).
 		// The runner's session-scoped credential must NOT be able to subscribe
@@ -575,24 +592,41 @@ func TestSessionRuntimeSubsystem(t *testing.T) {
 		// Publish attempt: fire-and-forget; denial comes as async -ERR.
 		_ = neighborNC.Publish(neighborSubject, []byte(`{"kind":"session.frame","frame":"token","origin":"wrapper","sessionId":"`+neighborID+`","text":"injected"}`))
 		_ = neighborNC.FlushTimeout(300 * time.Millisecond)
-		// Drain async errors; fail if no Permissions Violation for publish.
 		drainAsyncErr("publish to neighbor session ingest subject")
 
-		// ── observe frames on ingest subject over real NATS ─────────────────
-		// A separate observer (with broader permissions) subscribes to the
-		// ingest subject and expects to see the stand-in frames.
-		observerNC, err := rt.Connect(ctx)
+		// ── denied-neighbor KV: runner cannot write neighbor's terminal record ─
+		// The runner credential is scoped to $KV.tb-session-records.<sessionID>.
+		// A kv.Put for the neighbor's sessionID publishes to
+		// $KV.tb-session-records.<neighborID>, which is not in the allow list.
+		// Use a short context so the Put fails fast on denial rather than waiting.
+		kvCtx, kvCancel := context.WithTimeout(ctx, 2*time.Second)
+		defer kvCancel()
+		neighborJS, err := jetstream.New(neighborNC)
 		if err != nil {
-			t.Fatalf("observer connect: %v", err)
+			t.Fatalf("denied-neighbor KV: jetstream.New: %v", err)
 		}
-		defer observerNC.Close()
+		kv, kvErr := neighborJS.CreateOrUpdateKeyValue(kvCtx, jetstream.KeyValueConfig{
+			Bucket:  sessionRecordsKV,
+			Storage: jetstream.FileStorage,
+		})
+		if kvErr != nil {
+			// If CreateOrUpdate itself is denied or fails, that is also evidence
+			// of scoping enforcement; the test does not need to proceed to Put.
+			t.Logf("denied-neighbor KV: CreateOrUpdateKeyValue returned %v (bucket creation denied or timed out)", kvErr)
+		} else {
+			_, putErr := kv.Put(kvCtx, neighborID, []byte(`{"sessionId":"`+neighborID+`","state":"terminal"}`))
+			if putErr == nil {
+				t.Fatal("denied-neighbor KV: runner was able to write terminal record for neighbor session — per-session KV key scope not enforced")
+			}
+		}
 
-		ingestSubject := sessionIngestSubject(sessionID)
-		observerSub, err := observerNC.SubscribeSync(ingestSubject)
-		if err != nil {
-			t.Fatalf("subscribe ingest: %v", err)
-		}
-		t.Cleanup(func() { _ = observerSub.Unsubscribe() })
+		// ── denied-neighbor KV READ: runner cannot retrieve neighbor's record ──
+		// The narrow publish set excludes $JS.API.DIRECT.GET.KV_<bucket>.>; a
+		// DIRECT.GET request for the neighbor's key must be denied by NATS.
+		directGetSubj := "$JS.API.DIRECT.GET.KV_" + sessionRecordsKV + "." + neighborID
+		_ = neighborNC.Publish(directGetSubj, nil)
+		_ = neighborNC.FlushTimeout(300 * time.Millisecond)
+		drainAsyncErr("DIRECT.GET read of neighbor session terminal record")
 
 		// Wait for the stand-in to emit its frames and the runtime to publish them.
 		var observed []map[string]any

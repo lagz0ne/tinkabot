@@ -17,6 +17,15 @@
     "revoked": ["TestSessionRuntimeSubsystem/RevokedLease"],
     "attributed-failure": ["TestSessionRuntimeSubsystem/TerminalRecordMissing"]
   },
+  "session-frame-mediation": {
+    "allowed": ["TestSessionFrameMediation/OutsideIn"],
+    "denied-neighbor": ["TestSessionFrameMediation/BridgeBypassAttempt"],
+    "malformed": ["TestSessionFrameMediation/SchemaViolationOnOut"],
+    "duplicate": ["TestSessionFrameMediation/DuplicateFrame"],
+    "stale": ["TestSessionFrameMediation/StaleFrame"],
+    "revoked": ["TestSessionFrameMediation/BridgeBypassAttempt"],
+    "attributed-failure": ["TestSessionFrameMediation/QuotaExceeded"]
+  },
   "live-source-router": {
     "allowed": [
       "TestSourceRouterAcceptsLiveSourcesOverEmbeddedNATS",
