@@ -15,7 +15,7 @@
 
 ## Active Goal
 
-Reach the Tinkabot v1 platform target with matched-abstraction docs, inside-out ownership proof, outside-in real-NATS proof, and NATS as the system seam for release confidence.
+Implement the `session-v2` program end to end: all seven slices of `docs/matched-abstraction/plan/session-v2.md`, each fully tested with inside-out ownership proof (one owning test per declared failure family) and outside-in proof where the seam is real embedded NATS (embednats runtime, JetStream KV/Object/streams, output-parsed denial oracles), code inspected per `.codex/skills/be-lazy/`, every slice driven through the `quality-slice` workflow (RED-GREEN-TDD plus the six gates: real-nats, parallel-safety, coverage, be-lazy, no-slop, security), closing with the release-evidence extension in slice 7.
 
 ## Active Session
 
@@ -90,9 +90,22 @@ RED-GREEN-TDD result:
 - After `release-spine`, the next program is `quality-v1`: deliver a usable, high-quality v1 with four enforced gates — all tests over real embedded NATS with an explicit fakes allowlist, parallel test execution with isolated servers, dual coverage (inside-out per-layer measurement plus outside-in scenario-matrix completeness), and `be-lazy` style enforced by a diff-scoped reviewer gate per slice.
 - The v1 user entry surface is a single Go binary: embedded NATS plus embedded frontend shell plus the script materializer loop, operated through the `nats` CLI. Product UI rendering stays deferred.
 
-## Next Slice
+## Next Program: Session V2
 
-Resume point: commit and push the five quality-v1 slices (quality-gate-infrastructure, typed-exposure-posture, operator-jwt-authority, tinkabot-binary, quality-release) — the working tree carries them all, verified green on the final tree. No further quality-v1 slice exists; after the push, the next program is an open product decision (deferred scope remains named in `release/v1.json`: direct browser NATS WebSocket, Docker sandboxing, product UI rendering beyond the shell, broad script CRUD UI, multi-node HA, package publication).
+The next program is decided: `session-v2` — long-lived agent sessions. A wrapper process (an agent runner such as `claude` driven over structured stdio by Bun) stays alive, streams output continuously, and accepts steering mid-run; the substrate exposes the session over NATS for observation and steering; a trusted browser surface streams content and sends steering chat.
+
+Matched-abstraction docs are authored and pass `bun run validate:layers`:
+- Approach: `docs/matched-abstraction/approach/session-v2.md` (purpose, core thesis, eight invariants, non-goals, decision hierarchy, met Plan-readiness gate).
+- Plan: `docs/matched-abstraction/plan/session-v2.md` (seven-slice decomposition, dependency ordering, handoff contract, verification strategy, deferred scope).
+- Diagram (authority + recovery model): `https://diashort.apps.quickable.co/d/13b0196d`.
+
+Resume point: execute Slice 1 (`session-contract-authority`) through the `quality-slice` workflow under RED-GREEN-TDD; author its Task doc with RED proof. Slices, in order: `session-contract-authority` -> `session-runtime-subsystem` -> `session-frame-mediation` -> `trusted-wrapper-authority` -> `steering-acceptance` -> `agent-wrapper-proof` (local) -> `web-session-surface + release closure`. Slices 6 and 7 may run in parallel after 3, 4, 5.
+
+Six forking decisions are resolved as carried decisions (see Plan "Consumed Approach"): canonical session = structured stream-json (raw terminal deferred); trust = control-plane attribution bound at mint (never relaxes the raw-import deny); single mediated writer for steering + single validating republisher for output; sessions are a distinct subsystem (no activation starvation); recovery = reconciliation between a durable session record and a heartbeat-bound liveness lease (restart behavior derives from lease state, terminal record on every path including crash); browser observation = direct NATS WebSocket at loopback (user decision, retiring the v1 deferral by its own proven conditions) with two-step custody — HttpOnly cookie exchanged at a mint endpoint for an ephemeral bearer viewer cred (short-TTL, loopback-source-pinned, leaf-scoped to one deliver subject + acceptance publish, zero JetStream API authority) over a cookie-gated WS upgrade, untrusted app frames staying credential-free behind the leased frame channel. Out of scope by user decision: built-in redaction/secret handling (future hook feature; transcript confidentiality equals transcript sensitivity) and real-agent-in-CI (real runner proven locally + manual pairs only).
+
+The session-v2 design passed a three-angle adversarial triage (security/authority, runtime/protocol, decomposition) before authoring; the corrected 7-slice shape and all eight invariants trace to confirmed findings. Key verified facts feeding the design: `claude` supports bidirectional `stream-json` I/O with no PTY (Bun has no native PTY), so PTY left the critical path; `MintUser` has no subject-breadth check (overbroad mint risk); `source_router` `send()` drops on full buffer then ACKs (steer/stop losable); `KVLedgerStore.Source` is O(history) per `Accept` (durable-activation-per-message unscalable); facade `rawValue` is key-only and `rawWords` contains `token` (session output bypasses + collides with existing content mediation).
+
+Prior resume point CLOSED: the five quality-v1 slices are committed (history through `7e696f5`; working tree at session-v2 start carried only the session-v2 docs). Deferred scope remains named in `release/v1.json`: direct browser NATS WebSocket (now retired at loopback by session-v2; manifest update belongs to slice 7), Docker sandboxing, product UI rendering beyond the shell, broad script CRUD UI, multi-node HA, package publication.
 
 The Quality V1 Plan is the program decomposition authority: `docs/matched-abstraction/plan/quality-v1.md`. Five slices, all DONE: `quality-gate-infrastructure` -> `typed-exposure-posture` -> `operator-jwt-authority` -> `tinkabot-binary` -> `quality-release`.
 
@@ -223,7 +236,7 @@ Evidence gathered:
 - Browser service-worker setup belongs to the substrate/browser edge, not generated content. It is cookie-session-backed, scope-isolated, revocable, CSRF/origin checked, and token-free for generated content.
 - Browser generated content runs as opaque sandboxed receiver code for v1. The shell must bind IPC by source window or port, nonce, frame lease, schema revision, artifact revision, and capability context; `event.origin` alone is not authority.
 - Unsafe same-origin `allow-scripts` plus `allow-same-origin` is denied for untrusted generated content.
-- Direct browser NATS WebSocket is deferred until live credential reload, post-connection revocation, denied-neighbor, stale-access, and confidentiality proof exist.
+- Direct browser NATS WebSocket is deferred until live credential reload, post-connection revocation, denied-neighbor, stale-access, and confidentiality proof exist. Update (session-v2): the first four are proven by `operator-jwt-authority`; confidentiality is satisfied at the loopback posture. The deferral is retired at loopback by `docs/matched-abstraction/approach/session-v2.md` invariant 8 (two-step mint, cookie-gated WS upgrade, leaf-scoped bearer viewer cred, no JetStream API authority in the browser). External/TLS forms stay deferred.
 - Go substrate Approach is sealed for `go-substrate-core`; downstream Plan/Task work may refine decomposition and verification, but cannot redefine embedded NATS ownership, HA/scale authority, auth vocabulary, authority envelopes, mediated scripts, generated-content denial, or typed substrate failures.
 - Go substrate embeds and manages NATS by default; HA/scale posture uses NATS-provided clustering, JetStream replica/quorum, route/gateway/leaf, WebSocket, queue/consumer, and observability semantics rather than bespoke substrate replication or routing.
 - Go substrate core must exist before embedded-NATS adapter, activation, script, or materializer implementation consumes substrate behavior; TypeScript runtime work is regression evidence, not substrate authority.
