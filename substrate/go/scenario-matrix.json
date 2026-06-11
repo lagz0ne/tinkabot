@@ -8,6 +8,15 @@
     "revoked": ["TestActivationReleaseProofFailureAttribution/revoked_lease"],
     "attributed-failure": ["TestActivationReleaseProofFailureAttribution/loop_suppressed"]
   },
+  "session-runtime-subsystem": {
+    "allowed": ["TestSessionRuntimeSubsystem/SessionStarvation"],
+    "denied-neighbor": ["TestSessionRuntimeSubsystem/TerminalRecordMissing"],
+    "malformed": ["TestSessionRuntimeSubsystem/TerminalRecordMissing"],
+    "duplicate": ["TestSessionLivenessIdempotent"],
+    "stale": ["TestSessionRuntimeSubsystem/StaleLeaseRevision"],
+    "revoked": ["TestSessionRuntimeSubsystem/RevokedLease"],
+    "attributed-failure": ["TestSessionRuntimeSubsystem/TerminalRecordMissing"]
+  },
   "live-source-router": {
     "allowed": [
       "TestSourceRouterAcceptsLiveSourcesOverEmbeddedNATS",

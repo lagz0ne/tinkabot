@@ -125,6 +125,10 @@ type Runtime struct {
 	drain    func(context.Context) error
 	shutdown func()
 	wait     func()
+
+	// mu guards opts for dynamic user registration (non-operator mode only).
+	mu   sync.Mutex
+	opts *natsserver.Options
 }
 
 func Start(cfg Config) (rt *Runtime, err error) {
@@ -320,6 +324,9 @@ func Start(cfg Config) (rt *Runtime, err error) {
 	}
 	if probe != nil {
 		rt.probe, rt.probePw = probe.Username, probe.Password
+	}
+	if op == nil {
+		rt.opts = opts
 	}
 	rt.drain = func(ctx context.Context) error {
 		if rt.nc == nil {
