@@ -1,0 +1,17 @@
+{
+  "kind": "session.record",
+  "sessionId": "session-001",
+  "runnerId": "principal.session.runner.001",
+  "state": "running",
+  "trust": {
+    "tier": "untrusted",
+    "ownerLayer": "trusted-wrapper-authority"
+  },
+  "provenance": {
+    "schemaId": "tb.schema.base.contract_authority.v1",
+    "schemaVersion": "v1",
+    "appRevision": "rev-7",
+    "createdAt": "2026-06-11T00:00:00.000Z",
+    "producer": "principal.session.runner.001"
+  }
+}

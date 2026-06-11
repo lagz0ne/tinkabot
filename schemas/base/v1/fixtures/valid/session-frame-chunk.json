@@ -1,0 +1,10 @@
+{
+  "kind": "session.frame",
+  "frame": "chunk",
+  "origin": "wrapper",
+  "sessionId": "session-001",
+  "body": {
+    "role": "assistant",
+    "text": "hello from the wrapper"
+  }
+}

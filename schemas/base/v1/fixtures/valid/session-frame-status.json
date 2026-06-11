@@ -1,0 +1,8 @@
+{
+  "kind": "session.frame",
+  "frame": "status",
+  "origin": "runner",
+  "sessionId": "session-001",
+  "state": "running",
+  "detail": "wrapper attached"
+}

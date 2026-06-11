@@ -1,0 +1,6 @@
+{
+  "kind": "session.steer_intent",
+  "intent": "steer",
+  "sessionId": "session-001",
+  "text": "focus on the failing parity test first"
+}

@@ -1,0 +1,7 @@
+{
+  "kind": "session.frame",
+  "frame": "metrics",
+  "origin": "wrapper",
+  "sessionId": "session-001",
+  "text": "cpu 99%"
+}

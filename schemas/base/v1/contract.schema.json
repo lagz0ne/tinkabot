@@ -11,7 +11,10 @@
     { "$ref": "#/$defs/scriptEffect" },
     { "$ref": "#/$defs/artifactManifest" },
     { "$ref": "#/$defs/materialProjection" },
-    { "$ref": "#/$defs/eventEnvelope" }
+    { "$ref": "#/$defs/eventEnvelope" },
+    { "$ref": "#/$defs/sessionRecord" },
+    { "$ref": "#/$defs/sessionFrame" },
+    { "$ref": "#/$defs/steerIntent" }
   ],
   "$defs": {
     "text": {
@@ -683,6 +686,100 @@
         },
         "error": { "$ref": "#/$defs/error" }
       }
+    },
+    "trustTier": {
+      "type": "object",
+      "required": ["tier", "ownerLayer"],
+      "additionalProperties": false,
+      "properties": {
+        "tier": { "enum": ["untrusted", "trusted"] },
+        "ownerLayer": { "const": "trusted-wrapper-authority" }
+      }
+    },
+    "sessionState": {
+      "enum": ["starting", "running", "stopping", "stopped", "failed"]
+    },
+    "sessionRecord": {
+      "type": "object",
+      "required": ["kind", "sessionId", "runnerId", "state", "trust", "provenance"],
+      "additionalProperties": false,
+      "properties": {
+        "kind": { "const": "session.record" },
+        "sessionId": { "$ref": "#/$defs/text" },
+        "runnerId": { "$ref": "#/$defs/text" },
+        "state": { "$ref": "#/$defs/sessionState" },
+        "trust": { "$ref": "#/$defs/trustTier" },
+        "provenance": { "$ref": "#/$defs/provenance" }
+      }
+    },
+    "sessionFrame": {
+      "oneOf": [
+        { "$ref": "#/$defs/sessionTokenFrame" },
+        { "$ref": "#/$defs/sessionChunkFrame" },
+        { "$ref": "#/$defs/sessionStatusFrame" }
+      ]
+    },
+    "sessionTokenFrame": {
+      "type": "object",
+      "required": ["kind", "frame", "origin", "sessionId", "text"],
+      "additionalProperties": false,
+      "properties": {
+        "kind": { "const": "session.frame" },
+        "frame": { "const": "token" },
+        "origin": { "const": "wrapper" },
+        "sessionId": { "$ref": "#/$defs/text" },
+        "text": { "$ref": "#/$defs/text" }
+      }
+    },
+    "sessionChunkFrame": {
+      "type": "object",
+      "required": ["kind", "frame", "origin", "sessionId", "body"],
+      "additionalProperties": false,
+      "properties": {
+        "kind": { "const": "session.frame" },
+        "frame": { "const": "chunk" },
+        "origin": { "const": "wrapper" },
+        "sessionId": { "$ref": "#/$defs/text" },
+        "body": { "$ref": "#/$defs/safeValue" }
+      }
+    },
+    "sessionStatusFrame": {
+      "type": "object",
+      "required": ["kind", "frame", "origin", "sessionId", "state"],
+      "additionalProperties": false,
+      "properties": {
+        "kind": { "const": "session.frame" },
+        "frame": { "const": "status" },
+        "origin": { "const": "runner" },
+        "sessionId": { "$ref": "#/$defs/text" },
+        "state": { "$ref": "#/$defs/sessionState" },
+        "detail": { "$ref": "#/$defs/text" }
+      }
+    },
+    "steerIntent": {
+      "oneOf": [
+        {
+          "type": "object",
+          "required": ["kind", "intent", "sessionId", "text"],
+          "additionalProperties": false,
+          "properties": {
+            "kind": { "const": "session.steer_intent" },
+            "intent": { "const": "steer" },
+            "sessionId": { "$ref": "#/$defs/text" },
+            "text": { "$ref": "#/$defs/text" }
+          }
+        },
+        {
+          "type": "object",
+          "required": ["kind", "intent", "sessionId"],
+          "additionalProperties": false,
+          "properties": {
+            "kind": { "const": "session.steer_intent" },
+            "intent": { "const": "stop" },
+            "sessionId": { "$ref": "#/$defs/text" }
+          }
+        }
+      ]
     }
   }
 }

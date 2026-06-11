@@ -1,0 +1,5 @@
+{
+  "kind": "session.steer_intent",
+  "intent": "stop",
+  "sessionId": "session-001"
+}

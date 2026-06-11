@@ -387,6 +387,63 @@ const event = z.strictObject({
   error: err.optional(),
 });
 
+const trustTier = z.strictObject({
+  tier: z.enum(["untrusted", "trusted"]),
+  ownerLayer: z.literal("trusted-wrapper-authority"),
+});
+
+const sessionState = z.enum(["starting", "running", "stopping", "stopped", "failed"]);
+
+const sessionRecord = z.strictObject({
+  kind: z.literal("session.record"),
+  sessionId: text,
+  runnerId: text,
+  state: sessionState,
+  trust: trustTier,
+  provenance,
+});
+
+const tokenFrame = z.strictObject({
+  kind: z.literal("session.frame"),
+  frame: z.literal("token"),
+  origin: z.literal("wrapper"),
+  sessionId: text,
+  text,
+});
+
+const chunkFrame = z.strictObject({
+  kind: z.literal("session.frame"),
+  frame: z.literal("chunk"),
+  origin: z.literal("wrapper"),
+  sessionId: text,
+  body: safeValue,
+});
+
+const statusFrame = z.strictObject({
+  kind: z.literal("session.frame"),
+  frame: z.literal("status"),
+  origin: z.literal("runner"),
+  sessionId: text,
+  state: sessionState,
+  detail: text.optional(),
+});
+
+const sessionFrame = z.discriminatedUnion("frame", [tokenFrame, chunkFrame, statusFrame]);
+
+const steerIntent = z.discriminatedUnion("intent", [
+  z.strictObject({
+    kind: z.literal("session.steer_intent"),
+    intent: z.literal("steer"),
+    sessionId: text,
+    text,
+  }),
+  z.strictObject({
+    kind: z.literal("session.steer_intent"),
+    intent: z.literal("stop"),
+    sessionId: text,
+  }),
+]);
+
 export const Contract = z.union([
   authPolicy,
   browserCommand,
@@ -397,6 +454,9 @@ export const Contract = z.union([
   artifact,
   projection,
   event,
+  sessionRecord,
+  sessionFrame,
+  steerIntent,
 ]);
 
 export type Contract = z.infer<typeof Contract>;

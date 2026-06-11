@@ -1,0 +1,62 @@
+[
+  {
+    "caseId": "session-record",
+    "fixture": "fixtures/valid/session-record.json",
+    "expect": { "valid": true, "policy": "allowed", "ownerLayer": "session-runtime-subsystem" }
+  },
+  {
+    "caseId": "session-frame-token",
+    "fixture": "fixtures/valid/session-frame-token.json",
+    "expect": { "valid": true, "policy": "allowed", "ownerLayer": "session-frame-mediation" }
+  },
+  {
+    "caseId": "session-frame-chunk",
+    "fixture": "fixtures/valid/session-frame-chunk.json",
+    "expect": { "valid": true, "policy": "allowed", "ownerLayer": "session-frame-mediation" }
+  },
+  {
+    "caseId": "session-frame-status",
+    "fixture": "fixtures/valid/session-frame-status.json",
+    "expect": { "valid": true, "policy": "allowed", "ownerLayer": "session-frame-mediation" }
+  },
+  {
+    "caseId": "session-steer-intent",
+    "fixture": "fixtures/valid/session-steer-intent.json",
+    "expect": { "valid": true, "policy": "allowed", "ownerLayer": "steering-acceptance" }
+  },
+  {
+    "caseId": "session-stop-intent",
+    "fixture": "fixtures/valid/session-stop-intent.json",
+    "expect": { "valid": true, "policy": "allowed", "ownerLayer": "steering-acceptance" }
+  },
+  {
+    "caseId": "session-frame-malformed",
+    "fixture": "fixtures/invalid/session-frame-malformed.json",
+    "expect": {
+      "valid": false,
+      "errorKind": "ContractInvalid",
+      "policy": "malformed",
+      "ownerLayer": "session-contract-authority"
+    }
+  },
+  {
+    "caseId": "session-frame-unknown-kind",
+    "fixture": "fixtures/invalid/session-frame-unknown-kind.json",
+    "expect": {
+      "valid": false,
+      "errorKind": "ContractInvalid",
+      "policy": "unknown-frame-kind",
+      "ownerLayer": "session-contract-authority"
+    }
+  },
+  {
+    "caseId": "session-record-missing-provenance",
+    "fixture": "fixtures/invalid/session-record-missing-provenance.json",
+    "expect": {
+      "valid": false,
+      "errorKind": "ContractInvalid",
+      "policy": "missing-provenance",
+      "ownerLayer": "session-contract-authority"
+    }
+  }
+]

@@ -1,0 +1,10 @@
+{
+  "kind": "session.record",
+  "sessionId": "session-001",
+  "runnerId": "principal.session.runner.001",
+  "state": "running",
+  "trust": {
+    "tier": "untrusted",
+    "ownerLayer": "trusted-wrapper-authority"
+  }
+}
