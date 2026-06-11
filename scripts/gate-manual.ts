@@ -48,14 +48,14 @@ export function anchors(expected: string): string[] {
     .filter((a) => a.length > 1);
 }
 
-export function check(manual: string, run: (cmd: string) => string): Finding[] {
+export function check(manual: string, run: (cmd: string, expected?: string) => string): Finding[] {
   const ps = pairs(manual);
   if (ps.length === 0) {
     return [{ family: "measurement-stale", detail: "manual documents no command/outcome pairs to verify" }];
   }
   const out: Finding[] = [];
   for (const { cmd, expected } of ps) {
-    const live = run(cmd);
+    const live = run(cmd, expected);
     const missing = anchors(expected).filter((a) => !strip(live).includes(a));
     if (missing.length) {
       out.push({
@@ -172,24 +172,29 @@ if (import.meta.main) {
     ]);
 
     // Each documented pair runs verbatim under the manual's connection
-    // preamble ("Connecting with the nats CLI"); material observations use
-    // observer creds ("Observing results") and retry briefly because
-    // materialization is asynchronous behind the Accepted reply.
-    const run = (cmd: string) => {
+    // preamble ("Connecting with the nats CLI"). Role follows the touched
+    // surface: script bucket -> author, material/artifact buckets -> observer,
+    // anything else -> caller. Pairs whose anchors are not yet all present
+    // retry briefly because materialization is asynchronous behind the
+    // accepted reply.
+    const run = (cmd: string, expected = "") => {
       const observes = /\$MATERIAL_BUCKET|\$ARTIFACT_BUCKET/.test(cmd);
+      const authors = /\$SCRIPT_BUCKET/.test(cmd);
       const sh = cmd.replace(/^nats /, `nats --no-context --server "$CLIENT_URL" --creds "$CREDS" --timeout 2s `);
       const env = {
         ...process.env,
         CLIENT_URL: clientURL,
-        CREDS: creds(observes ? "observer" : "caller"),
+        CREDS: creds(authors ? "author" : observes ? "observer" : "caller"),
         MATERIAL_BUCKET,
         ARTIFACT_BUCKET,
+        SCRIPT_BUCKET,
       };
+      const want = anchors(expected);
       const until = Date.now() + 5000;
       while (true) {
-        const p = Bun.spawnSync(["sh", "-c", sh], { env });
+        const p = Bun.spawnSync(["sh", "-c", sh], { env, cwd: root });
         const out = p.stdout.toString() + p.stderr.toString();
-        if (!observes || out.includes('"kind"') || Date.now() > until) return out;
+        if (want.every((a) => strip(out).includes(a)) || Date.now() > until) return out;
         Bun.sleepSync(100);
       }
     };
