@@ -1,0 +1,20 @@
+{
+  "kind": "script.record",
+  "scriptKey": "scripts.app.main",
+  "scriptRevision": 1,
+  "desc": "Render the service status page: one projection, one HTML artifact.",
+  "process": {
+    "command": "/bin/sh",
+    "args": [
+      "-c",
+      "b1='{\"kind\":\"script.effect\",\"effectType\":\"projection\",\"projectionId\":\"main\",\"snapshotRevision\":\"snap-status-1\",\"artifactRevision\":\"page.rev.1\",\"sequence\":10,\"value\":{\"page\":\"status\",\"state\":\"ok\",\"checks\":3}}'; b2='{\"kind\":\"script.effect\",\"effectType\":\"artifact\",\"artifactName\":\"artifact/status.html\",\"artifactRevision\":\"page.rev.1\",\"mediaType\":\"text/html\",\"body\":\"<h1>status: ok</h1>\"}'; printf \"Content-Length: %s\\r\\n\\r\\n%s\" \"${#b1}\" \"$b1\"; printf \"Content-Length: %s\\r\\n\\r\\n%s\" \"${#b2}\" \"$b2\""
+    ],
+    "cwd": "/tmp",
+    "rpc": "framed_stdio",
+    "timeoutMs": 2000,
+    "resource": { "cpuMillis": 100, "memoryMB": 64 },
+    "kill": "process.kill",
+    "cleanup": "workdir.keep",
+    "identity": "principal.script.001"
+  }
+}
