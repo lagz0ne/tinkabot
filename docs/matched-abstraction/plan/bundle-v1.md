@@ -16,7 +16,7 @@ sequences within those invariants.
 
 ## Decomposition
 
-Two slices, strictly sequenced; slice 1 delivers the user-testable app.
+Three slices, strictly sequenced; slice 1 delivers the user-testable app.
 
 ### Slice 1: bundle-dir-app
 
@@ -34,7 +34,17 @@ Two read-only shell routes give the frontend its reach: `GET
 under sandbox headers, and `GET /projections/<id>` serving projection JSON.
 Ships a runnable example bundle under `examples/`.
 
-### Slice 2: bundle-zip
+### Slice 2: bundle-account-isolation
+
+(Added 2026-06-12, user decision — see Escalation Log.) The bundle plane
+moves into its own runtime-minted NATS account: scripts, materials,
+artifacts, and ledger live in the bundle account's JetStream plane, bundle
+principals are minted there, and the only crossing into the app account is a
+service export/import per trigger under the importer's local name. New
+embednats primitives: `MintAccount`, `ExportService`, `ImportService`. The
+user-visible surface from slice 1 does not move.
+
+### Slice 3: bundle-zip
 
 Pure front-end to slice 1: `--bundle <file.zip>` extracts to a per-run
 directory under the store dir, records the archive's content hash into load
@@ -84,3 +94,11 @@ never exit-code.
   permissions cannot scope base64url-encoded artifact-manifest and
   script-record KV keys, so artifact-grant enforcement stays with the
   in-process script policy unless per-bundle buckets are introduced.
+- 2026-06-12 (second escalation, same day): the user resolved the isolation
+  mechanism upward again — "we play within the boundary of nats auth...
+  same subject doesn't mean a lot as long as the imports and exports are
+  correctly set". Slice 2 `bundle-account-isolation` inserted (zip slides to
+  slice 3): the account boundary supersedes both the prefix-law and the
+  base64url constraint above (bundle buckets are unreachable from the app
+  account regardless of key encoding). Derived names survive as the
+  import-remap convention on the app-facing surface.

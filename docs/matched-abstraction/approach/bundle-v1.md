@@ -35,13 +35,18 @@ Diagram: https://diashort.apps.quickable.co/d/4ee5ebeb
    operator is assumed to know what is inside; remaining load checks are
    namespace hygiene (well-formed names, intra-bundle duplicates), not
    adversarial defense. Load stays all-or-nothing and fail-fast: a binary
-   given a bad bundle refuses to start.
-3. **Code is ephemeral, effects are durable.** Bundle records and wiring live
-   in memory-storage state that dies with the process; nothing durable is
-   mutated by loading, and a restart without the bundle restores the exact
-   prior surface. Accepted effects (projections, artifacts, ledger events)
-   persist like any app output; provenance must remain meaningful after the
-   bundle is gone.
+   given a bad bundle refuses to start. (Amended again 2026-06-12, user
+   decision: the boundary is realized by NATS account isolation — the bundle
+   plane lives in its own minted account, the same names in other accounts
+   are unrelated, and the only crossing is an explicit service
+   export/import; the derived names remain as the app-facing import-remap
+   convention.)
+3. **The bundle plane is ephemeral by account lifecycle.** (Amended
+   2026-06-12.) Bundle account identity is process-ephemeral, so the entire
+   bundle plane — records, wiring, materials, artifacts, ledger — is
+   unreachable after restart by construction; nothing durable is mutated by
+   loading, and a restart without the bundle restores the exact prior
+   surface. The app plane's own truth is untouched throughout.
 4. **The trust posture is unchanged.** Bundle frontend content is untrusted
    generated material served read-only under sandbox headers; it never holds
    credentials, never registers workers, and reaches backend state only

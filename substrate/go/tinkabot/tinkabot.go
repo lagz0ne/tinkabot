@@ -148,9 +148,10 @@ type App struct {
 	route     *embednats.Route
 	stopLoop  func()
 	closers   []func()
-	routes    []*embednats.Route
-	stopLoops []func()
-	materials *embednats.KVMaterialStore
+	routes          []*embednats.Route
+	stopLoops       []func()
+	materials       *embednats.KVMaterialStore
+	bundleMaterials *embednats.KVMaterialStore
 
 	mu      sync.Mutex
 	torn    bool
@@ -245,18 +246,11 @@ func Start(cfg Config) (*App, error) {
 		app.creds[role], app.files[role] = uc, file
 	}
 
-	rp := routerPerms(w)
-	sp := servicePerms(w)
-	if bun != nil {
-		rp.Subscribe.Allow = append(rp.Subscribe.Allow, bun.subjects()...)
-		sp.Publish.Allow = append(sp.Publish.Allow, "$JS.API.STREAM.CREATE.KV_"+bundleBucket, "$KV."+bundleBucket+".>")
-		sp.Publish.Allow = append(sp.Publish.Allow, readKV(bundleBucket)...)
-	}
-	routerUC, err := rt.MintUser(embednats.AppAccount, principal("principal.runtime.router", "lease-router-"+nonce, rp), time.Hour)
+	routerUC, err := rt.MintUser(embednats.AppAccount, principal("principal.runtime.router", "lease-router-"+nonce, routerPerms(w)), time.Hour)
 	if err != nil {
 		return nil, fail(StartupMaterializationFailed, "Start", "router creds could not be minted", nil, err)
 	}
-	svcUC, err := rt.MintUser(embednats.AppAccount, principal("principal.runtime.materializer", "lease-materializer-"+nonce, sp), time.Hour)
+	svcUC, err := rt.MintUser(embednats.AppAccount, principal("principal.runtime.materializer", "lease-materializer-"+nonce, servicePerms(w)), time.Hour)
 	if err != nil {
 		return nil, fail(StartupMaterializationFailed, "Start", "materializer creds could not be minted", nil, err)
 	}
@@ -331,15 +325,10 @@ func Start(cfg Config) (*App, error) {
 
 	if bun != nil {
 		if err := app.startBundle(bun, bundleDeps{
-			cap:       cap,
-			nonce:     nonce,
-			dial:      dial,
-			svc:       svcUC,
-			caller:    app.creds[RoleCaller],
-			ledger:    ledgerStore,
-			materials: materialStore,
-			mat:       mat,
-			routerNC:  routerNC,
+			cap:    cap,
+			nonce:  nonce,
+			dial:   dial,
+			caller: app.creds[RoleCaller],
 		}); err != nil {
 			return nil, err
 		}

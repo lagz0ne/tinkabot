@@ -10,6 +10,7 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -19,6 +20,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/lagz0ne/tinkabot/substrate/go/core"
 	"github.com/lagz0ne/tinkabot/substrate/go/embednats"
 	"github.com/nats-io/nats.go"
 )
@@ -69,6 +71,38 @@ func TestBundle(t *testing.T) {
 		}
 		if _, err := kv.Get("s." + base64.RawURLEncoding.EncodeToString([]byte("scripts.bundle.clock.tick"))); err == nil {
 			t.Fatal("bundle record leaked into the durable script bucket")
+		}
+
+		// Account isolation: the bundle's entire plane is invisible from
+		// TB_APP — its script bucket does not exist there, and its
+		// projections never land in the app's material bucket.
+		probe, err := app.Runtime().MintUser(embednats.AppAccount, principal("principal.test.probe", "lease-probe-bundle", core.Permissions{
+			Publish:   core.PermList{Allow: []string{"$JS.API.>"}},
+			Subscribe: core.PermList{Allow: []string{"_INBOX.>"}},
+		}), time.Hour)
+		if err != nil {
+			t.Fatal(err)
+		}
+		pctx, pcancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer pcancel()
+		pnc, err := app.Runtime().ConnectCreds(pctx, probe.File)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer pnc.Close()
+		pjs, err := pnc.JetStream()
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := pjs.KeyValue("tb_bundle"); !errors.Is(err, nats.ErrBucketNotFound) {
+			t.Fatalf("bundle bucket visible in the app account: %v", err)
+		}
+		appMaterial, err := pjs.KeyValue("tb_material")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := appMaterial.Get("p.bundle.clock.state"); !errors.Is(err, nats.ErrKeyNotFound) {
+			t.Fatalf("bundle projection leaked into the app material bucket: %v", err)
 		}
 
 		// Caller trigger round trip re-renders the projection.

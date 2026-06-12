@@ -390,6 +390,74 @@ func (r *Runtime) MintUser(account string, auth core.Auth, ttl time.Duration) (U
 	return UserCreds{UserPub: pub, File: file, Lease: lease}, nil
 }
 
+// MintAccount compiles a new account into the live resolver at runtime. An
+// account is a hard namespace: same-name subjects and buckets in other
+// accounts are unrelated, and only explicit service exports/imports cross
+// the boundary. Account identity is ephemeral per process, like the
+// control/app split.
+func (r *Runtime) MintAccount(name string) error {
+	if r == nil || r.op == nil {
+		return fail(AccountCompileFailed, "MintAccount", "operator mode is not enabled", nil, nil)
+	}
+	r.op.mu.Lock()
+	defer r.op.mu.Unlock()
+	if strings.TrimSpace(name) == "" {
+		return fail(AccountCompileFailed, "MintAccount", "account name is required", nil, nil)
+	}
+	if r.op.accounts[name] != nil {
+		return fail(AccountCompileFailed, "MintAccount", "account already exists", map[string]string{"account": name}, nil)
+	}
+	acc, err := r.op.newAccount(name)
+	if err != nil {
+		return err
+	}
+	r.op.accounts[name] = acc
+	return nil
+}
+
+// ExportService exposes a request/reply subject across the account boundary.
+// It stays invisible to every other account until one imports it.
+func (r *Runtime) ExportService(account, subject string) error {
+	if r == nil || r.op == nil {
+		return fail(AccountUpdateFailed, "ExportService", "operator mode is not enabled", nil, nil)
+	}
+	r.op.mu.Lock()
+	defer r.op.mu.Unlock()
+	acc := r.op.accounts[account]
+	if acc == nil {
+		return fail(AccountUpdateFailed, "ExportService", "unknown account", map[string]string{"account": account}, nil)
+	}
+	acc.claims.Exports.Add(&jwt.Export{Subject: jwt.Subject(subject), Type: jwt.Service})
+	if _, _, err := r.pushAccount(acc); err != nil {
+		return err
+	}
+	return nil
+}
+
+// ImportService makes a service exported by fromAccount callable inside
+// account, under localSubject — the importer chooses the local name; empty
+// keeps the exporter's.
+func (r *Runtime) ImportService(account, fromAccount, subject, localSubject string) error {
+	if r == nil || r.op == nil {
+		return fail(AccountUpdateFailed, "ImportService", "operator mode is not enabled", nil, nil)
+	}
+	r.op.mu.Lock()
+	defer r.op.mu.Unlock()
+	acc, from := r.op.accounts[account], r.op.accounts[fromAccount]
+	if acc == nil || from == nil {
+		return fail(AccountUpdateFailed, "ImportService", "unknown account", map[string]string{"account": account, "from": fromAccount}, nil)
+	}
+	imp := &jwt.Import{Account: from.pub, Subject: jwt.Subject(subject), Type: jwt.Service}
+	if localSubject != "" && localSubject != subject {
+		imp.LocalSubject = jwt.RenamingSubject(localSubject)
+	}
+	acc.claims.Imports.Add(imp)
+	if _, _, err := r.pushAccount(acc); err != nil {
+		return err
+	}
+	return nil
+}
+
 // ConnectCreds connects a minted credential through the declared exposure
 // posture. Malformed and expired creds are denied at this boundary before any
 // dial; the embedded server stays the authority for signature, account, and
