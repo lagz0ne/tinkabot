@@ -117,6 +117,12 @@ const (
 	schemaID     = "tb.schema.base.contract_authority.v1"
 	authorityRef = "auth.source.trigger.main"
 	eventsStream = "tb_events"
+	// servingTTL bounds the assembly's own minted credentials. JWT expiry is
+	// enforced on live connections, so a 1h TTL killed the binary's plane at
+	// minute 60 (found live 2026-06-12); the bound must comfortably exceed a
+	// serving session — teardown revocation is what ends minted authority
+	// with the process.
+	servingTTL = 30 * 24 * time.Hour
 )
 
 // wiring names the served surfaces. The caller-facing literals are quoted
@@ -144,10 +150,10 @@ type App struct {
 	creds   map[string]embednats.UserCreds
 	files   map[string]string
 
-	shell     *http.Server
-	route     *embednats.Route
-	stopLoop  func()
-	closers   []func()
+	shell           *http.Server
+	route           *embednats.Route
+	stopLoop        func()
+	closers         []func()
 	routes          []*embednats.Route
 	stopLoops       []func()
 	materials       *embednats.KVMaterialStore
@@ -235,7 +241,7 @@ func Start(cfg Config) (*App, error) {
 		perms[RoleCaller] = cp
 	}
 	for role, p := range perms {
-		uc, err := rt.MintUser(embednats.AppAccount, principal("principal."+role, "lease-"+role+"-"+nonce, p), time.Hour)
+		uc, err := rt.MintUser(embednats.AppAccount, principal("principal."+role, "lease-"+role+"-"+nonce, p), servingTTL)
 		if err != nil {
 			return nil, fail(StartupMaterializationFailed, "Start", "role creds could not be minted", map[string]string{"role": role}, err)
 		}
@@ -246,11 +252,11 @@ func Start(cfg Config) (*App, error) {
 		app.creds[role], app.files[role] = uc, file
 	}
 
-	routerUC, err := rt.MintUser(embednats.AppAccount, principal("principal.runtime.router", "lease-router-"+nonce, routerPerms(w)), time.Hour)
+	routerUC, err := rt.MintUser(embednats.AppAccount, principal("principal.runtime.router", "lease-router-"+nonce, routerPerms(w)), servingTTL)
 	if err != nil {
 		return nil, fail(StartupMaterializationFailed, "Start", "router creds could not be minted", nil, err)
 	}
-	svcUC, err := rt.MintUser(embednats.AppAccount, principal("principal.runtime.materializer", "lease-materializer-"+nonce, servicePerms(w)), time.Hour)
+	svcUC, err := rt.MintUser(embednats.AppAccount, principal("principal.runtime.materializer", "lease-materializer-"+nonce, servicePerms(w)), servingTTL)
 	if err != nil {
 		return nil, fail(StartupMaterializationFailed, "Start", "materializer creds could not be minted", nil, err)
 	}

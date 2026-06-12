@@ -202,11 +202,11 @@ func (a *App) startBundle(b *bundle, deps bundleDeps) error {
 	if err := a.rt.MintAccount(acct); err != nil {
 		return rejectBundle("bundle account could not be minted", map[string]string{"account": acct}, err)
 	}
-	svcUC, err := a.rt.MintUser(acct, principal("principal.bundle."+b.manifest.Name+".service", "lease-bundle-svc-"+deps.nonce, bundleServicePerms()), time.Hour)
+	svcUC, err := a.rt.MintUser(acct, principal("principal.bundle."+b.manifest.Name+".service", "lease-bundle-svc-"+deps.nonce, bundleServicePerms()), servingTTL)
 	if err != nil {
 		return rejectBundle("bundle service creds could not be minted", map[string]string{"account": acct}, err)
 	}
-	routerUC, err := a.rt.MintUser(acct, principal("principal.bundle."+b.manifest.Name+".router", "lease-bundle-router-"+deps.nonce, bundleRouterPerms(b)), time.Hour)
+	routerUC, err := a.rt.MintUser(acct, principal("principal.bundle."+b.manifest.Name+".router", "lease-bundle-router-"+deps.nonce, bundleRouterPerms(b)), servingTTL)
 	if err != nil {
 		return rejectBundle("bundle router creds could not be minted", map[string]string{"account": acct}, err)
 	}
