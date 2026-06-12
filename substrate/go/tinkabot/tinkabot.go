@@ -43,6 +43,7 @@ const (
 	WiringMismatch               Kind = "WiringMismatch"
 	ManualDivergence             Kind = "ManualDivergence"
 	ShutdownFailed               Kind = "ShutdownFailed"
+	BundleRejected               Kind = "BundleRejected"
 )
 
 type Error struct {
@@ -72,6 +73,10 @@ type Config struct {
 	// session under that id so the shell observe panel has something live to
 	// watch. Demo gate only — never a product surface.
 	DemoSession string
+	// BundleDir, when non-empty, serves that directory as an ephemeral app
+	// for this run: manifest-declared scripts wired to triggers, nothing
+	// durable mutated (docs/matched-abstraction/approach/bundle-v1.md).
+	BundleDir string
 }
 
 // Wiring names every NATS-visible surface the manual operates against this
@@ -139,10 +144,13 @@ type App struct {
 	creds   map[string]embednats.UserCreds
 	files   map[string]string
 
-	shell    *http.Server
-	route    *embednats.Route
-	stopLoop func()
-	closers  []func()
+	shell     *http.Server
+	route     *embednats.Route
+	stopLoop  func()
+	closers   []func()
+	routes    []*embednats.Route
+	stopLoops []func()
+	materials *embednats.KVMaterialStore
 
 	mu      sync.Mutex
 	torn    bool
@@ -175,6 +183,14 @@ func Start(cfg Config) (*App, error) {
 	}
 
 	w := wiring()
+	var bun *bundle
+	if cfg.BundleDir != "" {
+		b, err := loadBundle(cfg.BundleDir, w)
+		if err != nil {
+			return nil, err
+		}
+		bun = b
+	}
 	rt, err := embednats.Start(embednats.Config{
 		Core: core.Config{
 			Topology: core.Topology{Mode: core.SingleNode, JetStream: true, Ready: true},
@@ -209,8 +225,16 @@ func Start(cfg Config) (*App, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	nonce := strconv.FormatInt(time.Now().UnixNano(), 36)
-	for role, perms := range rolePerms(w) {
-		uc, err := rt.MintUser(embednats.AppAccount, principal("principal."+role, "lease-"+role+"-"+nonce, perms), time.Hour)
+	perms := rolePerms(w)
+	if bun != nil {
+		// The bundle's triggers are caller authority for this run, nothing
+		// more — observers and authors are untouched.
+		cp := perms[RoleCaller]
+		cp.Publish.Allow = append(cp.Publish.Allow, bun.triggers()...)
+		perms[RoleCaller] = cp
+	}
+	for role, p := range perms {
+		uc, err := rt.MintUser(embednats.AppAccount, principal("principal."+role, "lease-"+role+"-"+nonce, p), time.Hour)
 		if err != nil {
 			return nil, fail(StartupMaterializationFailed, "Start", "role creds could not be minted", map[string]string{"role": role}, err)
 		}
@@ -221,11 +245,18 @@ func Start(cfg Config) (*App, error) {
 		app.creds[role], app.files[role] = uc, file
 	}
 
-	routerUC, err := rt.MintUser(embednats.AppAccount, principal("principal.runtime.router", "lease-router-"+nonce, routerPerms(w)), time.Hour)
+	rp := routerPerms(w)
+	sp := servicePerms(w)
+	if bun != nil {
+		rp.Subscribe.Allow = append(rp.Subscribe.Allow, bun.triggers()...)
+		sp.Publish.Allow = append(sp.Publish.Allow, "$JS.API.STREAM.CREATE.KV_"+bundleBucket, "$KV."+bundleBucket+".>")
+		sp.Publish.Allow = append(sp.Publish.Allow, readKV(bundleBucket)...)
+	}
+	routerUC, err := rt.MintUser(embednats.AppAccount, principal("principal.runtime.router", "lease-router-"+nonce, rp), time.Hour)
 	if err != nil {
 		return nil, fail(StartupMaterializationFailed, "Start", "router creds could not be minted", nil, err)
 	}
-	svcUC, err := rt.MintUser(embednats.AppAccount, principal("principal.runtime.materializer", "lease-materializer-"+nonce, servicePerms(w)), time.Hour)
+	svcUC, err := rt.MintUser(embednats.AppAccount, principal("principal.runtime.materializer", "lease-materializer-"+nonce, sp), time.Hour)
 	if err != nil {
 		return nil, fail(StartupMaterializationFailed, "Start", "materializer creds could not be minted", nil, err)
 	}
@@ -269,6 +300,7 @@ func Start(cfg Config) (*App, error) {
 	if err != nil {
 		return nil, fail(StartupMaterializationFailed, "Start", "material store could not be materialized", nil, err)
 	}
+	app.materials = materialStore
 
 	cap := app.creds[RoleCaller].Lease
 	router, err := embednats.NewSourceRouter(sourceAuthority(w, cap), core.NewDurableLedger(ledgerStore))
@@ -296,6 +328,23 @@ func Start(cfg Config) (*App, error) {
 			// envelopes to the material store; nothing to do here.
 		}
 	}()
+
+	if bun != nil {
+		if err := app.startBundle(bun, bundleDeps{
+			cap:       cap,
+			nonce:     nonce,
+			dial:      dial,
+			svc:       svcUC,
+			caller:    app.creds[RoleCaller],
+			scripts:   scriptStore,
+			ledger:    ledgerStore,
+			materials: materialStore,
+			mat:       mat,
+			routerNC:  routerNC,
+		}); err != nil {
+			return nil, err
+		}
+	}
 
 	shell, err := app.serveShell(shellAddr)
 	if err != nil {
@@ -345,8 +394,14 @@ func (a *App) teardown() {
 	if a.route != nil {
 		_ = a.route.Stop()
 	}
+	for _, r := range a.routes {
+		_ = r.Stop()
+	}
 	if a.stopLoop != nil {
 		a.stopLoop()
+	}
+	for _, stop := range a.stopLoops {
+		stop()
 	}
 	revoked := false
 	for _, uc := range a.creds {
@@ -392,11 +447,15 @@ func (a *App) serveShell(addr string) (ShellPosture, error) {
 	}
 	fileSrv := http.FileServer(http.FS(files))
 	a.shell = &http.Server{Handler: http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
-		switch r.URL.Path {
-		case "/session/viewer":
+		switch {
+		case r.URL.Path == "/session/viewer":
 			a.mintViewer(rw, r)
-		case "/session/ws":
+		case r.URL.Path == "/session/ws":
 			a.sessionWS(rw, r)
+		case strings.HasPrefix(r.URL.Path, "/artifacts/"):
+			a.serveArtifact(rw, r)
+		case strings.HasPrefix(r.URL.Path, "/projections/"):
+			a.serveProjection(rw, r)
 		default:
 			for k, v := range headers {
 				rw.Header().Set(k, v)

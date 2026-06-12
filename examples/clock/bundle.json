@@ -1,0 +1,18 @@
+{
+  "kind": "bundle.manifest",
+  "name": "clock",
+  "scripts": [
+    {
+      "scriptKey": "scripts.clock.tick",
+      "scriptRevision": 1,
+      "desc": "Render the clock projection and the clock page.",
+      "file": "scripts/tick.sh",
+      "command": "/bin/sh",
+      "timeoutMs": 2000,
+      "trigger": "tb.bundle.clock.tick",
+      "projections": ["bundle.clock"],
+      "artifactPrefix": "bundle/clock/",
+      "boot": true
+    }
+  ]
+}

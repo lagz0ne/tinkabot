@@ -19,7 +19,26 @@ Implement the `session-v2` program end to end: all seven slices of `docs/matched
 
 ## Active Session
 
-Post-program demo: browser-observes-backend example — DONE (2026-06-12, user-requested "frontend to observe backend", no claude — a simple continuous emitter).
+`bundle-dir-app` — DONE (2026-06-12, bundle-v1 slice 1/2). The brainstormed model below is now implemented and proven:
+
+- Docs: `docs/matched-abstraction/{approach,plan}/bundle-v1.md`, `task/bundle-dir-app.md` (complete, full evidence). validate:layers green.
+- Surface: `Config.BundleDir` / `--bundle <dir>`; `loadBundle` (strict manifest decode, disjoint-authority checks vs durable claims + reserved subjects + intra-bundle dups, fail-fast BEFORE NATS starts); `startBundle` (memory-storage `tb_bundle` bucket = ephemerality mechanism, per-entry router route + script loop + ScriptPolicy grants, boot via caller-creds request/reply with per-run request id); shell routes `GET /artifacts/<name>` (recorded mediaType + `CSP: sandbox allow-scripts` + ACAO `*` — sandboxed pages have opaque origins, so their fetches are cross-origin) and `GET /projections/<id>`; embednats `LoadArtifact`/`LoadProjection` read-only getters. Typed kind `BundleRejected`.
+- Example: `examples/clock` (manifest + framed-stdio sh script emitting projection + HTML page). Proven LIVE: agent-browser rendered the page, `nats request ... tb.bundle.clock.tick` -> accepted -> page self-updated within its 2s poll.
+- `TestBundle` 13/13 over real NATS; full battery PASS (all gates, 9/9 Go packages).
+- KEY POSTURE FACT (recorded in task Residual Risk): account identity is ephemeral -> JetStream durable buckets are empty on every boot (fresh plane); the durable-key collision check is vacuous today but kept for when planes persist.
+- Run: `go run ./cmd/tinkabot --store /tmp/tb-clock --shell 127.0.0.1:8419 --bundle ../../examples/clock` then open `/artifacts/bundle/clock/index.html`.
+- Next when resumed: bundle-v1 slice 2 (`bundle-zip`: extraction front-end + content-hash provenance, per Plan).
+
+Prior brainstorm record (2026-06-12, converged with user, now superseded by the docs above): **bundle** feature — `--bundle <dir|zip>` startup param serving included scripts per manifest. Converged model:
+
+- Bundle = **ephemeral run posture** (user decision): loaded at startup, nothing durable mutated, gone on exit. Records land in a **memory-storage JetStream KV bucket** (still NATS-observable, dies with the process). Loader acts as an automated author (strict-decoded `bundle.manifest`, all-or-nothing, typed attributed failures, fail-fast at boot). Zip = extraction front-end to the dir path.
+- **Disjoint authority** (user decision: disjoint namespaces; generalized): a bundle may not claim any authority already claimed durably — scriptKey, wired trigger subject, projectionId, artifact prefix. Collision anywhere = typed load failure. Consequence: the manifest MUST declare its own wiring + grants (bundle scripts can never occupy the boot-fixed `scripts.app.main` slot).
+- Effects stay durable; ledger provenance carries bundle name + content hash so history survives the bundle. Revisions manifest-declared, pinned per run; paths rewritten to the bundle dir at load.
+- Non-goals: dir watch/live-reload, shadowing/override semantics, session/agent definitions in bundles.
+- **One-stroke app** (user direction, 2026-06-12): a bundle = a complete app, backend + frontend together. Frontend needs no new mechanism — in this platform a frontend IS artifacts rendered by the trusted shell's sandbox. Missing piece: a manifest-declared **boot script** fired by a new `bundle-load` activation source (deduped per run), which emits the frontend artifacts + initial projections through the NORMAL materializer gate. Explicitly rejected: loader writing materials directly (second truth path, bypasses the materializer). Trust model untouched: bundle UI is untrusted generated content (sandboxed iframe, command allowlist), never trusted-shell code. Durability: code ephemeral, effects durable — `--store` choice is the demo/prod knob (temp dir = throwaway demo). Payoff: today's `TB_DEMO_SESSION` baked-in demo becomes `tinkabot --bundle examples/observe-demo/`.
+- Diagram: https://diashort.apps.quickable.co/d/4ee5ebeb — Next step when resumed: matched-abstraction Approach doc (skill now symlinked at `.claude/skills/matched-abstraction-thinking`).
+
+Prior: post-program demo: browser-observes-backend example — DONE (2026-06-12, user-requested "frontend to observe backend", no claude — a simple continuous emitter).
 
 - Binary: `TB_DEMO_SESSION=<id>` (env on `cmd/tinkabot`, `Config.DemoSession`) spawns a demo-gated mediated session: a sh ticker subprocess under the REAL session subsystem emitting canonical token frames 1/sec (`tinkabot/demo_session.go`). Required an operator-mode branch in `StartSessionRuntime` (runner credential now minted through the breadth-checked `MintUser` seam in operator mode; `runnerPerms` is the single shared authority set; non-operator static path unchanged) — sessions had never been spawned in operator mode before.
 - Shell: observe panel (`apps/frontend/src/observe.ts` + `nats.ws` dep): mint grant -> ticket-gated WS connect -> deliver-subject subscribe -> streaming render. Proven LIVE with agent-browser: ticks stream continuously; reload replays from tick 1 (DeliverAll snapshot-plus-tail) then continues live.

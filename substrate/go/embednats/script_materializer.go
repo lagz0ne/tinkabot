@@ -219,6 +219,41 @@ func (s *KVMaterialStore) SaveArtifact(art core.MaterialArtifact) error {
 	return nil
 }
 
+// LoadArtifact returns the stored artifact manifest and body by artifact
+// name; ok is false when no such artifact has materialized.
+func (s *KVMaterialStore) LoadArtifact(name string) (core.MaterialArtifact, []byte, bool, error) {
+	entry, err := s.kv.Get("a." + keyEnc(name))
+	if errors.Is(err, nats.ErrKeyNotFound) {
+		return core.MaterialArtifact{}, nil, false, nil
+	}
+	if err != nil {
+		return core.MaterialArtifact{}, nil, false, core.MaterialErr(core.MaterialWriteFailed, "LoadArtifact", "artifact manifest could not be read", map[string]string{"artifactName": name}, err)
+	}
+	var art core.MaterialArtifact
+	if err := json.Unmarshal(entry.Value(), &art); err != nil {
+		return core.MaterialArtifact{}, nil, false, core.MaterialErr(core.MaterialWriteFailed, "LoadArtifact", "artifact manifest could not be decoded", map[string]string{"artifactName": name}, err)
+	}
+	body, err := s.obj.GetBytes(name)
+	if err != nil {
+		return core.MaterialArtifact{}, nil, false, core.MaterialErr(core.ArtifactWriteFailed, "LoadArtifact", "artifact body could not be read", map[string]string{"artifactName": name}, err)
+	}
+	art.Name = name
+	return art, body, true, nil
+}
+
+// LoadProjection returns the stored projection record JSON by id; ok is
+// false when no such projection has materialized.
+func (s *KVMaterialStore) LoadProjection(id string) ([]byte, bool, error) {
+	entry, err := s.kv.Get("p." + id)
+	if errors.Is(err, nats.ErrKeyNotFound) {
+		return nil, false, nil
+	}
+	if err != nil {
+		return nil, false, core.MaterialErr(core.MaterialWriteFailed, "LoadProjection", "projection could not be read", map[string]string{"projectionId": id}, err)
+	}
+	return entry.Value(), true, nil
+}
+
 func (s *KVMaterialStore) SaveEvent(ev core.EventEnvelope) error {
 	body, err := json.Marshal(ev)
 	if err != nil {

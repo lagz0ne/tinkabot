@@ -33,6 +33,7 @@ func run(args []string, out io.Writer, sig <-chan os.Signal) error {
 	fs := flag.NewFlagSet("tinkabot", flag.ContinueOnError)
 	store := fs.String("store", "", "durable store directory (operator key, JetStream state, role creds)")
 	shell := fs.String("shell", "127.0.0.1:8419", "loopback address for the embedded shell")
+	bundle := fs.String("bundle", "", "bundle directory served as an ephemeral app for this run")
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
@@ -44,6 +45,7 @@ func run(args []string, out io.Writer, sig <-chan os.Signal) error {
 		Exposure:    embednats.Loopback(),
 		ShellAddr:   *shell,
 		DemoSession: os.Getenv("TB_DEMO_SESSION"),
+		BundleDir:   *bundle,
 	})
 	if err != nil {
 		return err
