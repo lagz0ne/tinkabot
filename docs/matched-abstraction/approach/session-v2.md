@@ -13,7 +13,7 @@ Diagram: https://diashort.apps.quickable.co/d/13b0196d
 
 ## Purpose
 
-Tinkabot v1 mediates scripts as run-to-completion processes whose effects materialize after exit. Session V2 adds a second, co-equal execution shape: a long-lived agent session. A wrapper process (an agent runner such as `claude` driven over structured stdio by Bun) stays alive, streams its output continuously, and accepts steering input mid-run. The substrate exposes that session over NATS for observation and steering, and a trusted browser surface streams the session and sends steering chat.
+Tinkabot v1 mediates scripts as run-to-completion processes whose effects materialize after exit. Session V2 adds a second, co-equal execution shape: a long-lived agent session. A wrapper process (driving an agent runner such as `claude` over structured stdio) stays alive, streams its output continuously, and accepts steering input mid-run. The substrate exposes that session over NATS for observation and steering, and a trusted browser surface streams the session and sends steering chat.
 
 This is not a refinement of the script materializer loop. The script loop is batch: one activation, one run, end-of-run effects. A session is interactive and unbounded in time: it is observed while it runs and influenced while it runs. The two share the activation front door and the authority model, but a session is its own execution subsystem.
 
