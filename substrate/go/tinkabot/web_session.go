@@ -78,20 +78,31 @@ func (a *App) mintViewer(rw http.ResponseWriter, r *http.Request) {
 		http.Error(rw, "session stream unavailable", http.StatusConflict)
 		return
 	}
+	// Browsers do not reliably attach SameSite cookies to ws:// upgrades, so
+	// the cookie-gated mint also derives a single-use upgrade ticket that
+	// carries the cookie session's authority onto the WS route.
+	ticket, err := embednats.IssueUpgradeTicket(a.rt)
+	if err != nil {
+		_ = a.rt.Revoke(embednats.AppAccount, viewer.UserPub)
+		http.Error(rw, "upgrade ticket unavailable", http.StatusInternalServerError)
+		return
+	}
 	rw.Header().Set("Content-Type", "application/json")
 	_ = json.NewEncoder(rw).Encode(map[string]string{
 		"jwt":            viewer.JWT,
 		"deliverSubject": viewer.DeliverSubject,
+		"wsTicket":       ticket,
 	})
 }
 
-// sessionWS gates the WebSocket upgrade on the cookie session and pipes the
-// upgraded connection to the embedded NATS loopback WebSocket listener. Only
-// the WebSocket handshake headers are replayed to the backend — the cookie
-// never crosses into NATS.
+// sessionWS gates the WebSocket upgrade on the cookie session — directly, or
+// via a single-use upgrade ticket derived from it at the mint endpoint — and
+// pipes the upgraded connection to the embedded NATS loopback WebSocket
+// listener. Only the WebSocket handshake headers are replayed to the backend;
+// neither the cookie nor the ticket crosses into NATS.
 func (a *App) sessionWS(rw http.ResponseWriter, r *http.Request) {
-	if !a.shellSession(r) {
-		http.Error(rw, "shell cookie session required", http.StatusUnauthorized)
+	if !a.shellSession(r) && !embednats.RedeemUpgradeTicket(a.rt, r.URL.Query().Get("t")) {
+		http.Error(rw, "shell cookie session or upgrade ticket required", http.StatusUnauthorized)
 		return
 	}
 	ws := a.rt.Posture().WebSocket

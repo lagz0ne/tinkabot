@@ -19,7 +19,14 @@ Implement the `session-v2` program end to end: all seven slices of `docs/matched
 
 ## Active Session
 
-Current slice: `web-session-surface` — DONE (session-v2 slice 7/7, program close).
+Post-program demo: browser-observes-backend example — DONE (2026-06-12, user-requested "frontend to observe backend", no claude — a simple continuous emitter).
+
+- Binary: `TB_DEMO_SESSION=<id>` (env on `cmd/tinkabot`, `Config.DemoSession`) spawns a demo-gated mediated session: a sh ticker subprocess under the REAL session subsystem emitting canonical token frames 1/sec (`tinkabot/demo_session.go`). Required an operator-mode branch in `StartSessionRuntime` (runner credential now minted through the breadth-checked `MintUser` seam in operator mode; `runnerPerms` is the single shared authority set; non-operator static path unchanged) — sessions had never been spawned in operator mode before.
+- Shell: observe panel (`apps/frontend/src/observe.ts` + `nats.ws` dep): mint grant -> ticket-gated WS connect -> deliver-subject subscribe -> streaming render. Proven LIVE with agent-browser: ticks stream continuously; reload replays from tick 1 (DeliverAll snapshot-plus-tail) then continues live.
+- EMPIRICAL FINDING (recorded in lessons.md + slice-7 task doc addendum): browsers do not attach SameSite cookies (Strict or Lax) to ws:// upgrades, while the same cookie rides fetch — every Go-side link proof passed, the browser composition failed. Resolution: the cookie-gated mint endpoint also derives a single-use 30s upgrade ticket (`wsTicket`, `embednats.IssueUpgradeTicket`/`RedeemUpgradeTicket`); `GET /session/ws` accepts cookie OR ticket; gating authority unchanged (ticket obtainable only via cookie), posture narrower. Owned by `TestWebSessionShell/TicketGatedUpgrade` (fresh ticket cookieless 101+INFO; reuse 401; forged 401) and `TestDemoSession` (full cookie->mint->bearer-WS->deliver dogfood in Go).
+- Run it: `TB_DEMO_SESSION=demo-001 go run ./cmd/tinkabot --store <dir> --shell 127.0.0.1:8419`, open the shell URL, click Observe.
+
+Prior: `web-session-surface` — DONE (session-v2 slice 7/7, program close).
 
 Workflow vetting result (important precedent): the `quality-slice` main run (21 agents) passed its own six subtests but UNDER-DELIVERED the Plan — no WebSocket surface existed anywhere (the "upgrade" proof tested a bare function), the viewer credential granted steer-subject publish (invariant-1 violation), the viewer subscribed `.out` directly (no transcript replay) instead of the deliver-consumer design, no bearer mode (seed shipped browser-side), and a parallel Go `FrameLease` was invented instead of extending the TS lease. Caught by vetting GREEN against a pre-built seam map (binary shell server, WS posture, mint API, TS lease, release closure points) rather than against the workflow's own claims. The slice was re-driven under a strengthened RED.
 

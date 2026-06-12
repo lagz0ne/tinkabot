@@ -226,17 +226,49 @@ func (s *SessionRuntime) Wait(ctx context.Context) error {
 // The subprocess (stand-in in CI) holds zero NATS authority; only the runner
 // connection (using the per-session credential) publishes to NATS.
 func StartSessionRuntime(ctx context.Context, rt *Runtime, cfg SessionRuntimeConfig) (*SessionRuntime, error) {
-	cred, err := sessionCred(rt, cfg.SessionID)
+	var (
+		cred     core.Auth
+		runnerNC *nats.Conn
+		err      error
+	)
+	if rt.op != nil {
+		// Operator mode mints the runner principal through the breadth-checked
+		// mint seam instead of registering a static user.
+		leaseID, serr := secret()
+		if serr != nil {
+			return nil, serr
+		}
+		user := "session-runner-" + cfg.SessionID
+		cred = core.Auth{
+			User: user,
+			Capability: core.Capability{
+				PrincipalID:   user,
+				SessionID:     cfg.SessionID,
+				CapabilityID:  "runner-cap-" + cfg.SessionID,
+				LeaseID:       leaseID,
+				LeaseStatus:   "active",
+				AppRevision:   "runner.v1",
+				SchemaVersion: "v1",
+			},
+			Permissions: runnerPerms(cfg.SessionID),
+		}
+		uc, merr := rt.MintUser(AppAccount, cred, time.Hour)
+		if merr != nil {
+			return nil, merr
+		}
+		runnerNC, err = rt.ConnectCreds(ctx, uc.File)
+	} else {
+		cred, err = sessionCred(rt, cfg.SessionID)
+		if err != nil {
+			return nil, err
+		}
+		runnerNC, err = rt.ConnectAs(ctx, cred)
+	}
 	if err != nil {
 		return nil, err
 	}
 
 	ingest := "tb.session." + cfg.SessionID + ".ingest"
-
-	runnerNC, err := rt.ConnectAs(ctx, cred)
-	if err != nil {
-		return nil, err
-	}
 
 	steer := "tb.session." + cfg.SessionID + ".steer"
 
@@ -313,8 +345,6 @@ func sessionCred(rt *Runtime, sessionID string) (core.Auth, error) {
 		return core.Auth{}, err
 	}
 	user := "session-runner-" + sessionID
-	ingest := "tb.session." + sessionID + ".ingest"
-	steer := "tb.session." + sessionID + ".steer"
 
 	auth := core.Auth{
 		User: user,
@@ -323,16 +353,7 @@ func sessionCred(rt *Runtime, sessionID string) (core.Auth, error) {
 			LeaseID:     pass,
 			LeaseStatus: "active",
 		},
-		Permissions: core.Permissions{
-			Publish: core.PermList{Allow: []string{
-				"$JS.API.INFO",
-				"$JS.API.STREAM.CREATE.KV_" + sessionRecordsKV,
-				"$JS.API.STREAM.INFO.KV_" + sessionRecordsKV,
-				"$KV." + sessionRecordsKV + "." + sessionID,
-				ingest,
-			}},
-			Subscribe: core.PermList{Allow: []string{steer, "_INBOX.>"}},
-		},
+		Permissions: runnerPerms(sessionID),
 	}
 
 	if err := rt.addSessionUser(auth); err != nil {
@@ -341,11 +362,28 @@ func sessionCred(rt *Runtime, sessionID string) (core.Auth, error) {
 
 	// Grant the primary user subscribe access to this session's ingest subject
 	// only — not the full tb.session.> wildcard.
-	if err := rt.grantPrimarySubscribe(ingest); err != nil {
+	if err := rt.grantPrimarySubscribe("tb.session." + sessionID + ".ingest"); err != nil {
 		return core.Auth{}, err
 	}
 
 	return auth, nil
+}
+
+// runnerPerms is the session runner's least-authority set, shared by the
+// static (non-operator) and minted (operator) credential paths: publish on
+// the session's ingest subject and its terminal-record KV key, subscribe on
+// its steering subject — never a wildcard over the session subtree.
+func runnerPerms(sessionID string) core.Permissions {
+	return core.Permissions{
+		Publish: core.PermList{Allow: []string{
+			"$JS.API.INFO",
+			"$JS.API.STREAM.CREATE.KV_" + sessionRecordsKV,
+			"$JS.API.STREAM.INFO.KV_" + sessionRecordsKV,
+			"$KV." + sessionRecordsKV + "." + sessionID,
+			"tb.session." + sessionID + ".ingest",
+		}},
+		Subscribe: core.PermList{Allow: []string{"tb.session." + sessionID + ".steer", "_INBOX.>"}},
+	}
 }
 
 // grantPrimaryPerm adds subj to the allow list selected by field on the primary

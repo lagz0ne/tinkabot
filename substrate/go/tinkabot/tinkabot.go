@@ -68,6 +68,10 @@ type Config struct {
 	StoreDir  string
 	Exposure  embednats.Exposure
 	ShellAddr string
+	// DemoSession, when non-empty, runs a continuously ticking stand-in
+	// session under that id so the shell observe panel has something live to
+	// watch. Demo gate only — never a product surface.
+	DemoSession string
 }
 
 // Wiring names every NATS-visible surface the manual operates against this
@@ -296,6 +300,11 @@ func Start(cfg Config) (*App, error) {
 	shell, err := app.serveShell(shellAddr)
 	if err != nil {
 		return nil, err
+	}
+	if cfg.DemoSession != "" {
+		if err := app.startDemoSession(cfg.DemoSession); err != nil {
+			return nil, fail(StartupMaterializationFailed, "Start", "demo session could not be started", map[string]string{"session": cfg.DemoSession}, err)
+		}
 	}
 	app.posture = Posture{NATS: rt.Posture(), Shell: shell, Wiring: w}
 	ok = true

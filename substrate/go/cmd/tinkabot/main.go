@@ -40,9 +40,10 @@ func run(args []string, out io.Writer, sig <-chan os.Signal) error {
 		return errors.New("--store is required")
 	}
 	app, err := tinkabot.Start(tinkabot.Config{
-		StoreDir:  *store,
-		Exposure:  embednats.Loopback(),
-		ShellAddr: *shell,
+		StoreDir:    *store,
+		Exposure:    embednats.Loopback(),
+		ShellAddr:   *shell,
+		DemoSession: os.Getenv("TB_DEMO_SESSION"),
 	})
 	if err != nil {
 		return err

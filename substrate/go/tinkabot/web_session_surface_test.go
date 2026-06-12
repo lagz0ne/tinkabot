@@ -45,11 +45,12 @@ func shellCookie(t *testing.T, shellURL string) *http.Cookie {
 }
 
 // wsUpgrade hand-rolls an HTTP/1.1 WebSocket upgrade against the shell WS
-// route (the nats.go client cannot attach a Cookie header, and the browser
-// attaches it automatically — the test plays the browser). It returns the
-// response status line and any bytes that followed the response head within
-// the read window (for a piped connection, the NATS INFO banner).
-func wsUpgrade(t *testing.T, shellURL, cookie string) (string, []byte) {
+// route at path (the nats.go client cannot attach a Cookie header, and
+// browsers do not reliably attach SameSite cookies to ws:// upgrades — the
+// test plays both gating modes). It returns the response status line and any
+// bytes that followed the response head within the read window (for a piped
+// connection, the NATS INFO banner).
+func wsUpgrade(t *testing.T, shellURL, path, cookie string) (string, []byte) {
 	t.Helper()
 	u, err := url.Parse(shellURL)
 	if err != nil {
@@ -66,7 +67,7 @@ func wsUpgrade(t *testing.T, shellURL, cookie string) (string, []byte) {
 	if _, err := rand.Read(keyRaw); err != nil {
 		t.Fatal(err)
 	}
-	req := "GET /session/ws HTTP/1.1\r\n" +
+	req := "GET " + path + " HTTP/1.1\r\n" +
 		"Host: " + u.Host + "\r\n" +
 		"Upgrade: websocket\r\n" +
 		"Connection: Upgrade\r\n" +
@@ -128,11 +129,11 @@ func TestWebSessionShell(t *testing.T) {
 	// UngatedUpgrade: a WS upgrade without a cookie session is denied 401, and
 	// a malformed/unknown cookie is denied 401 — output-parsed, never exit-code.
 	t.Run("UngatedUpgrade", func(t *testing.T) {
-		status, _ := wsUpgrade(t, shell.URL, "")
+		status, _ := wsUpgrade(t, shell.URL, "/session/ws", "")
 		if !strings.Contains(status, "401") {
 			t.Fatalf("UngatedUpgrade: upgrade without cookie session must be 401, got %q", status)
 		}
-		status2, _ := wsUpgrade(t, shell.URL, "forged-token-xyz")
+		status2, _ := wsUpgrade(t, shell.URL, "/session/ws", "forged-token-xyz")
 		if !strings.Contains(status2, "401") {
 			t.Fatalf("UngatedUpgrade: upgrade with unknown cookie must be 401, got %q", status2)
 		}
@@ -145,16 +146,65 @@ func TestWebSessionShell(t *testing.T) {
 	// consumed by one upgrade).
 	t.Run("CookieGatedUpgrade", func(t *testing.T) {
 		cookie := shellCookie(t, shell.URL)
-		status, body := wsUpgrade(t, shell.URL, cookie.Value)
+		status, body := wsUpgrade(t, shell.URL, "/session/ws", cookie.Value)
 		if !strings.Contains(status, "101") {
 			t.Fatalf("CookieGatedUpgrade: expected 101 Switching Protocols, got %q", status)
 		}
 		if !strings.Contains(string(body), "INFO") {
 			t.Fatal("CookieGatedUpgrade: no NATS INFO banner through the proxied upgrade — the shell WS route must pipe to the embedded NATS WebSocket listener")
 		}
-		status2, body2 := wsUpgrade(t, shell.URL, cookie.Value)
+		status2, body2 := wsUpgrade(t, shell.URL, "/session/ws", cookie.Value)
 		if !strings.Contains(status2, "101") || !strings.Contains(string(body2), "INFO") {
 			t.Fatalf("DuplicateUpgrade: second upgrade with the same cookie session must succeed, got %q", status2)
+		}
+	})
+
+	// TicketGatedUpgrade: the mint endpoint derives a single-use upgrade
+	// ticket from the cookie session (browsers do not reliably attach
+	// SameSite cookies to ws:// handshakes). The ticket upgrades once without
+	// any cookie, is consumed by use, and a forged ticket is denied.
+	t.Run("TicketGatedUpgrade", func(t *testing.T) {
+		ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+		defer cancel()
+
+		const sid = "wss-ticket-001"
+		mediator, err := embednats.StartFrameMediator(ctx, app.Runtime(), embednats.FrameMediatorConfig{SessionID: sid, QuotaMaxBytes: 1 << 20})
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer mediator.Stop()
+
+		cookie := shellCookie(t, shell.URL)
+		req, err := http.NewRequest(http.MethodPost, shell.URL+"/session/viewer", strings.NewReader(`{"sessionId":"`+sid+`"}`))
+		if err != nil {
+			t.Fatal(err)
+		}
+		req.Header.Set("Content-Type", "application/json")
+		req.AddCookie(cookie)
+		res, err := http.DefaultClient.Do(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		var grant struct {
+			WSTicket string `json:"wsTicket"`
+		}
+		err = json.NewDecoder(res.Body).Decode(&grant)
+		res.Body.Close()
+		if err != nil || grant.WSTicket == "" {
+			t.Fatalf("mint must return a wsTicket, err %v", err)
+		}
+
+		status, body := wsUpgrade(t, shell.URL, "/session/ws?t="+grant.WSTicket, "")
+		if !strings.Contains(status, "101") || !strings.Contains(string(body), "INFO") {
+			t.Fatalf("TicketGatedUpgrade: cookieless upgrade with a fresh ticket must succeed, got %q", status)
+		}
+		status2, _ := wsUpgrade(t, shell.URL, "/session/ws?t="+grant.WSTicket, "")
+		if !strings.Contains(status2, "401") {
+			t.Fatalf("TicketGatedUpgrade: a ticket is single-use — reuse must be 401, got %q", status2)
+		}
+		status3, _ := wsUpgrade(t, shell.URL, "/session/ws?t=forged-ticket", "")
+		if !strings.Contains(status3, "401") {
+			t.Fatalf("TicketGatedUpgrade: forged ticket must be 401, got %q", status3)
 		}
 	})
 

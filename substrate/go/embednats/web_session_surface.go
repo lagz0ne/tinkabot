@@ -200,3 +200,48 @@ func RevokeCookieSession(rt *Runtime, token string) error {
 		return kv.Delete(ctx, token)
 	})
 }
+
+// upgradeTicketTTL bounds how long a minted upgrade ticket stays redeemable.
+const upgradeTicketTTL = 30 * time.Second
+
+// IssueUpgradeTicket mints a single-use, short-lived WebSocket upgrade ticket
+// derived from a validated cookie session. Browsers do not reliably attach
+// SameSite cookies to ws:// handshakes, so the cookie gates the ticket mint
+// and the ticket carries that authority onto the upgrade itself.
+func IssueUpgradeTicket(rt *Runtime) (string, error) {
+	tok, err := secret()
+	if err != nil {
+		return "", err
+	}
+	err = withCookieKV(rt, func(ctx context.Context, kv jetstream.KeyValue) error {
+		_, err := kv.Put(ctx, "t."+tok, []byte(time.Now().Format(time.RFC3339Nano)))
+		return err
+	})
+	if err != nil {
+		return "", err
+	}
+	return tok, nil
+}
+
+// RedeemUpgradeTicket consumes an upgrade ticket: valid exactly once, and
+// only within its TTL. Unknown, reused, and expired tickets are invalid.
+func RedeemUpgradeTicket(rt *Runtime, ticket string) bool {
+	if ticket == "" {
+		return false
+	}
+	valid := false
+	_ = withCookieKV(rt, func(ctx context.Context, kv jetstream.KeyValue) error {
+		entry, err := kv.Get(ctx, "t."+ticket)
+		if err != nil {
+			return err
+		}
+		_ = kv.Delete(ctx, "t."+ticket)
+		issued, err := time.Parse(time.RFC3339Nano, string(entry.Value()))
+		if err != nil {
+			return err
+		}
+		valid = time.Since(issued) <= upgradeTicketTTL
+		return nil
+	})
+	return valid
+}

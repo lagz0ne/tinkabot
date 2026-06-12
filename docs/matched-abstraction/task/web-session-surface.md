@@ -191,6 +191,22 @@ Does not own:
   consumed unchanged).
 - Live-agent CI (slice 6's exclusion stands).
 
+## Addendum (2026-06-12, browser demo)
+
+The first real-browser run of this surface (demo-gated observe panel) found
+that browsers do not reliably attach SameSite cookies to `ws://` upgrade
+handshakes — both Strict and Lax were omitted by the test browser while the
+same cookie rode `fetch` requests fine. The cookie gate therefore gained a
+derived transport: the cookie-gated mint endpoint also returns a single-use,
+30s-TTL upgrade ticket (`wsTicket`), and `GET /session/ws` accepts a valid
+cookie OR a valid ticket (`?t=`). The gating authority is unchanged — the
+ticket is obtainable only through the cookie session — and the posture is
+strictly narrower (single-use, short TTL). Proven by
+`TestWebSessionShell/TicketGatedUpgrade` (cookieless upgrade with fresh
+ticket succeeds; reuse and forgery are 401) and by the live browser run:
+`TB_DEMO_SESSION=demo-001` binary, observe panel streaming the demo session
+with full replay-on-reload through the DeliverAll consumer.
+
 ## Residual Risk
 
 - The browser composition (automatic cookie on same-origin WS upgrade +

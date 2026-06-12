@@ -1,5 +1,6 @@
 import { accept, frameAttrs, makeLease, type BrowserCommandIntent } from "./isolation";
 import { generatedUrl } from "./fixture";
+import { observe } from "./observe";
 import "./style.css";
 
 declare global {
@@ -47,6 +48,12 @@ app.innerHTML = `
         <div><dt>Denied</dt><dd data-proof="denied">0</dd></div>
         <div><dt>Cookie Probe</dt><dd data-proof="cookie">pending</dd></div>
       </dl>
+    </section>
+    <section class="observe">
+      <p class="eyebrow">session observation</p>
+      <label>Session <input data-obs="sid" value="demo-001" /></label>
+      <button data-obs="go">Observe</button>
+      <pre data-obs="log"></pre>
     </section>
     <iframe
       data-proof="frame"
@@ -106,6 +113,18 @@ window.addEventListener("message", (event) => {
 });
 
 frame.src = generatedUrl();
+
+const obsLog = app.querySelector<HTMLPreElement>('[data-obs="log"]')!;
+const obsSid = app.querySelector<HTMLInputElement>('[data-obs="sid"]')!;
+app.querySelector<HTMLButtonElement>('[data-obs="go"]')!.addEventListener("click", () => {
+  obsLog.textContent = "";
+  observe(obsSid.value, (text) => {
+    obsLog.textContent += text;
+    obsLog.scrollTop = obsLog.scrollHeight;
+  }).catch((err) => {
+    obsLog.textContent = `observe failed: ${err instanceof Error ? err.message : String(err)}`;
+  });
+});
 
 render();
 
