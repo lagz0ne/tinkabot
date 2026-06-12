@@ -53,6 +53,29 @@ func TestTrustedWrapperAuthority(t *testing.T) {
 		assertAdapter(t, err, OverbroadMint)
 	})
 
+	// OverbroadMintInfix: an infix wildcard such as tb.session.*.ingest grants
+	// publish authority across every session's ingest subject.  The breadth check
+	// must catch mid-path wildcards, not only terminal ones.
+	t.Run("OverbroadMintInfix", func(t *testing.T) {
+		t.Parallel()
+
+		rt, err := start(t, operatorCfg(t, Loopback()))
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		auth := principal("twa-overbroad-infix", core.Permissions{
+			Publish:   core.PermList{Allow: []string{"tb.session.*.ingest"}}, // infix wildcard — spans all sessions
+			Subscribe: core.PermList{Allow: []string{"_INBOX.>"}},
+		})
+
+		_, err = rt.MintUser(AppAccount, auth, time.Hour)
+		if err == nil {
+			t.Fatal("OverbroadMintInfix: MintUser accepted tb.session.*.ingest — infix wildcard grants cross-session ambient authority")
+		}
+		assertAdapter(t, err, OverbroadMint)
+	})
+
 	t.Run("SelfDeclaredTrust", func(t *testing.T) {
 		t.Parallel()
 

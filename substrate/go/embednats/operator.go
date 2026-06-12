@@ -291,14 +291,16 @@ func (o *operator) posture() OperatorPosture {
 }
 
 // isSessionSubtreeWildcard reports whether a subject is a tb.session.-prefixed
-// wildcard pattern (e.g. "tb.session.>" or "tb.session.abc.*").  Legitimate
-// wildcards like _INBOX.>, $KV.*.>, and $JS.API.* are not tb.session.-prefixed
-// and are unaffected.
+// wildcard pattern.  Catches both terminal wildcards (tb.session.abc.*)
+// and infix wildcards (tb.session.*.ingest) — any .* or .> token anywhere in
+// the tb.session. subtree is considered overbroad.  Legitimate wildcards like
+// _INBOX.>, $KV.*.>, and $JS.API.* are not tb.session.-prefixed and are
+// unaffected.
 func isSessionSubtreeWildcard(subj string) bool {
 	if !strings.HasPrefix(subj, "tb.session.") {
 		return false
 	}
-	return strings.HasSuffix(subj, ".>") || strings.HasSuffix(subj, ".*")
+	return strings.Contains(subj, ".*") || strings.Contains(subj, ".>")
 }
 
 // MintUser issues a short-lived user JWT in the given account, carrying the
@@ -334,7 +336,7 @@ func (r *Runtime) MintUser(account string, auth core.Auth, ttl time.Duration) (U
 	case strings.TrimSpace(cap.PrincipalID) == "" || strings.TrimSpace(cap.SessionID) == "" || strings.TrimSpace(cap.CapabilityID) == "":
 		return UserCreds{}, fail(ProvenanceLost, "MintUser", "lease provenance is incomplete", cap.Details(), nil)
 	}
-	for _, subj := range append(auth.Permissions.Publish.Allow, auth.Permissions.Subscribe.Allow...) {
+	for _, subj := range append(append(append(auth.Permissions.Publish.Allow, auth.Permissions.Subscribe.Allow...), auth.Permissions.Publish.Deny...), auth.Permissions.Subscribe.Deny...) {
 		if isSessionSubtreeWildcard(subj) {
 			return UserCreds{}, fail(OverbroadMint, "MintUser", "session-subtree wildcard grant denied", map[string]string{"subject": subj}, nil)
 		}

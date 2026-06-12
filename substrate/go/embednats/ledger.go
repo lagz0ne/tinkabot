@@ -59,18 +59,9 @@ func (s *KVLedgerStore) Dedupe(key string) (core.LedgerRecord, bool, error) {
 	return rec, ok, nil
 }
 
+// Source returns the most-recently accepted record for the given source ID.
 func (s *KVLedgerStore) Source(id string) (core.LedgerRecord, bool, error) {
-	recs, err := s.records("a.")
-	if err != nil {
-		return core.LedgerRecord{}, false, err
-	}
-	var out core.LedgerRecord
-	for _, rec := range recs {
-		if rec.SourceID == id {
-			out = rec
-		}
-	}
-	return out, out.ActivationID != "", nil
+	return s.get("s." + keyEnc(id))
 }
 
 func (s *KVLedgerStore) SaveAccepted(rec core.LedgerRecord) error {
@@ -80,6 +71,9 @@ func (s *KVLedgerStore) SaveAccepted(rec core.LedgerRecord) error {
 	}
 	if _, err := s.kv.Create("a."+keyEnc(rec.DedupeKey), body); err != nil {
 		return ledgerErr(core.WriteConflict, "Accept", "ledger record could not be written", err)
+	}
+	if _, err := s.kv.Put("s."+keyEnc(rec.SourceID), body); err != nil {
+		return ledgerErr(core.WriteConflict, "Accept", "source index key could not be written", err)
 	}
 	return nil
 }

@@ -1,6 +1,8 @@
 package embednats
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -63,24 +65,47 @@ func (r *SourceRouter) RequestReply(nc *nats.Conn, act core.Activation) (*Route,
 	return &Route{stop: sub.Unsubscribe}, out, nil
 }
 
+// Subject routes messages through an ephemeral JetStream stream so the server
+// assigns a monotone sequence to each arrival. The stream is deleted when the
+// route stops.
 func (r *SourceRouter) Subject(nc *nats.Conn, act core.Activation) (*Route, <-chan RouterResult, error) {
 	if nc == nil {
 		return nil, nil, routeErr(SubjectSubscribeFailed, "Subject", "NATS connection is required", nil, nil)
 	}
-	out := make(chan RouterResult, 16)
-	sub, err := nc.Subscribe(act.Source.Pattern, func(msg *nats.Msg) {
-		next := normSubject(act, msg)
-		rec, err := r.AcceptSubject(act, msg)
-		send(out, RouterResult{Activation: next, Record: rec, Err: err})
-	})
+	js, err := nc.JetStream()
 	if err != nil {
+		return nil, nil, routeErr(SubjectSubscribeFailed, "Subject", "JetStream context unavailable", nil, err)
+	}
+	h := sha256.Sum256([]byte(act.Source.Pattern + ":" + act.SourcePrincipal.SourceID))
+	streamName := "TB_SUBJ_" + hex.EncodeToString(h[:8])
+	if _, err := js.AddStream(&nats.StreamConfig{
+		Name:     streamName,
+		Subjects: []string{act.Source.Pattern},
+		Storage:  nats.MemoryStorage,
+	}); err != nil {
+		return nil, nil, routeErr(SubjectSubscribeFailed, "Subject", "subject stream could not be created", nil, err)
+	}
+	out := make(chan RouterResult, 16)
+	sub, err := js.Subscribe(act.Source.Pattern,
+		func(msg *nats.Msg) {
+			next := normSubject(act, msg)
+			rec, acceptErr := r.accept(next)
+			send(out, RouterResult{Activation: next, Record: rec, Err: acceptErr})
+			_ = msg.Ack()
+		},
+		nats.BindStream(streamName),
+		nats.OrderedConsumer(),
+		nats.DeliverNew(),
+	)
+	if err != nil {
+		_ = js.DeleteStream(streamName)
 		return nil, nil, routeErr(SubjectSubscribeFailed, "Subject", "subject subscribe failed", nil, err)
 	}
-	if err := nc.FlushTimeout(time.Second); err != nil {
-		_ = sub.Unsubscribe()
-		return nil, nil, routeErr(SubjectSubscribeFailed, "Subject", "subject subscribe was not acknowledged", nil, err)
-	}
-	return &Route{stop: sub.Unsubscribe}, out, nil
+	return &Route{stop: func() error {
+		err := sub.Unsubscribe()
+		_ = js.DeleteStream(streamName)
+		return err
+	}}, out, nil
 }
 
 func (r *SourceRouter) KV(kv nats.KeyValue, act core.Activation) (*Route, <-chan RouterResult, error) {
@@ -275,8 +300,18 @@ func normSubject(act core.Activation, msg *nats.Msg) core.Activation {
 	if msg != nil {
 		next.Source.ObservedSubject = msg.Subject
 		next.Source.MessageID = msg.Header.Get(HeaderMessageID)
+		if meta, err := msg.Metadata(); err == nil {
+			next.Source.StreamSequence = int64(meta.Sequence.Stream)
+			next.Source.Stream = meta.Stream
+			next.Source.Consumer = meta.Consumer
+			next.Source.ConsumerSequence = int64(meta.Sequence.Consumer)
+		}
 	}
-	stamp(&next, next.Source.MessageID)
+	if next.Source.StreamSequence > 0 {
+		stamp(&next, fmt.Sprint(next.Source.StreamSequence))
+	} else {
+		stamp(&next, next.Source.MessageID)
+	}
 	return next
 }
 
@@ -337,6 +372,9 @@ func malformed(act core.Activation) bool {
 	case "request_reply":
 		return src.Subject == "" || src.RequestID == ""
 	case "subject":
+		if src.StreamSequence > 0 {
+			return src.Pattern == "" || src.ObservedSubject == ""
+		}
 		return src.Pattern == "" || src.ObservedSubject == "" || src.MessageID == ""
 	case "kv":
 		return src.Bucket == "" || src.Key == "" || src.Revision <= 0 || src.Resume == ""
@@ -377,11 +415,11 @@ func resultKind(rec core.LedgerRecord, err error) string {
 	return string(RouterCritical)
 }
 
+// send blocks until the consumer reads, preserving per-subscription FIFO and
+// applying backpressure instead of dropping. out may close during teardown.
 func send(out chan<- RouterResult, res RouterResult) {
-	select {
-	case out <- res:
-	default:
-	}
+	defer func() { recover() }() //nolint:errcheck
+	out <- res
 }
 
 func ack(msg *nats.Msg, err error) {

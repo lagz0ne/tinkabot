@@ -19,7 +19,15 @@ Implement the `session-v2` program end to end: all seven slices of `docs/matched
 
 ## Active Session
 
-Current slice: `trusted-wrapper-authority` — DONE (session-v2 slice 4/7).
+Current slice: `steering-acceptance` — DONE (session-v2 slice 5/7).
+
+RED-GREEN-TDD result:
+
+- RED: `go test ./embednats -run 'TestSteeringAcceptance' -count=1` FAIL — all 4 subtests failed for contracted reasons: `SteerDropped` (drop-on-full send), `SteerOutOfOrder` (client-chosen cursors), `LedgerScanUnbounded` (O(history) `Source` scan), `NonIdempotentReplay` (forgeable MessageID dedup). Pre-existing tests stayed green.
+- GREEN: Blocking FIFO send at the `source_router.go` seam (no drops, backpressure preserved); JetStream-backed subject route with server-assigned sequences (`TB_SUBJ_*` stream + ordered push consumer, `StreamSequence` in cursor); O(1) ledger `Source` via `"s."+keyEnc(sourceID)` index key written by `SaveAccepted`; dedup bound to server-assigned stream sequence (not client MessageID). Two post-GREEN hardenings: goroutine-overflow path replaced with plain blocking send (preserved FIFO broken by goroutine overtake); gate-weakening in `gate-scenarios.ts` reverted and `stop-ordering` family folded into pinned `allowed` list in `scenario-matrix.json`.
+- Verified (full battery, 2026-06-12): `bun run test` 100 pass/492 expects, `test:e2e` 1 pass, `typecheck`, `build`, `pack:dry` (200.92 KB), `schema:parity`, `release:evidence` (16 milestones/11 spine steps/5 gate results), `validate:layers`, `test:layers` (10 OK), `gate:fakes`, `gate:parallel`, `gate:coverage`, `gate:scenarios`, `gate:manual`, `go test ./... -count=1` (7 packages ok), `git diff --check` — all pass. Gates real-nats, parallel-safety, be-lazy, coverage passed in main run; security and no-slop passed in finisher run. Evidence in `docs/matched-abstraction/task/steering-acceptance.md` (status complete).
+
+Prior slice: `trusted-wrapper-authority` — DONE (session-v2 slice 4/7).
 
 RED-GREEN-TDD result:
 
@@ -108,7 +116,14 @@ Matched-abstraction docs are authored and pass `bun run validate:layers`:
 
 ### Next Slice
 
-Next Slice: `steering-acceptance` (session-v2 slice 5/7; slices 1–4 are DONE). Owning Plan: `docs/matched-abstraction/plan/session-v2.md` (read its Consumed Approach carried decisions and the slice's failure families before RED); owning Approach: `docs/matched-abstraction/approach/session-v2.md` (eight invariants are pinned). Execute through the `quality-slice` workflow under RED-GREEN-TDD; author `docs/matched-abstraction/task/steering-acceptance.md` with RED proof. Slices, in order (workflow topic = task-doc name): `session-contract-authority` (DONE) -> `session-runtime-subsystem` (DONE) -> `session-frame-mediation` (DONE) -> `trusted-wrapper-authority` (DONE) -> `steering-acceptance` -> `agent-wrapper-proof` (local) -> `web-session-surface` (includes release closure). After slice 5, slices 6 and 7 may run in parallel. Every session-v2 slice's owning Plan is `docs/matched-abstraction/plan/session-v2.md`; each wrap-up must keep this pointer and the next slice's topic in this Next Slice section.
+Slices 6 and 7 may now run in parallel (slices 3, 4, 5 are DONE).
+
+- Slice 6: `agent-wrapper-proof` — local real-claude proof; pre-check: `claude` CLI with `--print --input-format stream-json --output-format stream-json --include-partial-messages` must run locally.
+- Slice 7: `web-session-surface` — includes release closure.
+
+Slices in order: `session-contract-authority` (DONE) -> `session-runtime-subsystem` (DONE) -> `session-frame-mediation` (DONE) -> `trusted-wrapper-authority` (DONE) -> `steering-acceptance` (DONE) -> `agent-wrapper-proof` + `web-session-surface` (parallel).
+
+Owning Plan: `docs/matched-abstraction/plan/session-v2.md`.
 
 Six forking decisions are resolved as carried decisions (see Plan "Consumed Approach"): canonical session = structured stream-json (raw terminal deferred); trust = control-plane attribution bound at mint (never relaxes the raw-import deny); single mediated writer for steering + single validating republisher for output; sessions are a distinct subsystem (no activation starvation); recovery = reconciliation between a durable session record and a heartbeat-bound liveness lease (restart behavior derives from lease state, terminal record on every path including crash); browser observation = direct NATS WebSocket at loopback (user decision, retiring the v1 deferral by its own proven conditions) with two-step custody — HttpOnly cookie exchanged at a mint endpoint for an ephemeral bearer viewer cred (short-TTL, loopback-source-pinned, leaf-scoped to one deliver subject + acceptance publish, zero JetStream API authority) over a cookie-gated WS upgrade, untrusted app frames staying credential-free behind the leased frame channel. Out of scope by user decision: built-in redaction/secret handling (future hook feature; transcript confidentiality equals transcript sensitivity) and real-agent-in-CI (real runner proven locally + manual pairs only).
 

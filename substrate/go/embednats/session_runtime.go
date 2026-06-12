@@ -112,7 +112,7 @@ func mintedConn(ctx context.Context, rt *Runtime, username string, perms core.Pe
 		},
 		Permissions: perms,
 	}
-	creds, err := rt.MintUser(AppAccount, auth, 24*time.Hour)
+	creds, err := rt.MintUser(AppAccount, auth, time.Hour)
 	if err != nil {
 		return nil, err
 	}

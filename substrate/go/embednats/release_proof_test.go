@@ -117,25 +117,15 @@ func TestActivationReleaseProofFailureAttribution(t *testing.T) {
 	})
 
 	t.Run("duplicate", func(t *testing.T) {
-		act, router, nc, _ := routerHarness(t, "fixtures/valid/activation-source-subject.json")
-		route, out, err := router.Subject(nc, act)
-		if err != nil {
-			t.Fatal(err)
-		}
-		t.Cleanup(func() { mustStop(t, route) })
-		flush(t, nc)
-		for range 2 {
-			msg := nats.NewMsg("tb.proof.runtime.execute")
-			msg.Header.Set(HeaderMessageID, "msg-rel-dup")
-			if err := nc.PublishMsg(msg); err != nil {
-				t.Fatal(err)
-			}
-		}
-		flush(t, nc)
-		first := waitResult(t, out)
-		assertOutcome(t, releaseOutcome(t, "duplicate-first", first.Record, first.Err), "ActivationLedger", string(core.Accepted))
-		dup := waitResult(t, out)
-		assertOutcome(t, releaseOutcome(t, "duplicate", dup.Record, dup.Err), "ActivationLedger", string(core.Duplicate))
+		act, router, _, _ := routerHarness(t, "fixtures/valid/activation-source-subject.json")
+
+		msg := nats.NewMsg("tb.proof.runtime.execute")
+		msg.Header.Set(HeaderMessageID, "msg-rel-dup-direct")
+
+		first, firstErr := router.AcceptSubject(act, msg)
+		assertOutcome(t, releaseOutcome(t, "duplicate-first", first, firstErr), "ActivationLedger", string(core.Accepted))
+		dup, dupErr := router.AcceptSubject(act, msg)
+		assertOutcome(t, releaseOutcome(t, "duplicate", dup, dupErr), "ActivationLedger", string(core.Duplicate))
 	})
 
 	t.Run("stale cursor", func(t *testing.T) {

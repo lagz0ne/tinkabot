@@ -1,41 +1,119 @@
 {
   "activation-release-proof": {
-    "allowed": ["TestActivationReleaseProofAcceptedSources"],
-    "denied-neighbor": ["TestActivationReleaseProofFailureAttribution/denied_neighbor"],
-    "malformed": ["TestActivationReleaseProofFailureAttribution/malformed"],
-    "duplicate": ["TestActivationReleaseProofFailureAttribution/duplicate"],
-    "stale": ["TestActivationReleaseProofFailureAttribution/stale_cursor"],
-    "revoked": ["TestActivationReleaseProofFailureAttribution/revoked_lease"],
-    "attributed-failure": ["TestActivationReleaseProofFailureAttribution/loop_suppressed"]
+    "allowed": [
+      "TestActivationReleaseProofAcceptedSources"
+    ],
+    "denied-neighbor": [
+      "TestActivationReleaseProofFailureAttribution/denied_neighbor"
+    ],
+    "malformed": [
+      "TestActivationReleaseProofFailureAttribution/malformed"
+    ],
+    "duplicate": [
+      "TestActivationReleaseProofFailureAttribution/duplicate"
+    ],
+    "stale": [
+      "TestActivationReleaseProofFailureAttribution/stale_cursor"
+    ],
+    "revoked": [
+      "TestActivationReleaseProofFailureAttribution/revoked_lease"
+    ],
+    "attributed-failure": [
+      "TestActivationReleaseProofFailureAttribution/loop_suppressed"
+    ]
   },
   "session-runtime-subsystem": {
-    "allowed": ["TestSessionRuntimeSubsystem/SessionStarvation"],
-    "denied-neighbor": ["TestSessionRuntimeSubsystem/TerminalRecordMissing"],
-    "malformed": ["TestSessionRuntimeSubsystem/TerminalRecordMissing"],
-    "duplicate": ["TestSessionLivenessIdempotent"],
-    "stale": ["TestSessionRuntimeSubsystem/StaleLeaseRevision"],
-    "revoked": ["TestSessionRuntimeSubsystem/RevokedLease"],
-    "attributed-failure": ["TestSessionRuntimeSubsystem/TerminalRecordMissing"]
+    "allowed": [
+      "TestSessionRuntimeSubsystem/SessionStarvation"
+    ],
+    "denied-neighbor": [
+      "TestSessionRuntimeSubsystem/TerminalRecordMissing"
+    ],
+    "malformed": [
+      "TestSessionRuntimeSubsystem/TerminalRecordMissing"
+    ],
+    "duplicate": [
+      "TestSessionLivenessIdempotent"
+    ],
+    "stale": [
+      "TestSessionRuntimeSubsystem/StaleLeaseRevision"
+    ],
+    "revoked": [
+      "TestSessionRuntimeSubsystem/RevokedLease"
+    ],
+    "attributed-failure": [
+      "TestSessionRuntimeSubsystem/TerminalRecordMissing"
+    ]
   },
   "session-frame-mediation": {
-    "allowed": ["TestSessionFrameMediation/OutsideIn"],
-    "denied-neighbor": ["TestSessionFrameMediation/BridgeBypassAttempt"],
-    "malformed": ["TestSessionFrameMediation/SchemaViolationOnOut"],
-    "duplicate": ["TestSessionFrameMediation/DuplicateFrame"],
-    "stale": ["TestSessionFrameMediation/StaleFrame"],
-    "revoked": ["TestSessionFrameMediation/BridgeBypassAttempt"],
-    "attributed-failure": ["TestSessionFrameMediation/QuotaExceeded"]
+    "allowed": [
+      "TestSessionFrameMediation/OutsideIn"
+    ],
+    "denied-neighbor": [
+      "TestSessionFrameMediation/BridgeBypassAttempt"
+    ],
+    "malformed": [
+      "TestSessionFrameMediation/SchemaViolationOnOut"
+    ],
+    "duplicate": [
+      "TestSessionFrameMediation/DuplicateFrame"
+    ],
+    "stale": [
+      "TestSessionFrameMediation/StaleFrame"
+    ],
+    "revoked": [
+      "TestSessionFrameMediation/BridgeBypassAttempt"
+    ],
+    "attributed-failure": [
+      "TestSessionFrameMediation/QuotaExceeded"
+    ]
   },
   "live-source-router": {
     "allowed": [
       "TestSourceRouterAcceptsLiveSourcesOverEmbeddedNATS",
       "TestSourceRouterRequestReplyFromNATSCLI"
     ],
-    "denied-neighbor": ["TestSourceRouterEdgeCases/source_authority_denial_is_propagated_with_attribution"],
-    "malformed": ["TestSourceRouterEdgeCases/malformed_request_frame"],
-    "duplicate": ["TestSourceRouterEdgeCases/duplicate_is_ledger_owned"],
-    "stale": ["TestSourceRouterEdgeCases/stale_stream_cursor_is_ledger_owned"],
-    "revoked": ["TestSourceRouterEdgeCases/revoked_source_lease_is_source-authority_owned"],
-    "attributed-failure": ["TestSourceRouterEdgeCases/router_failures_are_typed"]
+    "denied-neighbor": [
+      "TestSourceRouterEdgeCases/source_authority_denial_is_propagated_with_attribution"
+    ],
+    "malformed": [
+      "TestSourceRouterEdgeCases/malformed_request_frame"
+    ],
+    "duplicate": [
+      "TestSourceRouterEdgeCases/duplicate_is_ledger_owned"
+    ],
+    "stale": [
+      "TestSourceRouterEdgeCases/stale_stream_cursor_is_ledger_owned"
+    ],
+    "revoked": [
+      "TestSourceRouterEdgeCases/revoked_source_lease_is_source-authority_owned"
+    ],
+    "attributed-failure": [
+      "TestSourceRouterEdgeCases/router_failures_are_typed"
+    ]
+  },
+  "steering-acceptance": {
+    "allowed": [
+      "TestSteeringAcceptance/SteerOutOfOrder",
+      "TestSteeringAcceptance/StopOrderedAgainstPending"
+    ],
+    "denied-neighbor": [
+      "TestSteeringAcceptance/DeniedNeighbor"
+    ],
+    "malformed": [
+      "TestSteeringAcceptance/Malformed"
+    ],
+    "duplicate": [
+      "TestSteeringAcceptance/DuplicateReplay"
+    ],
+    "stale": [
+      "TestSteeringAcceptance/Stale"
+    ],
+    "revoked": [
+      "TestSteeringAcceptance/Revoked"
+    ],
+    "attributed-failure": [
+      "TestSteeringAcceptance/DeniedNeighbor"
+    ]
   }
 }

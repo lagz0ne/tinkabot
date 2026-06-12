@@ -1125,6 +1125,12 @@ func sourcePosition(src Source) (int64, string, error) {
 		}
 		return 0, src.CommandID, nil
 	case "subject":
+		if src.StreamSequence > 0 {
+			if src.Pattern == "" || src.ObservedSubject == "" {
+				return 0, "", fail(CursorFailure, "ActivationLedger", "SourcePosition", "subject position is required", nil)
+			}
+			return src.StreamSequence, fmt.Sprint(src.StreamSequence), nil
+		}
 		if src.Pattern == "" || src.ObservedSubject == "" || src.MessageID == "" {
 			return 0, "", fail(CursorFailure, "ActivationLedger", "SourcePosition", "subject position is required", nil)
 		}

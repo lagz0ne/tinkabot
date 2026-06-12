@@ -56,7 +56,7 @@ func TestSourceRouterAcceptsLiveSourcesOverEmbeddedNATS(t *testing.T) {
 		flush(t, nc)
 
 		rec := waitResult(t, out).Record
-		if rec.Status != core.Accepted || rec.SourceCursor != "msg-live-001" || rec.SourceID != act.SourcePrincipal.SourceID {
+		if rec.Status != core.Accepted || rec.SourceCursor == "" || rec.SourceID != act.SourcePrincipal.SourceID {
 			t.Fatalf("subject record drift: %#v", rec)
 		}
 	})
@@ -224,28 +224,24 @@ func TestSourceRouterEdgeCases(t *testing.T) {
 	})
 
 	t.Run("duplicate is ledger owned", func(t *testing.T) {
-		act, router, nc, _ := routerHarness(t, "fixtures/valid/activation-source-subject.json")
-		route, out, err := router.Subject(nc, act)
+		act, router, _, _ := routerHarness(t, "fixtures/valid/activation-source-subject.json")
+
+		msg := nats.NewMsg("tb.proof.runtime.execute")
+		msg.Header.Set(HeaderMessageID, "msg-dup-direct")
+
+		first, err := router.AcceptSubject(act, msg)
 		if err != nil {
 			t.Fatal(err)
 		}
-		t.Cleanup(func() { mustStop(t, route) })
-		flush(t, nc)
-
-		for range 2 {
-			msg := nats.NewMsg("tb.proof.runtime.execute")
-			msg.Header.Set(HeaderMessageID, "msg-dup")
-			if err := nc.PublishMsg(msg); err != nil {
-				t.Fatal(err)
-			}
+		if first.Status != core.Accepted {
+			t.Fatalf("first duplicate record drift: %#v", first)
 		}
-		flush(t, nc)
-
-		if rec := waitResult(t, out).Record; rec.Status != core.Accepted {
-			t.Fatalf("first duplicate record drift: %#v", rec)
+		dup, err := router.AcceptSubject(act, msg)
+		if err != nil {
+			t.Fatal(err)
 		}
-		if rec := waitResult(t, out).Record; rec.Status != core.Duplicate {
-			t.Fatalf("second duplicate record drift: %#v", rec)
+		if dup.Status != core.Duplicate {
+			t.Fatalf("second duplicate record drift: %#v", dup)
 		}
 	})
 
