@@ -68,6 +68,7 @@ const lease = makeLease({
   artifactRevision: "artifact.rev.7",
   schemaRevision: "schema.rev.1",
   commands: ["select_artifact"],
+  sessions: [],
   chain: {
     chainId: "chain-001",
     rootId: "root-001",

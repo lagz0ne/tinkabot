@@ -628,10 +628,72 @@
         "schedule-engine-proof-no-live-tick-source",
         "nats-cli-denial-output-parsed-oracle"
       ]
+    },
+    {
+      "milestone": "web-session-surface",
+      "taskDoc": "docs/matched-abstraction/task/web-session-surface.md",
+      "spineSteps": [
+        "session-v2"
+      ],
+      "red": {
+        "doc": "docs/matched-abstraction/task/web-session-surface.md",
+        "command": "cd substrate/go && go test ./embednats -run TestWebSessionSurface -count=1",
+        "result": "too many arguments in call to MintViewerCredential"
+      },
+      "insideOut": [
+        "cd substrate/go && go test ./embednats -run TestWebSessionSurface -count=1"
+      ],
+      "outsideIn": [
+        "cd substrate/go && go test ./embednats -run TestWebSessionSurface -count=1",
+        "cd substrate/go && go test ./tinkabot -run TestWebSessionShell -count=1"
+      ],
+      "negativeCases": [
+        {
+          "case": "denied_neighbor",
+          "doc": "docs/matched-abstraction/task/web-session-surface.md",
+          "quote": "denied-neighbor: viewer-A denied subscribe on session-B subjects, denied steer publish."
+        },
+        {
+          "case": "malformed",
+          "doc": "docs/matched-abstraction/task/web-session-surface.md",
+          "quote": "malformed: forged cookie upgrade returns 401, malformed mint body returns 400."
+        },
+        {
+          "case": "stale_revision",
+          "doc": "docs/matched-abstraction/task/web-session-surface.md",
+          "quote": "stale: expired short-TTL viewer credential denied connect."
+        },
+        {
+          "case": "revoked_lease",
+          "doc": "docs/matched-abstraction/task/web-session-surface.md",
+          "quote": "revoked: viewer credential disconnected live and denied reconnect."
+        },
+        {
+          "case": "attributed_failure",
+          "doc": "docs/matched-abstraction/task/web-session-surface.md",
+          "quote": "attributed: viewer mint misuse returns typed ViewerMintFailed."
+        }
+      ],
+      "scopeGuards": [
+        "viewer-cred-exact-subject-only",
+        "no-jetstream-api-in-viewer-cred",
+        "cookie-gate-not-jwt-cookie-option",
+        "all-session-principals-in-tb-app",
+        "direct-browser-nats-websocket-deferral-retired-at-loopback"
+      ],
+      "retiredDeferrals": [
+        {
+          "deferral": "direct-browser-nats-websocket",
+          "retiredBy": "web-session-surface",
+          "condition": "loopback posture only; external/TLS exposure remains deferred",
+          "citations": [
+            "docs/matched-abstraction/plan/session-v2.md:120-131"
+          ]
+        }
+      ]
     }
   ],
   "deferredScope": [
-    "direct-browser-nats-websocket",
     "docker-sandboxing",
     "product-ui-rendering",
     "live-auth-reload",

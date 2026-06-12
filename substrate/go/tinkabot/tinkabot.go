@@ -188,6 +188,7 @@ func Start(cfg Config) (*App, error) {
 		Exposure:   cfg.Exposure,
 		ServerName: "tinkabot",
 		StoreDir:   cfg.StoreDir,
+		WebSocket:  embednats.WebSocket{Enabled: true, Host: "127.0.0.1", Port: -1, NoTLS: true},
 	})
 	if err != nil {
 		return nil, fail(StartupMaterializationFailed, "Start", "embedded runtime did not start", nil, err)
@@ -382,10 +383,18 @@ func (a *App) serveShell(addr string) (ShellPosture, error) {
 	}
 	fileSrv := http.FileServer(http.FS(files))
 	a.shell = &http.Server{Handler: http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
-		for k, v := range headers {
-			rw.Header().Set(k, v)
+		switch r.URL.Path {
+		case "/session/viewer":
+			a.mintViewer(rw, r)
+		case "/session/ws":
+			a.sessionWS(rw, r)
+		default:
+			for k, v := range headers {
+				rw.Header().Set(k, v)
+			}
+			a.ensureShellCookie(rw, r)
+			fileSrv.ServeHTTP(rw, r)
 		}
-		fileSrv.ServeHTTP(rw, r)
 	})}
 	go func() { _ = a.shell.Serve(ln) }()
 	return ShellPosture{URL: "http://" + ln.Addr().String(), Scope: shellScope, WorkerRev: rev}, nil

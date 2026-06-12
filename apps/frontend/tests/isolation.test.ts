@@ -6,6 +6,7 @@ import {
   denyRaw,
   frameAttrs,
   makeLease,
+  mayObserve,
 } from "../src/isolation";
 
 describe("frontend isolation", () => {
@@ -63,6 +64,39 @@ describe("frontend isolation", () => {
     );
   });
 
+  test("FrameScopeEscape: steer for session outside observation scope is denied", () => {
+    const lease = testLease({ sessions: ["session-001"] });
+    const src = {};
+
+    // session in scope — accepted
+    const intent = accept(lease, src, src, msg({ command: "steer_session", sessionId: "session-001" }));
+    expect(intent.context.sessionId).toBe("session-001");
+
+    // session NOT in scope — denied with FrameScopeEscape
+    const denied = capture(() =>
+      accept(lease, src, src, msg({ command: "steer_session", sessionId: "session-999" })),
+    );
+    expect(denied.kind).toBe("FrameScopeEscape");
+  });
+
+  test("FrameScopeEscape: content intent with no sessionId passes scope check unchanged", () => {
+    const lease = testLease({ sessions: ["session-001"] });
+    const src = {};
+    // existing content.intent with no sessionId field — unaffected
+    const intent = accept(lease, src, src, msg());
+    expect(intent.kind).toBe("browser.command_intent");
+  });
+
+  test("mayObserve: returns true iff sessionId is in lease.sessions", () => {
+    const lease = testLease({ sessions: ["session-001", "session-002"] });
+    expect(mayObserve(lease, "session-001")).toBe(true);
+    expect(mayObserve(lease, "session-002")).toBe(true);
+    expect(mayObserve(lease, "session-999")).toBe(false);
+
+    const emptyLease = testLease({ sessions: [] });
+    expect(mayObserve(emptyLease, "session-001")).toBe(false);
+  });
+
   test("denies raw NATS authority anywhere in generated messages", () => {
     const err = capture(() =>
       denyRaw({
@@ -97,7 +131,7 @@ describe("frontend isolation", () => {
   });
 });
 
-function testLease() {
+function testLease(extra: Record<string, unknown> = {}) {
   return makeLease({
     frameId: "frame-001",
     nonce: "nonce-001",
@@ -106,14 +140,16 @@ function testLease() {
     artifactId: "artifact-001",
     artifactRevision: "artifact.rev.7",
     schemaRevision: "schema.rev.1",
-    commands: ["select_artifact"],
+    commands: ["select_artifact", "steer_session"],
+    sessions: ["session-001", "session-002"],
     chain: {
       chainId: "chain-001",
       rootId: "root-001",
       hop: 0,
       maxHops: 5,
     },
-  });
+    ...extra,
+  } as Parameters<typeof makeLease>[0]);
 }
 
 function msg(overrides: Record<string, unknown> = {}) {

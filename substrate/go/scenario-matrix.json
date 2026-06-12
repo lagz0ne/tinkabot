@@ -92,6 +92,31 @@
       "TestSourceRouterEdgeCases/router_failures_are_typed"
     ]
   },
+  "web-session-surface": {
+    "allowed": [
+      "TestWebSessionSurface/ViewerObserves",
+      "TestWebSessionShell/CookieGatedUpgrade"
+    ],
+    "denied-neighbor": [
+      "TestWebSessionSurface/CrossSessionLeak"
+    ],
+    "malformed": [
+      "TestWebSessionShell/UngatedUpgrade",
+      "TestWebSessionShell/MintEndpoint"
+    ],
+    "duplicate": [
+      "TestWebSessionShell/CookieGatedUpgrade"
+    ],
+    "stale": [
+      "TestWebSessionSurface/StaleViewerCred"
+    ],
+    "revoked": [
+      "TestWebSessionSurface/StaleViewerCred"
+    ],
+    "attributed-failure": [
+      "TestWebSessionSurface/ViewerMintFailed"
+    ]
+  },
   "steering-acceptance": {
     "allowed": [
       "TestSteeringAcceptance/SteerOutOfOrder",

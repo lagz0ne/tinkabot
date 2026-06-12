@@ -1,7 +1,7 @@
 // Centralized release authority checker for release/v1.json.
 // Gate rules come from docs/matched-abstraction/plan/endgame-app.md
-// (Release-Spine Decomposition, lines 165-181): sixteen milestones over the
-// eleven Release Verification Spine steps, resolvable citations, Plan-owned
+// (Release-Spine Decomposition, lines 165-181): seventeen milestones over the
+// twelve Release Verification Spine steps, resolvable citations, Plan-owned
 // deferred scope, four scope guards, doc authority map, and four owned
 // failure families.
 
@@ -70,7 +70,8 @@ export type Gates = {
   requiredGates?: string[];
 };
 
-// endgame-app.md:173 — gate list is all sixteen endgame milestones.
+// endgame-app.md:173 — gate list is all seventeen milestones (sixteen endgame
+// plus the session-v2 web-session-surface closure).
 export const MILESTONES = [
   "endgame-contract-authority",
   "managed-auth-subjects",
@@ -88,9 +89,11 @@ export const MILESTONES = [
   "activation-release-proof",
   "script-materializer-loop",
   "release-spine",
+  "web-session-surface",
 ];
 
-// endgame-app.md:133-149 — the eleven Release Verification Spine steps.
+// endgame-app.md:133-149 — the eleven Release Verification Spine steps plus
+// the session-v2 step.
 export const SPINE = [
   "contract",
   "auth-subjects",
@@ -103,11 +106,11 @@ export const SPINE = [
   "materializer-artifact",
   "frontend-rendering",
   "release-ops",
+  "session-v2",
 ];
 
 // endgame-app.md:175 — Plan-owned deferred scope, never presented as proven.
 export const DEFERRED = [
-  "direct-browser-nats-websocket",
   "docker-sandboxing",
   "product-ui-rendering",
   "live-auth-reload",

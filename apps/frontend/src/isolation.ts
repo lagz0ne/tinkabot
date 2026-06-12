@@ -16,6 +16,7 @@ export interface Lease {
   schemaRevision: string;
   chain: Chain;
   commands: readonly string[];
+  sessions: readonly string[];
 }
 
 export interface ContentIntent {
@@ -27,6 +28,7 @@ export interface ContentIntent {
   frameId: string;
   artifactRevision: string;
   schemaRevision: string;
+  sessionId?: string;
   payload?: unknown;
 }
 
@@ -51,7 +53,8 @@ export type ErrKind =
   | "FrameSandboxDenied"
   | "FrameMessageInvalid"
   | "FrameLeaseDenied"
-  | "FrameCapabilityDenied";
+  | "FrameCapabilityDenied"
+  | "FrameScopeEscape";
 
 export class FrameError extends Error {
   layer = "FrontendIsolation" as const;
@@ -112,6 +115,10 @@ export function makeLease(input: Omit<Lease, "nonce"> & { nonce?: string }): Lea
   };
 }
 
+export function mayObserve(lease: Lease, sessionId: string): boolean {
+  return lease.sessions.includes(sessionId);
+}
+
 export function accept(lease: Lease, source: unknown, expectedSource: unknown, msg: unknown) {
   if (source !== expectedSource) {
     throw err("FrameLeaseDenied", "Message source does not match leased frame", {
@@ -152,6 +159,11 @@ export function accept(lease: Lease, source: unknown, expectedSource: unknown, m
   if (!lease.commands.includes(intent.command)) {
     throw err("FrameCapabilityDenied", "Command is not allowed for frame lease", {
       command: intent.command,
+    });
+  }
+  if (intent.sessionId !== undefined && !mayObserve(lease, intent.sessionId)) {
+    throw err("FrameScopeEscape", "Session is not in frame lease observation scope", {
+      sessionId: intent.sessionId,
     });
   }
 

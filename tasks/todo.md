@@ -19,16 +19,19 @@ Implement the `session-v2` program end to end: all seven slices of `docs/matched
 
 ## Active Session
 
-Current slice: `agent-wrapper-proof` — DONE (session-v2 slice 6/7).
+Current slice: `web-session-surface` — DONE (session-v2 slice 7/7, program close).
 
-Drift resolution first: the prior session's Go wrapper at `substrate/go/apps/wrapper` conflicted with the Plan's Bun-at-`apps/wrapper` pin. Escalated with evidence; user decided KEEP GO ("we moved to golang so embedding nats going to be easier"). Plan slice-6 text, Approach Purpose framing, and a Plan Escalation Log entry record the amendment; the eight invariants untouched.
+Workflow vetting result (important precedent): the `quality-slice` main run (21 agents) passed its own six subtests but UNDER-DELIVERED the Plan — no WebSocket surface existed anywhere (the "upgrade" proof tested a bare function), the viewer credential granted steer-subject publish (invariant-1 violation), the viewer subscribed `.out` directly (no transcript replay) instead of the deliver-consumer design, no bearer mode (seed shipped browser-side), and a parallel Go `FrameLease` was invented instead of extending the TS lease. Caught by vetting GREEN against a pre-built seam map (binary shell server, WS posture, mint API, TS lease, release closure points) rather than against the workflow's own claims. The slice was re-driven under a strengthened RED.
 
 RED-GREEN-TDD result:
 
-- RED (3 legs, 2026-06-12): `go test ./apps/...` compile-fail (`ParseStreamJsonFrame`/`SessionFrame`/`SteerToStdin` undefined); rewritten `TestAgentWrapperMediated` against the first-pass wrapper hung in old `publishLine` to the 600s suite timeout (non-canonical envelopes, untranslated steers, ctx never killing the subprocess); `go run ./apps/wrapper/cmd/run` — package missing.
-- GREEN: claude stream-json parsing moved out of `embednats` into the wrapper package (substrate leak reverted: `embednats/stream_json.go` deleted, Kind constant reverted); wrapper emits canonical `session.frame` envelopes — token frames from `text_delta` deltas, chunk frames carrying the verbatim event line as a STRING body (claude keys like `usage.input_tokens` collide with the reserved-vocab `safeValue` facade, which scans property names, never values); `SteerToStdin` translates canonical `session.steer_intent` to the claude stream-json user message (skip non-steer kinds, typed reject on malformed); ctx cancellation kills the subprocess; scanner overflow ends the session instead of freezing observation silently; `cmd/run` entry with signal ctx. Fixtures are REAL recorded claude 2.1.173 lines (`apps/wrapper/testdata/recorded.jsonl`) — the prior invented fixtures used bare `message_start` top-level types the real CLI never emits (it wraps Anthropic events as `{"type":"stream_event",...}`).
-- Live-CLI findings: the Plan's flag set requires `--verbose` (CLI rejects `--print` + stream-json output without it); claude streams words across deltas, so transcript oracles must join token texts, not match single frames.
-- Verified (2026-06-12): `go test ./apps/...` ok (wrapper 40.5% cover, cmd/run 72.2%; `apps: 40` floor added to coverage-thresholds.json — `StartWrapper`'s behavior owner is the cross-package mediated test, which per-layer `-cover` can't attribute); `TestAgentWrapperMediated` PASS 1.1s (operator/JWT, MintTrustedWrapper cred, real subprocess, canonical frames on mediated out stream, malformed-line survival, steer-to-stdin echo proof); `TB_E2E_CLAUDE=1 TestAgentWrapperLocalE2E` PASS 13.3s (LIVE claude: session opened by steer, "pong" tokens observed, mid-session steer answered "maple" as split deltas) — establishes the env-guard precedent for local-only tests; full battery with slice staged: all 14 bun/go commands + 5 gates + `git diff --check` PASS. Reviews: be-lazy pass, security pass, no-slop fail→fixed (comment narration, manual `# Attempt:` lines). Evidence in `docs/matched-abstraction/task/agent-wrapper-proof.md`.
+- RED (2026-06-12, strengthened): embednats compile-fail (`MintViewerCredential` ttl arg, `ViewerCred.JWT/DeliverSubject`, `BindViewerDeliver` undefined); tinkabot behavioral fail (no `tb_shell` cookie, WS route 404).
+- GREEN hop one: `MintViewerCredential(rt, sid, ttl)` mints a BEARER JWT (`BearerToken=true` re-sign with the account key, Src loopback CIDR pin, leaf scope: subscribe own `tb.session.<id>.deliver.<nonce>` + `_INBOX.>`, publish `tb.app.browser.command` only); `BindViewerDeliver` creates the substrate-bound DeliverAll push consumer over `tb-session-out-<id>` (snapshot-plus-tail); cookie session store in JetStream KV (`IssueSessionCookie`/`ValidateCookieSession`/`RevokeCookieSession` via one `withCookieKV` seam); binary enables the loopback WS listener, issues the HttpOnly SameSite=Strict `tb_shell` cookie, serves `POST /session/viewer` (cookie→bearer grant, revokes the mint if the deliver bind fails) and the cookie-gated `GET /session/ws` proxy that replays only WS handshake headers (cookie never crosses into NATS).
+- GREEN hop two: TS lease in `apps/frontend/src/isolation.ts` gains `sessions` scope + `mayObserve`; `accept()` rejects out-of-scope steer intents with typed `FrameScopeEscape` (frontend tests own the family).
+- Closure: scenario-matrix `web-session-surface` surface (7 families → committed Go tests across `TestWebSessionSurface`/`TestWebSessionShell`); `release/v1.json` milestone + `session-v2` spine step; `release-evidence.ts` MILESTONES/SPINE grown, `direct-browser-nats-websocket` removed from DEFERRED with a `retiredDeferrals` record (loopback only; external/TLS stays deferred).
+- Verified (2026-06-12): `TestWebSessionSurface` 6/6 over real NATS (bearer-over-WS observe with pre-attach replay, denied-neighbor + steer-publish denial output-parsed, expiry/revocation/renewal/cookie-revocation, typed `ViewerMintFailed`, matrix+manifest closure checks); `TestWebSessionShell` 4/4 (HttpOnly cookie, 401 ungated/forged upgrade, 101 + NATS INFO banner through the proxy twice, mint endpoint 401/400/200 + e2e observe over WS + steer landing on `tb.app.browser.command`); frontend 7 pass; full battery all 14 commands + 5 gates + `git diff --check` PASS; one expiry-boundary flake fixed (JWT expiry truncates to seconds — poll-until-denied oracle). Reviews: security pass (bearer revocation binding confirmed; orphan-mint-revoke advisory applied), be-lazy fail→fixed (mayObserve reuse, bool ValidateCookieSession, withCookieKV), no-slop per finisher. Evidence in `docs/matched-abstraction/task/web-session-surface.md`.
+
+Prior slice: `agent-wrapper-proof` — DONE (session-v2 slice 6/7). Go wrapper decision recorded in the Plan Escalation Log; live-claude e2e via `TB_E2E_CLAUDE=1`. Evidence in `docs/matched-abstraction/task/agent-wrapper-proof.md`.
 
 Prior slice: `steering-acceptance` — DONE (session-v2 slice 5/7). Evidence in `docs/matched-abstraction/task/steering-acceptance.md`.
 
@@ -113,15 +116,16 @@ Matched-abstraction docs are authored and pass `bun run validate:layers`:
 - Plan: `docs/matched-abstraction/plan/session-v2.md` (seven-slice decomposition, dependency ordering, handoff contract, verification strategy, deferred scope).
 - Diagram (authority + recovery model): `https://diashort.apps.quickable.co/d/13b0196d`.
 
-### Next Slice
+### Next Step
 
-Resume point: slice 7 `web-session-surface` (not started; includes program release closure). Owning Plan: `docs/matched-abstraction/plan/session-v2.md` slice 7.
+ALL SEVEN session-v2 slices are DONE. The program-level final review the user reserved ("we'll judge the result by the end") is the next step: full-program diff review against the eight Approach invariants, then present commits, gate evidence, and residual risks for the user's judgment.
 
-Carry-notes for slice 7 from slice 6:
-- Sessions are NOT yet a binary surface: the manual's wrapper pairs run under the proof harness, and the named manual-runner coupling (gate:manual executes only `# ->` pairs against the running binary) is resolved when slice 7 registers the session surface in the binary.
-- Security advisory from the slice-6 review, relevant when the browser viewer consumes frames: the FrameMediator's `validFrame` does not check the frame's `sessionId` BODY field against the ingest subject — a wrapper can publish on its own ingest with a foreign `sessionId` in the body (data-integrity gap, not an authority escape; NATS creds remain the authority boundary). Decide in slice 7 whether the viewer trusts subject/stream identity (correct) or body `sessionId` (must not).
-- The live-agent flag set is `--print --verbose --input-format stream-json --output-format stream-json --include-partial-messages` (`--verbose` is mandatory).
-- Local-only test guard precedent: `TB_E2E_CLAUDE=1` env skip (`TestAgentWrapperLocalE2E`).
+Resolved carry-notes (for the record):
+- Sessions are now a binary surface at the observation level: cookie session, viewer mint endpoint, cookie-gated WS proxy, loopback WS listener. The wrapper-side manual pairs still run under the proof harness (the wrapper itself is an external process by design).
+- The body-`sessionId` integrity gap is resolved by design: viewers trust subject/stream identity (the deliver consumer binds per session stream); the body field stays unvalidated data. Recorded in the slice-7 task doc.
+- Live-agent flag set (`--verbose` mandatory) and the `TB_E2E_CLAUDE=1` guard precedent stand.
+
+Residual risks carried out of the program (named in the slice-7 task doc): browser composition proven link-wise in Go, not as one browser run (the shell UI stays deferred with product UI rendering); `ValidateCookieSession` opens a connection per check (cache seam if traffic ever grows); hijacked WS proxy conns end with either side, bounded by process exit.
 
 Operating pattern learned this program (keep using it):
 - Run each slice via `Workflow {name: quality-slice, topic: <slice>}` (agents pinned to sonnet, commit `c43948d`). The main run usually completes RED+GREEN and 4-5 gates; no-slop/be-lazy often stall on comment-narration cosmetics after 3 fix rounds.
@@ -132,7 +136,7 @@ Operating pattern learned this program (keep using it):
 
 After slice 7 (includes release closure: manifest + gates extension covering the session program, plus the direct-browser-WebSocket deferral retirement record), do the program-level final review the user reserved ("we'll judge the result by the end"): full-program diff review against the eight Approach invariants, then present commits, gate evidence, and residual risks for the user's judgment.
 
-Slices in order: `session-contract-authority` (DONE, 8013d49) -> `session-runtime-subsystem` (DONE, fc8effd) -> `session-frame-mediation` (DONE, 526d290) -> `trusted-wrapper-authority` (DONE, cc805f1) -> `steering-acceptance` (DONE, 7aceeaa) -> `agent-wrapper-proof` (DONE) -> `web-session-surface` (not started; includes release closure).
+Slices in order: `session-contract-authority` (DONE, 8013d49) -> `session-runtime-subsystem` (DONE, fc8effd) -> `session-frame-mediation` (DONE, 526d290) -> `trusted-wrapper-authority` (DONE, cc805f1) -> `steering-acceptance` (DONE, 7aceeaa) -> `agent-wrapper-proof` (DONE, 9ed17d1) -> `web-session-surface` (DONE; release closure landed: 17 milestones / 12 spine steps, direct-browser-WS deferral retired at loopback). PROGRAM COMPLETE pending the user's final review.
 
 Every session-v2 slice's owning Plan is `docs/matched-abstraction/plan/session-v2.md`; each wrap-up must keep this pointer and the next slice's topic in this Next Slice section.
 
