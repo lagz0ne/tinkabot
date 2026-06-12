@@ -240,6 +240,106 @@ func TestBundle(t *testing.T) {
 		waitAdvance(t, url, nsOf(t, pc), 10*time.Second)
 	})
 
+	// Chain-reaction: an entry with `watches` is a long-lived filter fed each
+	// watched-projection change on stdin (one JSON value per line), emitting
+	// framed effects through the same materializer gate into its own granted
+	// projections. The frontend consumes only the derived view.
+	t.Run("TransformPipe", func(t *testing.T) {
+		t.Parallel()
+		manifest := `{"kind":"bundle.manifest","name":"t","scripts":[` +
+			`{"name":"state","file":"scripts/run.sh","command":"/bin/sh","projections":["state"],"boot":true,"every":"300ms"},` +
+			`{"name":"present","file":"scripts/present.sh","command":"/bin/sh","watches":"state","projections":["view"]}]}`
+		state := "#!/bin/sh\nns=$(date +%s%N)\n" +
+			`b1="{\"kind\":\"script.effect\",\"effectType\":\"projection\",\"projectionId\":\"bundle.t.state\",\"snapshotRevision\":\"snap-$ns\",\"artifactRevision\":\"r1\",\"sequence\":$ns,\"value\":{\"ns\":$ns}}"` + "\n" +
+			`printf 'Content-Length: %s\r\n\r\n%s' "${#b1}" "$b1"` + "\n"
+		present := "#!/bin/sh\n" +
+			"while IFS= read -r line; do\n" +
+			`  ns=$(printf '%s' "$line" | sed -n 's/.*"ns":\([0-9]*\).*/\1/p')` + "\n" +
+			"  [ -z \"$ns\" ] && continue\n" +
+			`  v="{\"kind\":\"script.effect\",\"effectType\":\"projection\",\"projectionId\":\"bundle.t.view\",\"snapshotRevision\":\"snap-v-$ns\",\"artifactRevision\":\"r1\",\"sequence\":$ns,\"value\":{\"sourceNs\":$ns,\"doubled\":$((ns*2))}}"` + "\n" +
+			`  printf 'Content-Length: %s\r\n\r\n%s' "${#v}" "$v"` + "\n" +
+			"done\n"
+		dir := writeBundleScript(t, manifest, state)
+		if err := os.WriteFile(filepath.Join(dir, "scripts", "present.sh"), []byte(present), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		cfg := cfgFor(t.TempDir())
+		cfg.BundleDir = dir
+		app, err := boot(t, cfg)
+		if err != nil {
+			t.Fatal(err)
+		}
+		shell := app.Posture().Shell.URL
+
+		// The derived view appears and advances with NO trigger anywhere —
+		// state ticks feed the filter, the filter feeds the view.
+		_, pv := waitFor200(t, shell+"/projections/bundle.t.view", 20*time.Second)
+		var view struct {
+			Value struct {
+				SourceNs int64 `json:"sourceNs"`
+				Doubled  int64 `json:"doubled"`
+			} `json:"value"`
+		}
+		if err := json.Unmarshal(pv, &view); err != nil {
+			t.Fatalf("view is not the derived record: %v: %s", err, pv)
+		}
+		if view.Value.Doubled != 2*view.Value.SourceNs {
+			t.Fatalf("transform did not transform: %+v", view.Value)
+		}
+		first := view.Value.SourceNs
+		deadline := time.Now().Add(15 * time.Second)
+		for {
+			_, pv := waitFor200(t, shell+"/projections/bundle.t.view", 5*time.Second)
+			var again struct {
+				Value struct {
+					SourceNs int64 `json:"sourceNs"`
+				} `json:"value"`
+			}
+			if err := json.Unmarshal(pv, &again); err != nil {
+				t.Fatal(err)
+			}
+			if again.Value.SourceNs > first {
+				break
+			}
+			if time.Now().After(deadline) {
+				t.Fatal("derived view did not follow the watched projection")
+			}
+			time.Sleep(200 * time.Millisecond)
+		}
+	})
+
+	// A manifest cannot spell a reaction loop: the watches graph must be a
+	// DAG, watched projections must exist, and a filter is only a filter.
+	t.Run("TransformRejected", func(t *testing.T) {
+		t.Parallel()
+		filter := func(name, watches, projection string) string {
+			return fmt.Sprintf(`{"name":%q,"file":"scripts/noop.sh","command":"/bin/sh","watches":%q,"projections":[%q]}`, name, watches, projection)
+		}
+		cases := []struct {
+			name    string
+			scripts string
+		}{
+			{"SelfWatch", filter("a", "out", "out")},
+			{"Cycle", filter("a", "bout", "aout") + "," + filter("b", "aout", "bout")},
+			{"UnknownWatch", filter("a", "ghost", "aout")},
+			{"WatchWithEvery", `{"name":"a","file":"scripts/noop.sh","command":"/bin/sh","watches":"x","projections":["aout"],"every":"1s"}` + "," +
+				bundleEntry("b", `"x"`)},
+			{"WatchWithBoot", `{"name":"a","file":"scripts/noop.sh","command":"/bin/sh","watches":"x","projections":["aout"],"boot":true}` + "," +
+				bundleEntry("b", `"x"`)},
+			{"WatchWithoutOutput", `{"name":"a","file":"scripts/noop.sh","command":"/bin/sh","watches":"x"}` + "," +
+				bundleEntry("b", `"x"`)},
+		}
+		for _, c := range cases {
+			t.Run(c.name, func(t *testing.T) {
+				t.Parallel()
+				cfg := cfgFor(t.TempDir())
+				cfg.BundleDir = writeBundle(t, `{"kind":"bundle.manifest","name":"t","scripts":[`+c.scripts+`]}`)
+				_, err := boot(t, cfg)
+				assertKind(t, err, BundleRejected)
+			})
+		}
+	})
+
 	// Authority is derived, never declared: a manifest cannot even spell a
 	// collision with durable claims — free-form naming fields are unknown
 	// fields, and the only name a bundle controls must parse as a name.

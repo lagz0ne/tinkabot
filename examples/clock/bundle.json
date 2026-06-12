@@ -10,6 +10,14 @@
       "projections": ["state"],
       "boot": true,
       "every": "5s"
+    },
+    {
+      "name": "present",
+      "desc": "Derive the display view from raw clock state.",
+      "file": "scripts/present.sh",
+      "command": "/bin/sh",
+      "watches": "state",
+      "projections": ["view"]
     }
   ]
 }

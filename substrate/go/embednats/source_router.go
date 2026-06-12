@@ -27,6 +27,7 @@ type SourceRouter struct {
 type RouterResult struct {
 	Activation core.Activation
 	Record     core.LedgerRecord
+	Payload    []byte
 	Err        error
 }
 
@@ -150,7 +151,7 @@ func (r *SourceRouter) KV(kv nats.KeyValue, act core.Activation) (*Route, <-chan
 				}
 				next := normKV(act, entry)
 				rec, err := r.AcceptKV(act, entry)
-				send(out, RouterResult{Activation: next, Record: rec, Err: err})
+				send(out, RouterResult{Activation: next, Record: rec, Payload: entry.Value(), Err: err})
 			}
 		}
 	}()

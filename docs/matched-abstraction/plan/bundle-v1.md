@@ -55,7 +55,21 @@ settings — the app config bucket key `bundle.<bundle>.<entry>.every`
 existing caller authority. Not the deferred HA `schedule` source; that
 deferral stands.
 
-### Slice 4: bundle-zip
+### Slice 4: bundle-transform
+
+(Added 2026-06-12, user decision — see Escalation Log.) Chain-reaction
+inside the bundle: a manifest entry with `watches: <projection>` is a
+long-lived filter process, backend-like — spawned once with the bundle, fed
+each watched-projection change as it arrives (one JSON value per stdin
+line, the session-steer precedent), emitting framed effects on stdout
+continuously through the same materializer gate into its own granted
+projections. The platform keeps the watching: `SourceRouter.KV` activations
+with revision cursors, dedupe, stale rejection, and the ledger's
+LoopSuppressed backstop, all inside the bundle account. Loop safety is
+load-time structure: the watches graph must be a DAG — a manifest cannot
+spell a cycle. The frontend consumes only the derived projection.
+
+### Slice 5: bundle-zip
 
 Pure front-end to slice 1: `--bundle <file.zip>` extracts to a per-run
 directory under the store dir, records the archive's content hash into load
@@ -119,3 +133,13 @@ never exit-code.
   `bundle-schedule` inserted (zip slides to slice 4): manifest `every` +
   config-bucket runtime control over the ordinary caller trigger path,
   explicitly not the deferred HA schedule source.
+- 2026-06-12 (fourth escalation): "chain-reaction" — the frontend may not
+  benefit from raw KV; a transform pipe derives a frontend-shaped
+  projection. User refined the shape: the transform is backend-like — a
+  long-lived filter watching the KV and transforming as changes come, not a
+  one-shot script per change. Slice 4 `bundle-transform` inserted (zip
+  slides to slice 5). Recorded gaps driving the design: the KV route
+  discards `entry.Value()` (RouterResult grows a Payload), no production
+  code derives child chains (hop inheritance deferred; DAG-at-load owns
+  loop safety), and scripts had no stdin (filter feed = JSONL lines,
+  session-steer precedent).

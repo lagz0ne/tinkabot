@@ -44,4 +44,10 @@ nats kv del config_bucket bundle.clock.tick.every --creds /tmp/tb-clock/caller.c
   manifest cannot even spell a collision with durable claims. `boot: true`
   fires the entry once at startup.
 - `scripts/tick.sh` — a plain process emitting length-framed JSON effects on
-  stdout; it never sees NATS, credentials, or store handles.
+  stdout; it never sees NATS, credentials, or store handles. Writes raw state
+  to `bundle.clock.state`.
+- `scripts/present.sh` — a long-lived filter: the platform pipes one JSON line
+  per state change into its stdin, it derives `bundle.clock.view` and emits
+  a framed projection effect back on stdout. Chain-reaction: raw KV →
+  transform → derived KV → frontend. The page consumes only the view; it
+  never reads raw state directly.

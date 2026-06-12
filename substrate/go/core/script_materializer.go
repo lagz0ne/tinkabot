@@ -314,7 +314,7 @@ func (r *ScriptRuntime) Run(acc AcceptedActivation, rec ScriptRecord) (ScriptRun
 		run.Status = "applied"
 	}
 	for _, eff := range run.Effects {
-		if err := r.allow(eff); err != nil {
+		if err := r.Allow(eff); err != nil {
 			return ScriptRun{}, err
 		}
 	}
@@ -334,6 +334,10 @@ func (r *ScriptRuntime) env(act Activation, rec ScriptRecord) map[string]string 
 		env[k] = v
 	}
 	return env
+}
+
+func (r *ScriptRuntime) Allow(eff ScriptEffect) error {
+	return r.allow(eff)
 }
 
 func (r *ScriptRuntime) allow(eff ScriptEffect) error {

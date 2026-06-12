@@ -78,7 +78,11 @@ func TestSourceRouterAcceptsLiveSourcesOverEmbeddedNATS(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		rec := waitResult(t, out).Record
+		res := waitResult(t, out)
+		if string(res.Payload) != "state" {
+			t.Fatalf("KV payload drift: %q", res.Payload)
+		}
+		rec := res.Record
 		if rec.Status != core.Accepted || rec.SourcePosition != 1 || !strings.Contains(rec.SourceCursor, act.Source.Key) {
 			t.Fatalf("KV record drift: %#v", rec)
 		}

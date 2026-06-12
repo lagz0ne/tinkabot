@@ -11,6 +11,7 @@ package tinkabot
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"os"
@@ -60,6 +61,9 @@ type bundleScript struct {
 	// the app config bucket (`bundle.<bundle>.<entry>.every`: a duration
 	// retunes, `off` pauses, delete falls back here).
 	Every string `json:"every,omitempty"`
+	// Watches names the short projection id this entry observes; a watches
+	// entry is a long-lived filter fed each change of that projection.
+	Watches string `json:"watches,omitempty"`
 
 	everyDur time.Duration
 }
@@ -129,6 +133,8 @@ func loadBundle(dir string) (*bundle, error) {
 	}
 	b := &bundle{dir: abs, manifest: m}
 	seenNames, seenProjections := map[string]bool{}, map[string]bool{}
+	// projectionOwner maps short projection id -> entry name that owns it.
+	projectionOwner := map[string]string{}
 	for i := range m.Scripts {
 		e := &m.Scripts[i]
 		if e.TimeoutMs == 0 {
@@ -154,6 +160,7 @@ func loadBundle(dir string) (*bundle, error) {
 				return nil, rejectBundle("bundle projection is duplicated", at, nil)
 			}
 			seenProjections[p] = true
+			projectionOwner[p] = e.Name
 		}
 		if !filepath.IsLocal(e.File) {
 			return nil, rejectBundle("bundle script file escapes the bundle dir", at, nil)
@@ -170,7 +177,76 @@ func loadBundle(dir string) (*bundle, error) {
 		}
 		seenNames[e.Name] = true
 	}
+	// Second pass: validate filter (watches) entries.
+	for _, e := range m.Scripts {
+		if e.Watches == "" {
+			continue
+		}
+		at := map[string]string{"script": e.Name}
+		if !bundleName.MatchString(e.Watches) {
+			return nil, rejectBundle("bundle watches id is invalid", at, nil)
+		}
+		if e.Boot {
+			return nil, rejectBundle("bundle filter must not declare boot", at, nil)
+		}
+		if e.everyDur > 0 {
+			return nil, rejectBundle("bundle filter must not declare every", at, nil)
+		}
+		if len(e.Projections) == 0 {
+			return nil, rejectBundle("bundle filter must declare at least one projection", at, nil)
+		}
+		owner, known := projectionOwner[e.Watches]
+		if !known {
+			return nil, rejectBundle("bundle filter watches unknown projection", at, nil)
+		}
+		if owner == e.Name {
+			return nil, rejectBundle("bundle filter must not watch its own projection", at, nil)
+		}
+	}
+	// DAG check: detect cycles in the watches graph (edge: watcher -> owner of watched projection).
+	if err := checkWatchDAG(m.Scripts, projectionOwner); err != nil {
+		return nil, rejectBundle("bundle watches graph contains a cycle", nil, err)
+	}
 	return b, nil
+}
+
+// checkWatchDAG returns an error if the watches graph contains a cycle.
+func checkWatchDAG(scripts []bundleScript, projectionOwner map[string]string) error {
+	// Build adjacency: entry name -> name of entry it watches (via owned projection).
+	watchEdge := map[string]string{}
+	for _, e := range scripts {
+		if e.Watches != "" {
+			if owner, ok := projectionOwner[e.Watches]; ok {
+				watchEdge[e.Name] = owner
+			}
+		}
+	}
+	visited := map[string]bool{}
+	inStack := map[string]bool{}
+	var visit func(name string) bool
+	visit = func(name string) bool {
+		if inStack[name] {
+			return true // cycle
+		}
+		if visited[name] {
+			return false
+		}
+		visited[name] = true
+		inStack[name] = true
+		if next, ok := watchEdge[name]; ok {
+			if visit(next) {
+				return true
+			}
+		}
+		inStack[name] = false
+		return false
+	}
+	for _, e := range scripts {
+		if visit(e.Name) {
+			return fmt.Errorf("cycle detected")
+		}
+	}
+	return nil
 }
 
 // subjects is the bundle's entire app-account reach: one wildcard under its
@@ -259,6 +335,12 @@ func (a *App) startBundle(b *bundle, deps bundleDeps) error {
 		return rejectBundle("bundle materializer could not be configured", nil, err)
 	}
 
+	// Obtain the material KV handle via the router connection for filter entries.
+	routerJS, err := routerNC.JetStream()
+	if err != nil {
+		return rejectBundle("bundle router JetStream context is unavailable", nil, err)
+	}
+
 	ledger := core.NewDurableLedger(ledgerStore)
 	for _, e := range b.manifest.Scripts {
 		rec := core.ScriptRecord{
@@ -282,35 +364,60 @@ func (a *App) startBundle(b *bundle, deps bundleDeps) error {
 			return rejectBundle("bundle record could not be landed", map[string]string{"script": e.Name}, err)
 		}
 
-		router, err := embednats.NewSourceRouter(bundleSourceAuthority(b, e, deps.cap), ledger)
-		if err != nil {
-			return rejectBundle("bundle trigger authority was denied", map[string]string{"trigger": b.trigger(e)}, err)
-		}
-		route, results, err := router.RequestReply(routerNC, bundleActivation(b, e, deps.cap))
-		if err != nil {
-			return rejectBundle("bundle trigger route could not be wired", map[string]string{"trigger": b.trigger(e)}, err)
-		}
-		a.routes = append(a.routes, route)
 		rtm, err := core.NewScriptRuntime(core.ScriptPolicy{AllowedProjections: b.projections(e), ArtifactPrefix: b.artifactPrefix()}, embednats.LocalScriptRunner{})
 		if err != nil {
 			return rejectBundle("bundle script policy was denied", map[string]string{"script": e.Name}, err)
 		}
-		runs, stop := embednats.NewScriptLoop(store, rtm, mat, materials, materials).Watch(results)
-		a.stopLoops = append(a.stopLoops, stop)
-		go func() {
-			for range runs {
-				// Run outcomes are event envelopes in the bundle's own
-				// material bucket; nothing to do here.
-			}
-		}()
 
-		// The only crossing: export the trigger service, import it into the
-		// app account under the same derived name.
-		if err := a.rt.ExportService(acct, b.trigger(e)); err != nil {
-			return rejectBundle("bundle trigger could not be exported", map[string]string{"trigger": b.trigger(e)}, err)
-		}
-		if err := a.rt.ImportService(embednats.AppAccount, acct, b.trigger(e), ""); err != nil {
-			return rejectBundle("bundle trigger could not be imported", map[string]string{"trigger": b.trigger(e)}, err)
+		if e.Watches == "" {
+			// Trigger entry: request/reply route + script loop + export/import.
+			router, err := embednats.NewSourceRouter(bundleSourceAuthority(b, e, deps.cap), ledger)
+			if err != nil {
+				return rejectBundle("bundle trigger authority was denied", map[string]string{"trigger": b.trigger(e)}, err)
+			}
+			route, results, err := router.RequestReply(routerNC, bundleActivation(b, e, deps.cap))
+			if err != nil {
+				return rejectBundle("bundle trigger route could not be wired", map[string]string{"trigger": b.trigger(e)}, err)
+			}
+			a.routes = append(a.routes, route)
+			runs, stop := embednats.NewScriptLoop(store, rtm, mat, materials, materials).Watch(results)
+			a.stopLoops = append(a.stopLoops, stop)
+			go func() {
+				for range runs {
+					// Run outcomes are event envelopes in the bundle's own
+					// material bucket; nothing to do here.
+				}
+			}()
+			// The only crossing: export the trigger service, import it into the
+			// app account under the same derived name.
+			if err := a.rt.ExportService(acct, b.trigger(e)); err != nil {
+				return rejectBundle("bundle trigger could not be exported", map[string]string{"trigger": b.trigger(e)}, err)
+			}
+			if err := a.rt.ImportService(embednats.AppAccount, acct, b.trigger(e), ""); err != nil {
+				return rejectBundle("bundle trigger could not be imported", map[string]string{"trigger": b.trigger(e)}, err)
+			}
+		} else {
+			// Filter entry: KV watch on the material bucket key for the watched projection.
+			kvh, err := routerJS.KeyValue(bundleMaterialBucket)
+			if err != nil {
+				return rejectBundle("bundle material KV handle is unavailable", map[string]string{"script": e.Name}, err)
+			}
+			router, err := embednats.NewSourceRouter(bundleKVSourceAuthority(b, e, deps.cap), ledger)
+			if err != nil {
+				return rejectBundle("bundle filter authority was denied", map[string]string{"script": e.Name}, err)
+			}
+			route, results, err := router.KV(kvh, bundleKVActivation(b, e, deps.cap))
+			if err != nil {
+				return rejectBundle("bundle filter route could not be wired", map[string]string{"script": e.Name}, err)
+			}
+			a.routes = append(a.routes, route)
+			runs, stopLoop := embednats.NewFilterLoop(rec, rtm, mat, materials).Watch(results)
+			a.stopLoops = append(a.stopLoops, stopLoop)
+			go func() {
+				for range runs {
+					// Filter run outcomes land in the material bucket; nothing to do here.
+				}
+			}()
 		}
 	}
 
@@ -410,11 +517,16 @@ func bundleServicePerms() core.Permissions {
 
 // bundleRouterPerms subscribes the bundle's trigger subjects and owns its
 // ledger; replies cross the account boundary on the bounded response grant.
+// readKV(bundleMaterialBucket) is included so filter entries can create a
+// KV watch consumer on the material stream.
 func bundleRouterPerms(b *bundle) core.Permissions {
 	pub := append([]string{"$JS.API.INFO", "_INBOX.>", "$KV." + bundleLedgerBucket + ".>", "$JS.API.STREAM.CREATE.KV_" + bundleLedgerBucket}, readKV(bundleLedgerBucket)...)
-	subs := []string{"_INBOX.>"}
+	pub = append(pub, readKV(bundleMaterialBucket)...)
+	subs := []string{"_INBOX.>", "$KV." + bundleMaterialBucket + ".>"}
 	for _, e := range b.manifest.Scripts {
-		subs = append(subs, b.trigger(e))
+		if e.Watches == "" {
+			subs = append(subs, b.trigger(e))
+		}
 	}
 	return core.Permissions{
 		Publish:        core.PermList{Allow: pub},
@@ -510,6 +622,62 @@ func bundleActivation(b *bundle, e bundleScript, cap core.Capability) core.Activ
 
 func bundleAuthorityRef(b *bundle, e bundleScript) string {
 	return "auth.source.bundle." + b.manifest.Name + "-" + e.Name
+}
+
+// bundleKVSourceAuthority builds a source-authority policy for a filter entry
+// watching a projection key in the bundle material bucket.
+func bundleKVSourceAuthority(b *bundle, e bundleScript, cap core.Capability) core.Auth {
+	key := "p.bundle." + b.manifest.Name + "." + e.Watches
+	src := "$KV." + bundleMaterialBucket + "." + key
+	ref := bundleKVAuthorityRef(b, e)
+	return core.Auth{
+		User:       cap.PrincipalID,
+		Capability: cap,
+		Permissions: core.Permissions{
+			Publish:        core.PermList{Allow: []string{src, "_INBOX.>"}, Deny: []string{"tb.internal.>"}},
+			Subscribe:      core.PermList{Allow: []string{src, "_INBOX.>"}, Deny: []string{"tb.internal.>"}},
+			AllowResponses: core.AllowResponses{Max: 1, ExpiresMs: 30000},
+		},
+		Imports:  map[string]core.Import{"source": {Kind: "subscribe", Subjects: []string{src}, Desc: "bundle filter watch"}},
+		Exports:  []string{src},
+		Exposure: map[string]core.Exposure{ref: {Kind: "kv_watch", Subject: src, Desc: "bundle filter exposure"}},
+	}
+}
+
+func bundleKVActivation(b *bundle, e bundleScript, cap core.Capability) core.Activation {
+	id := b.manifest.Name + "-" + e.Name
+	key := "p.bundle." + b.manifest.Name + "." + e.Watches
+	return core.Activation{
+		ScriptKey:      b.scriptKey(e),
+		ScriptRevision: e.ScriptRevision,
+		SourcePrincipal: core.SourcePrincipal{
+			PrincipalID:  cap.PrincipalID,
+			SourceID:     "src-bundle-filter-" + id,
+			SourceKind:   "kv",
+			AuthorityRef: bundleKVAuthorityRef(b, e),
+		},
+		SourceLease: core.SourceLease{
+			LeaseID:        cap.LeaseID,
+			LeaseStatus:    "active",
+			AppRevision:    appRevision,
+			SchemaVersion:  "v1",
+			ScriptRevision: e.ScriptRevision,
+		},
+		Source:     core.Source{Kind: "kv", ActivationName: "transform", Bucket: bundleMaterialBucket, Key: key},
+		Chain:      core.Chain{ChainID: "chain-bundle-filter-" + id, RootID: "root-bundle-filter-" + id, Hop: 1, MaxHops: 5},
+		Capability: cap,
+		Provenance: core.Provenance{
+			SchemaID:      schemaID,
+			SchemaVersion: "v1",
+			AppRevision:   appRevision,
+			CreatedAt:     time.Now().UTC().Format(time.RFC3339),
+			Producer:      "activation",
+		},
+	}
+}
+
+func bundleKVAuthorityRef(b *bundle, e bundleScript) string {
+	return "auth.source.bundle.kv." + b.manifest.Name + "-" + e.Name
 }
 
 // serveArtifact serves artifact bodies read-only under sandbox headers:
