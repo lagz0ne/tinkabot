@@ -25,12 +25,17 @@ Diagram: https://diashort.apps.quickable.co/d/4ee5ebeb
    script store and firing ordinary activations; every effect still passes
    the materializer's gate. The loader never writes projections, artifacts,
    or events directly.
-2. **Disjoint authority.** A bundle may not claim any authority already
-   claimed durably — script key, wired trigger subject, projection id, or
-   artifact prefix (no prefix-overlap in either direction). Any collision,
-   including intra-bundle duplicates, is a typed load failure. Load is
-   all-or-nothing and fail-fast: a binary given a bad bundle refuses to
-   start.
+2. **Disjoint authority by construction.** (Amended 2026-06-12, user
+   decision.) A bundle declares no authority: script keys, trigger subjects,
+   projection ids, and artifact prefixes are all derived under the bundle's
+   own namespace (`scripts.bundle.<name>.*`, `tb.bundle.<name>.*`,
+   `bundle.<name>.*`, `bundle/<name>/`), so a manifest cannot even spell a
+   collision with durable claims, and the bundle's entire NATS reach is one
+   wildcard grant. Loading a bundle is the operator's trust act — the
+   operator is assumed to know what is inside; remaining load checks are
+   namespace hygiene (well-formed names, intra-bundle duplicates), not
+   adversarial defense. Load stays all-or-nothing and fail-fast: a binary
+   given a bad bundle refuses to start.
 3. **Code is ephemeral, effects are durable.** Bundle records and wiring live
    in memory-storage state that dies with the process; nothing durable is
    mutated by loading, and a restart without the bundle restores the exact

@@ -25,8 +25,11 @@ nats request --creds /tmp/tb-clock/caller.creds -H Tinkabot-Request-Id:req-1 tb.
 
 ## Anatomy
 
-- `bundle.json` — strictly decoded manifest: each entry binds one script file
-  to one wired trigger with its grants (projection ids, artifact prefix) and
-  an optional `boot` flag fired once at startup.
+- `bundle.json` — strictly decoded manifest. Authority is derived, never
+  declared: entry `tick` in bundle `clock` gets trigger
+  `tb.bundle.clock.tick`, script key `scripts.bundle.clock.tick`, projection
+  ids under `bundle.clock.`, and artifacts under `bundle/clock/` — a
+  manifest cannot even spell a collision with durable claims. `boot: true`
+  fires the entry once at startup.
 - `scripts/tick.sh` — a plain process emitting length-framed JSON effects on
   stdout; it never sees NATS, credentials, or store handles.

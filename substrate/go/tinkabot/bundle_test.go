@@ -49,7 +49,7 @@ func TestBundle(t *testing.T) {
 			t.Fatalf("artifact body drift: %s", body)
 		}
 
-		_, pj := waitFor200(t, shell+"/projections/bundle.clock", 5*time.Second)
+		_, pj := waitFor200(t, shell+"/projections/bundle.clock.state", 5*time.Second)
 		first := unixOf(t, pj)
 
 		// Nothing durable mutated: the bundle record never lands in the
@@ -67,7 +67,7 @@ func TestBundle(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if _, err := kv.Get("s." + base64.RawURLEncoding.EncodeToString([]byte("scripts.clock.tick"))); err == nil {
+		if _, err := kv.Get("s." + base64.RawURLEncoding.EncodeToString([]byte("scripts.bundle.clock.tick"))); err == nil {
 			t.Fatal("bundle record leaked into the durable script bucket")
 		}
 
@@ -90,7 +90,7 @@ func TestBundle(t *testing.T) {
 		}
 		deadline := time.Now().Add(10 * time.Second)
 		for {
-			_, pj := waitFor200(t, shell+"/projections/bundle.clock", 5*time.Second)
+			_, pj := waitFor200(t, shell+"/projections/bundle.clock.state", 5*time.Second)
 			if unixOf(t, pj) > first {
 				break
 			}
@@ -142,23 +142,18 @@ func TestBundle(t *testing.T) {
 		}
 	})
 
-	t.Run("ManifestCollision", func(t *testing.T) {
+	// Authority is derived, never declared: a manifest cannot even spell a
+	// collision with durable claims — free-form naming fields are unknown
+	// fields, and the only name a bundle controls must parse as a name.
+	t.Run("InvalidNames", func(t *testing.T) {
 		t.Parallel()
 		cases := []struct {
 			name  string
 			entry string
 		}{
-			{"ScriptKey", bundleEntry("scripts.app.main", "tb.bundle.t.run", `"bundle.t"`, "bundle/t/")},
-			{"Trigger", bundleEntry("scripts.t.run", "tb.proof.runtime.execute", `"bundle.t"`, "bundle/t/")},
-			{"Projection", bundleEntry("scripts.t.run", "tb.bundle.t.run", `"main"`, "bundle/t/")},
-			{"ArtifactPrefix", bundleEntry("scripts.t.run", "tb.bundle.t.run", `"bundle.t"`, "artifact/")},
-			{"ArtifactPrefixOverlap", bundleEntry("scripts.t.run", "tb.bundle.t.run", `"bundle.t"`, "art")},
-			{"ReservedSubject", bundleEntry("scripts.t.run", "tb.session.t.run", `"bundle.t"`, "bundle/t/")},
-			{
-				"DuplicateInBundle",
-				bundleEntry("scripts.t.run", "tb.bundle.t.run", `"bundle.t"`, "bundle/t/") + "," +
-					bundleEntry("scripts.t.run", "tb.bundle.t.other", `"bundle.other"`, "bundle/other/"),
-			},
+			{"BadEntryName", bundleEntry("T.tick", `"state"`)},
+			{"DuplicateEntryName", bundleEntry("t", `"state"`) + "," + bundleEntry("t", `"other"`)},
+			{"DuplicateProjection", bundleEntry("t", `"state"`) + "," + bundleEntry("u", `"state"`)},
 		}
 		for _, c := range cases {
 			t.Run(c.name, func(t *testing.T) {
@@ -178,9 +173,11 @@ func TestBundle(t *testing.T) {
 			manifest string
 		}{
 			{"UnknownField", `{"kind":"bundle.manifest","name":"t","zip":true,"scripts":[` +
-				bundleEntry("scripts.t.run", "tb.bundle.t.run", `"bundle.t"`, "bundle/t/") + `]}`},
-			{"MissingTrigger", `{"kind":"bundle.manifest","name":"t","scripts":[` +
-				`{"scriptKey":"scripts.t.run","scriptRevision":1,"file":"scripts/noop.sh","command":"/bin/sh"}]}`},
+				bundleEntry("t", `"state"`) + `]}`},
+			{"FreeFormTrigger", `{"kind":"bundle.manifest","name":"t","scripts":[` +
+				`{"name":"t","file":"scripts/noop.sh","command":"/bin/sh","trigger":"tb.proof.runtime.execute"}]}`},
+			{"MissingCommand", `{"kind":"bundle.manifest","name":"t","scripts":[` +
+				`{"name":"t","file":"scripts/noop.sh"}]}`},
 			{"WrongKind", `{"kind":"script.record","name":"t","scripts":[]}`},
 		}
 		for _, c := range cases {
@@ -202,9 +199,9 @@ func TestBundle(t *testing.T) {
 	})
 }
 
-func bundleEntry(key, trigger, projections, prefix string) string {
-	return fmt.Sprintf(`{"scriptKey":%q,"scriptRevision":1,"file":"scripts/noop.sh","command":"/bin/sh","trigger":%q,"projections":[%s],"artifactPrefix":%q}`,
-		key, trigger, projections, prefix)
+func bundleEntry(name, projections string) string {
+	return fmt.Sprintf(`{"name":%q,"file":"scripts/noop.sh","command":"/bin/sh","projections":[%s]}`,
+		name, projections)
 }
 
 func writeBundle(t *testing.T, manifest string) string {

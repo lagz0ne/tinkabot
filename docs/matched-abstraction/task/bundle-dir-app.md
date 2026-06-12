@@ -78,14 +78,34 @@ displayed the boot projection (`renderedAt 08:14:38Z`); `nats request
 replied `accepted` and the page advanced itself to `renderedAt 08:15:14Z`
 within its 2s poll — the one-stroke app loop, end to end.
 
+## Addendum (2026-06-12, derive-by-construction)
+
+After the first GREEN the user resolved the naming contract upward (Plan
+Escalation Log): authority is derived, never declared. Manifest entries
+shrank to `name`/`file`/`command`/`projections` (short ids)/`boot`; the
+loader derives `scripts.bundle.<name>.<entry>`, `tb.bundle.<name>.<entry>`,
+`bundle.<name>.<id>`, `bundle/<name>/`, and the perms growth collapsed to
+the single wildcard `tb.bundle.<name>.>`. The entire collision-check family
+(durable script key, trigger subject, projection `main`, artifact prefix
+overlap, reserved subjects, durable-bucket probe) was deleted — a manifest
+cannot spell those collisions; free-form naming fields are unknown-field
+rejections.
+
+Re-driven RED-GREEN: RED — `TestBundle/AppServes` failed against the old
+contract (`/projections/bundle.clock.state` 404, old free-form manifest);
+GREEN — `go test ./tinkabot -run TestBundle -count=1` -> `ok`, 13/13
+(AppServes, EphemeralAcrossRestart, InvalidNames: BadEntryName /
+DuplicateEntryName / DuplicateProjection, MalformedManifest: UnknownField /
+FreeFormTrigger / MissingCommand / WrongKind / MissingManifest); full Go
+suite 9/9 ok; live browser re-proof recorded below.
+
 ## Residual Risk
 
-- The durable-script-key collision check is vacuous at the current posture:
-  account identity is ephemeral, so the durable script bucket is always
-  empty at load time (a restart starts a fresh JetStream plane). The check
-  stays in code and becomes meaningful when durable planes persist; a
-  same-key record authored after load lives in a different bucket and gains
-  no authority bleed (per-slot policies), at most provenance ambiguity.
+- NATS subject permissions cannot scope base64url-encoded artifact-manifest
+  (`a.<base64url>`) and script-record KV keys, so artifact grants are
+  enforced by the in-process script policy, not auth; acceptable under the
+  operator-trusts-the-bundle posture, revisit if bundles ever load from
+  untrusted sources (per-bundle buckets are the auth-true evolution).
 - `/artifacts/` and `/projections/` serve all materialized state read-only
   on the loopback shell — observer-level reach, acceptable at the declared
   posture, revisit with any external exposure.

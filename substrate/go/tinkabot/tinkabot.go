@@ -185,7 +185,7 @@ func Start(cfg Config) (*App, error) {
 	w := wiring()
 	var bun *bundle
 	if cfg.BundleDir != "" {
-		b, err := loadBundle(cfg.BundleDir, w)
+		b, err := loadBundle(cfg.BundleDir)
 		if err != nil {
 			return nil, err
 		}
@@ -230,7 +230,7 @@ func Start(cfg Config) (*App, error) {
 		// The bundle's triggers are caller authority for this run, nothing
 		// more — observers and authors are untouched.
 		cp := perms[RoleCaller]
-		cp.Publish.Allow = append(cp.Publish.Allow, bun.triggers()...)
+		cp.Publish.Allow = append(cp.Publish.Allow, bun.subjects()...)
 		perms[RoleCaller] = cp
 	}
 	for role, p := range perms {
@@ -248,7 +248,7 @@ func Start(cfg Config) (*App, error) {
 	rp := routerPerms(w)
 	sp := servicePerms(w)
 	if bun != nil {
-		rp.Subscribe.Allow = append(rp.Subscribe.Allow, bun.triggers()...)
+		rp.Subscribe.Allow = append(rp.Subscribe.Allow, bun.subjects()...)
 		sp.Publish.Allow = append(sp.Publish.Allow, "$JS.API.STREAM.CREATE.KV_"+bundleBucket, "$KV."+bundleBucket+".>")
 		sp.Publish.Allow = append(sp.Publish.Allow, readKV(bundleBucket)...)
 	}
@@ -336,7 +336,6 @@ func Start(cfg Config) (*App, error) {
 			dial:      dial,
 			svc:       svcUC,
 			caller:    app.creds[RoleCaller],
-			scripts:   scriptStore,
 			ledger:    ledgerStore,
 			materials: materialStore,
 			mat:       mat,

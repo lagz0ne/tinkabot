@@ -21,19 +21,18 @@ Two slices, strictly sequenced; slice 1 delivers the user-testable app.
 ### Slice 1: bundle-dir-app
 
 Owns the directory form end to end. `--bundle <dir>` on the binary loads a
-strictly-decoded `bundle.json` manifest; each entry binds one script source
-file to one wired slot (script key, revision, trigger subject, grants:
-projection ids + artifact prefix, optional boot). The loader validates
-disjoint authority against the durable claims (wired script key and trigger
-subject, events subject, projection `main`, artifact prefix `artifact/`,
-existing durable script-bucket keys, intra-bundle duplicates), creates a
-memory-storage script bucket, lands the derived script records there, wires
-one source-router route plus script loop per entry with a per-entry script
-policy, and fires each `boot` entry once through the normal request/reply
-activation path with a per-run request id. Two read-only shell routes give
-the frontend its reach: `GET /artifacts/<name>` serving artifact bodies with
-their recorded media type under sandbox headers, and `GET /projections/<id>`
-serving projection JSON. Ships a runnable example bundle under `examples/`.
+strictly-decoded `bundle.json` manifest; each entry names one script source
+file plus its short projection ids and an optional boot flag, and the loader
+derives all authority under the bundle namespace per Approach invariant 2
+(amended) — entries cannot spell collisions, so load validation is name
+hygiene only. The loader creates a memory-storage script bucket, lands the
+derived script records there, wires one source-router route plus script loop
+per entry with a per-entry script policy, and fires each `boot` entry once
+through the normal request/reply activation path with a per-run request id.
+Two read-only shell routes give the frontend its reach: `GET
+/artifacts/<name>` serving artifact bodies with their recorded media type
+under sandbox headers, and `GET /projections/<id>` serving projection JSON.
+Ships a runnable example bundle under `examples/`.
 
 ### Slice 2: bundle-zip
 
@@ -75,4 +74,13 @@ never exit-code.
 
 ## Escalation Log
 
-- (none yet)
+- 2026-06-12: after slice 1's first GREEN, the user resolved the bundle's
+  naming contract upward: authority is derived by construction instead of
+  declared-and-checked ("proxy the call... always append prefix — but I
+  think that's the auth setup as well"; trust posture: the operator loading
+  a bundle knows what is inside). Approach invariant 2 amended; slice 1
+  re-driven RED-GREEN under the derived contract, deleting the collision
+  validation family. Recorded constraint for later slices: NATS subject
+  permissions cannot scope base64url-encoded artifact-manifest and
+  script-record KV keys, so artifact-grant enforcement stays with the
+  in-process script policy unless per-bundle buckets are introduced.

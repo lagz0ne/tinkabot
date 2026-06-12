@@ -26,10 +26,6 @@ import (
 
 const bundleBucket = "tb_bundle"
 
-// reservedSubjects are subject prefixes owned by other subsystems; bundle
-// triggers may never live under them.
-var reservedSubjects = []string{"tb.internal.", "tb.session.", "tb.app.", "$"}
-
 var bundleName = regexp.MustCompile(`^[a-z0-9-]+$`)
 
 type bundleManifest struct {
@@ -38,16 +34,18 @@ type bundleManifest struct {
 	Scripts []bundleScript `json:"scripts"`
 }
 
+// bundleScript declares no authority: script key, trigger subject,
+// projection ids, and artifact prefix are all derived under the bundle's
+// namespace, so a manifest cannot even spell a collision with durable
+// claims. Projections name short ids prefixed at load.
 type bundleScript struct {
-	ScriptKey      string   `json:"scriptKey"`
-	ScriptRevision int      `json:"scriptRevision"`
+	Name           string   `json:"name"`
 	Desc           string   `json:"desc,omitempty"`
 	File           string   `json:"file"`
 	Command        string   `json:"command"`
 	TimeoutMs      int      `json:"timeoutMs,omitempty"`
-	Trigger        string   `json:"trigger"`
+	ScriptRevision int      `json:"scriptRevision,omitempty"`
 	Projections    []string `json:"projections,omitempty"`
-	ArtifactPrefix string   `json:"artifactPrefix,omitempty"`
 	Boot           bool     `json:"boot,omitempty"`
 }
 
@@ -56,14 +54,34 @@ type bundle struct {
 	manifest bundleManifest
 }
 
+func (b *bundle) scriptKey(e bundleScript) string {
+	return "scripts.bundle." + b.manifest.Name + "." + e.Name
+}
+
+func (b *bundle) trigger(e bundleScript) string {
+	return "tb.bundle." + b.manifest.Name + "." + e.Name
+}
+
+func (b *bundle) projections(e bundleScript) []string {
+	ids := make([]string, len(e.Projections))
+	for i, p := range e.Projections {
+		ids[i] = "bundle." + b.manifest.Name + "." + p
+	}
+	return ids
+}
+
+func (b *bundle) artifactPrefix() string {
+	return "bundle/" + b.manifest.Name + "/"
+}
+
 func rejectBundle(msg string, details map[string]string, cause error) *Error {
 	return fail(BundleRejected, "LoadBundle", msg, details, cause)
 }
 
-// loadBundle reads and validates the manifest against the durable authority
-// claims. Pure file work — it runs before any NATS state exists, so a bad
-// bundle fails the start before it costs anything.
-func loadBundle(dir string, w Wiring) (*bundle, error) {
+// loadBundle reads and validates the manifest. Pure file work — it runs
+// before any NATS state exists, so a bad bundle fails the start before it
+// costs anything.
+func loadBundle(dir string) (*bundle, error) {
 	abs, err := filepath.Abs(dir)
 	if err != nil {
 		return nil, rejectBundle("bundle dir could not be resolved", map[string]string{"dir": dir}, err)
@@ -91,46 +109,32 @@ func loadBundle(dir string, w Wiring) (*bundle, error) {
 		return nil, rejectBundle("bundle declares no scripts", map[string]string{"name": m.Name}, nil)
 	}
 	b := &bundle{dir: abs, manifest: m}
-	seenKeys, seenTriggers, seenProjections := map[string]bool{}, map[string]bool{}, map[string]bool{}
-	var prefixes []string
+	seenNames, seenProjections := map[string]bool{}, map[string]bool{}
 	for i := range m.Scripts {
 		e := &m.Scripts[i]
 		if e.TimeoutMs == 0 {
 			e.TimeoutMs = 2000
 		}
-		at := map[string]string{"scriptKey": e.ScriptKey}
-		switch {
-		case e.ScriptKey == "" || e.ScriptRevision <= 0 || e.File == "" || e.Command == "" || e.Trigger == "":
-			return nil, rejectBundle("bundle script entry is incomplete", at, nil)
-		case e.ScriptKey == w.ScriptKey:
-			return nil, rejectBundle("bundle script key collides with durable authority", at, nil)
-		case e.Trigger == w.TriggerSubject || e.Trigger == w.EventsSubject:
-			return nil, rejectBundle("bundle trigger collides with durable authority", at, nil)
-		case e.ArtifactPrefix == "" || prefixOverlap(e.ArtifactPrefix, "artifact/"):
-			return nil, rejectBundle("bundle artifact prefix collides with durable authority", at, nil)
-		case seenKeys[e.ScriptKey]:
-			return nil, rejectBundle("bundle script key is duplicated", at, nil)
-		case seenTriggers[e.Trigger]:
-			return nil, rejectBundle("bundle trigger is duplicated", at, nil)
+		if e.ScriptRevision == 0 {
+			e.ScriptRevision = 1
 		}
-		for _, res := range reservedSubjects {
-			if strings.HasPrefix(e.Trigger, res) {
-				return nil, rejectBundle("bundle trigger is under a reserved subject", at, nil)
-			}
+		at := map[string]string{"script": e.Name}
+		switch {
+		case !bundleName.MatchString(e.Name):
+			return nil, rejectBundle("bundle script name is invalid", at, nil)
+		case e.File == "" || e.Command == "" || e.ScriptRevision < 0:
+			return nil, rejectBundle("bundle script entry is incomplete", at, nil)
+		case seenNames[e.Name]:
+			return nil, rejectBundle("bundle script name is duplicated", at, nil)
 		}
 		for _, p := range e.Projections {
-			if p == "main" {
-				return nil, rejectBundle("bundle projection collides with durable authority", at, nil)
+			if !bundleName.MatchString(p) {
+				return nil, rejectBundle("bundle projection id is invalid", at, nil)
 			}
 			if seenProjections[p] {
 				return nil, rejectBundle("bundle projection is duplicated", at, nil)
 			}
 			seenProjections[p] = true
-		}
-		for _, prev := range prefixes {
-			if prefixOverlap(prev, e.ArtifactPrefix) {
-				return nil, rejectBundle("bundle artifact prefixes overlap", at, nil)
-			}
 		}
 		if !filepath.IsLocal(e.File) {
 			return nil, rejectBundle("bundle script file escapes the bundle dir", at, nil)
@@ -138,22 +142,15 @@ func loadBundle(dir string, w Wiring) (*bundle, error) {
 		if _, err := os.Stat(filepath.Join(abs, e.File)); err != nil {
 			return nil, rejectBundle("bundle script file is missing", at, err)
 		}
-		seenKeys[e.ScriptKey], seenTriggers[e.Trigger] = true, true
-		prefixes = append(prefixes, e.ArtifactPrefix)
+		seenNames[e.Name] = true
 	}
 	return b, nil
 }
 
-func prefixOverlap(a, b string) bool {
-	return strings.HasPrefix(a, b) || strings.HasPrefix(b, a)
-}
-
-func (b *bundle) triggers() []string {
-	subs := make([]string, len(b.manifest.Scripts))
-	for i, e := range b.manifest.Scripts {
-		subs[i] = e.Trigger
-	}
-	return subs
+// subjects is the bundle's entire NATS reach: one wildcard under its derived
+// namespace.
+func (b *bundle) subjects() []string {
+	return []string{"tb.bundle." + b.manifest.Name + ".>"}
 }
 
 // bundleDeps carries the Start-time seams the bundle wiring consumes; every
@@ -164,7 +161,6 @@ type bundleDeps struct {
 	dial      func(embednats.UserCreds, string) (*nats.Conn, error)
 	svc       embednats.UserCreds
 	caller    embednats.UserCreds
-	scripts   *embednats.KVScriptStore
 	ledger    core.LedgerStore
 	materials *embednats.KVMaterialStore
 	mat       *core.Materializer
@@ -175,14 +171,6 @@ type bundleDeps struct {
 // trigger route and script loop per entry under that entry's grants, and
 // fires the boot entries through the normal request/reply activation path.
 func (a *App) startBundle(b *bundle, deps bundleDeps) error {
-	for _, e := range b.manifest.Scripts {
-		if _, ok, err := deps.scripts.LoadScript(e.ScriptKey); err != nil {
-			return rejectBundle("durable script bucket could not be checked", map[string]string{"scriptKey": e.ScriptKey}, err)
-		} else if ok {
-			return rejectBundle("bundle script key collides with a durable record", map[string]string{"scriptKey": e.ScriptKey}, nil)
-		}
-	}
-
 	bnc, err := deps.dial(deps.svc, "bundle store")
 	if err != nil {
 		return err
@@ -205,7 +193,7 @@ func (a *App) startBundle(b *bundle, deps bundleDeps) error {
 	for _, e := range b.manifest.Scripts {
 		rec := core.ScriptRecord{
 			Kind:     "script.record",
-			Key:      e.ScriptKey,
+			Key:      b.scriptKey(e),
 			Revision: e.ScriptRevision,
 			Desc:     e.Desc,
 			Process: core.Process{
@@ -221,21 +209,21 @@ func (a *App) startBundle(b *bundle, deps bundleDeps) error {
 			},
 		}
 		if err := store.Put(rec); err != nil {
-			return rejectBundle("bundle record could not be landed", map[string]string{"scriptKey": e.ScriptKey}, err)
+			return rejectBundle("bundle record could not be landed", map[string]string{"script": e.Name}, err)
 		}
 
-		router, err := embednats.NewSourceRouter(bundleSourceAuthority(e, deps.cap), ledger)
+		router, err := embednats.NewSourceRouter(bundleSourceAuthority(b, e, deps.cap), ledger)
 		if err != nil {
-			return rejectBundle("bundle trigger authority was denied", map[string]string{"trigger": e.Trigger}, err)
+			return rejectBundle("bundle trigger authority was denied", map[string]string{"trigger": b.trigger(e)}, err)
 		}
-		route, results, err := router.RequestReply(deps.routerNC, bundleActivation(e, deps.cap))
+		route, results, err := router.RequestReply(deps.routerNC, bundleActivation(b, e, deps.cap))
 		if err != nil {
-			return rejectBundle("bundle trigger route could not be wired", map[string]string{"trigger": e.Trigger}, err)
+			return rejectBundle("bundle trigger route could not be wired", map[string]string{"trigger": b.trigger(e)}, err)
 		}
 		a.routes = append(a.routes, route)
-		rtm, err := core.NewScriptRuntime(core.ScriptPolicy{AllowedProjections: e.Projections, ArtifactPrefix: e.ArtifactPrefix}, embednats.LocalScriptRunner{})
+		rtm, err := core.NewScriptRuntime(core.ScriptPolicy{AllowedProjections: b.projections(e), ArtifactPrefix: b.artifactPrefix()}, embednats.LocalScriptRunner{})
 		if err != nil {
-			return rejectBundle("bundle script policy was denied", map[string]string{"scriptKey": e.ScriptKey}, err)
+			return rejectBundle("bundle script policy was denied", map[string]string{"script": e.Name}, err)
 		}
 		runs, stop := embednats.NewScriptLoop(store, rtm, deps.mat, deps.materials, deps.materials).Watch(results)
 		a.stopLoops = append(a.stopLoops, stop)
@@ -268,23 +256,23 @@ func (a *App) bootBundle(b *bundle, deps bundleDeps) error {
 		return err
 	}
 	for _, e := range boots {
-		msg := nats.NewMsg(e.Trigger)
+		msg := nats.NewMsg(b.trigger(e))
 		msg.Header.Set(embednats.HeaderRequestID, "boot-"+deps.nonce)
 		msg.Data = []byte("boot")
 		reply, err := nc.RequestMsg(msg, 10*time.Second)
 		if err != nil {
-			return rejectBundle("bundle boot trigger got no reply", map[string]string{"trigger": e.Trigger}, err)
+			return rejectBundle("bundle boot trigger got no reply", map[string]string{"trigger": b.trigger(e)}, err)
 		}
 		body := string(reply.Data)
 		if !strings.Contains(body, "accepted") && !strings.Contains(body, "duplicate") {
-			return rejectBundle("bundle boot trigger was denied", map[string]string{"trigger": e.Trigger, "reply": body}, nil)
+			return rejectBundle("bundle boot trigger was denied", map[string]string{"trigger": b.trigger(e), "reply": body}, nil)
 		}
 	}
 	return nil
 }
 
-func bundleSourceAuthority(e bundleScript, cap core.Capability) core.Auth {
-	src := e.Trigger
+func bundleSourceAuthority(b *bundle, e bundleScript, cap core.Capability) core.Auth {
+	src := b.trigger(e)
 	return core.Auth{
 		User:       cap.PrincipalID,
 		Capability: cap,
@@ -295,20 +283,20 @@ func bundleSourceAuthority(e bundleScript, cap core.Capability) core.Auth {
 		},
 		Imports:  map[string]core.Import{"trigger": {Kind: "subscribe", Subjects: []string{src}, Desc: "bundle trigger watch"}},
 		Exports:  []string{src},
-		Exposure: map[string]core.Exposure{bundleAuthorityRef(e): {Kind: "request_reply", Subject: src, Desc: "bundle trigger exposure"}},
+		Exposure: map[string]core.Exposure{bundleAuthorityRef(b, e): {Kind: "request_reply", Subject: src, Desc: "bundle trigger exposure"}},
 	}
 }
 
-func bundleActivation(e bundleScript, cap core.Capability) core.Activation {
-	id := strings.ReplaceAll(e.ScriptKey, ".", "-")
+func bundleActivation(b *bundle, e bundleScript, cap core.Capability) core.Activation {
+	id := b.manifest.Name + "-" + e.Name
 	return core.Activation{
-		ScriptKey:      e.ScriptKey,
+		ScriptKey:      b.scriptKey(e),
 		ScriptRevision: e.ScriptRevision,
 		SourcePrincipal: core.SourcePrincipal{
 			PrincipalID:  cap.PrincipalID,
-			SourceID:     "src-" + id,
+			SourceID:     "src-bundle-" + id,
 			SourceKind:   "request_reply",
-			AuthorityRef: bundleAuthorityRef(e),
+			AuthorityRef: bundleAuthorityRef(b, e),
 		},
 		SourceLease: core.SourceLease{
 			LeaseID:        cap.LeaseID,
@@ -317,8 +305,8 @@ func bundleActivation(e bundleScript, cap core.Capability) core.Activation {
 			SchemaVersion:  "v1",
 			ScriptRevision: e.ScriptRevision,
 		},
-		Source:     core.Source{Kind: "request_reply", ActivationName: "bundle", Subject: e.Trigger},
-		Chain:      core.Chain{ChainID: "chain-" + id, RootID: "root-" + id, Hop: 1, MaxHops: 5},
+		Source:     core.Source{Kind: "request_reply", ActivationName: "bundle", Subject: b.trigger(e)},
+		Chain:      core.Chain{ChainID: "chain-bundle-" + id, RootID: "root-bundle-" + id, Hop: 1, MaxHops: 5},
 		Capability: cap,
 		Provenance: core.Provenance{
 			SchemaID:      schemaID,
@@ -330,8 +318,8 @@ func bundleActivation(e bundleScript, cap core.Capability) core.Activation {
 	}
 }
 
-func bundleAuthorityRef(e bundleScript) string {
-	return "auth.source.bundle." + strings.ReplaceAll(e.ScriptKey, ".", "-")
+func bundleAuthorityRef(b *bundle, e bundleScript) string {
+	return "auth.source.bundle." + b.manifest.Name + "-" + e.Name
 }
 
 // serveArtifact serves artifact bodies read-only under sandbox headers:
