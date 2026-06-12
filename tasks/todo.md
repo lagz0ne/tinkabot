@@ -118,7 +118,12 @@ Matched-abstraction docs are authored and pass `bun run validate:layers`:
 
 ### Next Step
 
-ALL SEVEN session-v2 slices are DONE. The program-level final review the user reserved ("we'll judge the result by the end") is the next step: full-program diff review against the eight Approach invariants, then present commits, gate evidence, and residual risks for the user's judgment.
+ALL SEVEN session-v2 slices are DONE and the program-level final review was executed (2026-06-12, two adversarial per-invariant evidence sweeps + Fable spot-checks). Awaiting the user's judgment on the findings below; the recommended follow-up is one small slice (working name `steer-apply-gate`) closing the two primitive-only gaps.
+
+Final review verdicts (vs the eight Approach invariants):
+- HOLDS: 2 (control-plane trust), 4 (single mediated output writer, NATS-enforced via BridgeBypassAttempt), 7 (lossless attributed steering — all four slice-5 fixes proven).
+- HOLDS-WITH-CAVEAT: 3 (leaf scope — breadth check covers all operator-mode mints; `sessionCred`'s non-operator `addSessionUser` path bypasses it but is unreachable in the binary), 5 (subsystem separation is structural; no concurrent-load starvation proof), 8 (browser surface proven link-wise; `Secure` cookie flag deferred with TLS; hop-two enforcement is TS-layer only).
+- GAP (primitive exists + tested, not wired into production): invariant 1's apply-time revocation re-check — `ApplySteerAfterRevoke` (operator.go) is called ONLY from tests; the physical steer pipe (`session_runtime.go:260` and the trusted wrapper) writes to stdin unconditionally. Carried from slices 4/5 composition: no production component composes accepted-steer-activation -> lease re-check -> wrapper stdin (also: nobody in production publishes the steer subject; single-writer holds by absence of grants). Invariant 6's restart reconciliation sweep is likewise primitive-only — `ReconcileOrphanedSession` has zero production call sites, correctly bounded by the fact that the binary does not yet spawn sessions (session CRUD is deferred scope); the sweep belongs to whatever lands session spawning.
 
 Resolved carry-notes (for the record):
 - Sessions are now a binary surface at the observation level: cookie session, viewer mint endpoint, cookie-gated WS proxy, loopback WS listener. The wrapper-side manual pairs still run under the proof harness (the wrapper itself is an external process by design).
@@ -136,7 +141,7 @@ Operating pattern learned this program (keep using it):
 
 After slice 7 (includes release closure: manifest + gates extension covering the session program, plus the direct-browser-WebSocket deferral retirement record), do the program-level final review the user reserved ("we'll judge the result by the end"): full-program diff review against the eight Approach invariants, then present commits, gate evidence, and residual risks for the user's judgment.
 
-Slices in order: `session-contract-authority` (DONE, 8013d49) -> `session-runtime-subsystem` (DONE, fc8effd) -> `session-frame-mediation` (DONE, 526d290) -> `trusted-wrapper-authority` (DONE, cc805f1) -> `steering-acceptance` (DONE, 7aceeaa) -> `agent-wrapper-proof` (DONE, 9ed17d1) -> `web-session-surface` (DONE; release closure landed: 17 milestones / 12 spine steps, direct-browser-WS deferral retired at loopback). PROGRAM COMPLETE pending the user's final review.
+Slices in order: `session-contract-authority` (DONE, 8013d49) -> `session-runtime-subsystem` (DONE, fc8effd) -> `session-frame-mediation` (DONE, 526d290) -> `trusted-wrapper-authority` (DONE, cc805f1) -> `steering-acceptance` (DONE, 7aceeaa) -> `agent-wrapper-proof` (DONE, 9ed17d1) -> `web-session-surface` (DONE, 6f17ddc; release closure landed: 17 milestones / 12 spine steps, direct-browser-WS deferral retired at loopback). PROGRAM COMPLETE; final review executed, findings above await the user's judgment.
 
 Every session-v2 slice's owning Plan is `docs/matched-abstraction/plan/session-v2.md`; each wrap-up must keep this pointer and the next slice's topic in this Next Slice section.
 
