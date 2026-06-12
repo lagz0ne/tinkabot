@@ -8,7 +8,8 @@
       "file": "scripts/tick.sh",
       "command": "/bin/sh",
       "projections": ["state"],
-      "boot": true
+      "boot": true,
+      "every": "5s"
     }
   ]
 }

@@ -44,7 +44,18 @@ service export/import per trigger under the importer's local name. New
 embednats primitives: `MintAccount`, `ExportService`, `ImportService`. The
 user-visible surface from slice 1 does not move.
 
-### Slice 3: bundle-zip
+### Slice 3: bundle-schedule
+
+(Added 2026-06-12, user decision — see Escalation Log.) A bundle entry
+declares an automated cadence as manifest intent (`every`); the binary fires
+the entry's trigger on a ticker through the same caller request/reply path,
+every tick an ordinary attributed activation. Runtime control rides NATS
+settings — the app config bucket key `bundle.<bundle>.<entry>.every`
+(duration retunes, `off` pauses, delete falls back to the manifest) under
+existing caller authority. Not the deferred HA `schedule` source; that
+deferral stands.
+
+### Slice 4: bundle-zip
 
 Pure front-end to slice 1: `--bundle <file.zip>` extracts to a per-run
 directory under the store dir, records the archive's content hash into load
@@ -102,3 +113,9 @@ never exit-code.
   base64url constraint above (bundle buckets are unreachable from the app
   account regardless of key encoding). Derived names survive as the
   import-remap convention on the app-facing surface.
+- 2026-06-12 (third escalation): asked whether server-side scripts update
+  themselves, the user resolved: automated updates should be intended
+  (manifest-declared) with control through NATS "like settings". Slice 3
+  `bundle-schedule` inserted (zip slides to slice 4): manifest `every` +
+  config-bucket runtime control over the ordinary caller trigger path,
+  explicitly not the deferred HA schedule source.

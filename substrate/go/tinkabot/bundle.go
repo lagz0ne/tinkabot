@@ -16,6 +16,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"strconv"
 	"strings"
 	"time"
 
@@ -55,7 +56,17 @@ type bundleScript struct {
 	ScriptRevision int      `json:"scriptRevision,omitempty"`
 	Projections    []string `json:"projections,omitempty"`
 	Boot           bool     `json:"boot,omitempty"`
+	// Every declares the automated cadence as intent; runtime control rides
+	// the app config bucket (`bundle.<bundle>.<entry>.every`: a duration
+	// retunes, `off` pauses, delete falls back here).
+	Every string `json:"every,omitempty"`
+
+	everyDur time.Duration
 }
+
+// minEvery floors the tick cadence — below this a schedule is a busy loop,
+// not automation.
+const minEvery = 100 * time.Millisecond
 
 type bundle struct {
 	dir      string
@@ -149,6 +160,13 @@ func loadBundle(dir string) (*bundle, error) {
 		}
 		if _, err := os.Stat(filepath.Join(abs, e.File)); err != nil {
 			return nil, rejectBundle("bundle script file is missing", at, err)
+		}
+		if e.Every != "" {
+			d, err := time.ParseDuration(e.Every)
+			if err != nil || d < minEvery {
+				return nil, rejectBundle("bundle schedule cadence is invalid", at, err)
+			}
+			e.everyDur = d
 		}
 		seenNames[e.Name] = true
 	}
@@ -296,7 +314,75 @@ func (a *App) startBundle(b *bundle, deps bundleDeps) error {
 		}
 	}
 
-	return a.bootBundle(b, deps)
+	callerNC, err := deps.dial(deps.caller, "bundle caller")
+	if err != nil {
+		return err
+	}
+	if err := a.bootBundle(b, callerNC, deps.nonce); err != nil {
+		return err
+	}
+	return a.scheduleBundle(b, callerNC, deps.nonce)
+}
+
+// scheduleBundle starts one ticker per scheduled entry. Each tick fires the
+// entry's trigger through the same caller path as boot — an ordinary
+// attributed activation — and consults the app config bucket before every
+// cycle so the cadence is NATS-controllable settings, not baked-in state.
+func (a *App) scheduleBundle(b *bundle, nc *nats.Conn, nonce string) error {
+	var scheduled []bundleScript
+	for _, e := range b.manifest.Scripts {
+		if e.everyDur > 0 {
+			scheduled = append(scheduled, e)
+		}
+	}
+	if len(scheduled) == 0 {
+		return nil
+	}
+	js, err := nc.JetStream()
+	if err != nil {
+		return rejectBundle("bundle schedule JetStream context is unavailable", nil, err)
+	}
+	settings, err := js.KeyValue(wiring().ConfigBucket)
+	if err != nil {
+		return rejectBundle("bundle schedule settings bucket is unavailable", nil, err)
+	}
+	for _, e := range scheduled {
+		stop := make(chan struct{})
+		a.stopLoops = append(a.stopLoops, func() { close(stop) })
+		go a.tickBundle(b, e, nc, settings, nonce, stop)
+	}
+	return nil
+}
+
+func (a *App) tickBundle(b *bundle, e bundleScript, nc *nats.Conn, settings nats.KeyValue, nonce string, stop <-chan struct{}) {
+	key := "bundle." + b.manifest.Name + "." + e.Name + ".every"
+	for n := 1; ; n++ {
+		cadence, paused := e.everyDur, false
+		if entry, err := settings.Get(key); err == nil {
+			switch v := strings.TrimSpace(string(entry.Value())); {
+			case v == "off":
+				paused = true
+			default:
+				if d, err := time.ParseDuration(v); err == nil && d >= minEvery {
+					cadence = d
+				}
+			}
+		}
+		select {
+		case <-stop:
+			return
+		case <-time.After(cadence):
+		}
+		if paused {
+			continue
+		}
+		msg := nats.NewMsg(b.trigger(e))
+		msg.Header.Set(embednats.HeaderRequestID, "tick-"+nonce+"-"+e.Name+"-"+strconv.Itoa(n))
+		msg.Data = []byte("tick")
+		// Tick outcomes are recorded by the ledger like any activation; a
+		// denied or unanswered tick must not kill the running app.
+		_, _ = nc.RequestMsg(msg, time.Second)
+	}
 }
 
 // bundleServicePerms is the bundle-plane materializer authority, enumerated
@@ -340,7 +426,7 @@ func bundleRouterPerms(b *bundle) core.Permissions {
 // bootBundle fires each boot entry once through the ordinary caller-creds
 // request/reply path — bundle load is just one more trigger source, deduped
 // per run by the request id.
-func (a *App) bootBundle(b *bundle, deps bundleDeps) error {
+func (a *App) bootBundle(b *bundle, nc *nats.Conn, nonce string) error {
 	var boots []bundleScript
 	for _, e := range b.manifest.Scripts {
 		if e.Boot {
@@ -350,17 +436,13 @@ func (a *App) bootBundle(b *bundle, deps bundleDeps) error {
 	if len(boots) == 0 {
 		return nil
 	}
-	nc, err := deps.dial(deps.caller, "bundle boot")
-	if err != nil {
-		return err
-	}
 	for _, e := range boots {
 		// The import's claims push propagates asynchronously; retry inside a
 		// bounded window before declaring the boot dead.
 		deadline := time.Now().Add(10 * time.Second)
 		for {
 			msg := nats.NewMsg(b.trigger(e))
-			msg.Header.Set(embednats.HeaderRequestID, "boot-"+deps.nonce)
+			msg.Header.Set(embednats.HeaderRequestID, "boot-"+nonce)
 			msg.Data = []byte("boot")
 			reply, err := nc.RequestMsg(msg, time.Second)
 			if err == nil {

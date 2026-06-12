@@ -18,9 +18,21 @@ projection every 2 seconds.
 
 ## Poke the backend
 
+The bundle ticks itself every 5s (`"every": "5s"` in the manifest); the page
+shows the clock advancing on its own. Fire a tick manually any time:
+
 ```bash
 nats request --creds /tmp/tb-clock/caller.creds -H Tinkabot-Request-Id:req-1 tb.bundle.clock.tick go
 # -> accepted; the page picks up the new renderedAt/unix within 2s
+```
+
+Control the schedule through NATS settings — plain caller authority on the
+config bucket:
+
+```bash
+nats kv put config_bucket bundle.clock.tick.every off --creds /tmp/tb-clock/caller.creds   # pause
+nats kv put config_bucket bundle.clock.tick.every 1s --creds /tmp/tb-clock/caller.creds    # retune
+nats kv del config_bucket bundle.clock.tick.every --creds /tmp/tb-clock/caller.creds       # back to manifest
 ```
 
 ## Anatomy

@@ -176,6 +176,70 @@ func TestBundle(t *testing.T) {
 		}
 	})
 
+	// A scheduled entry drives its own updates: the manifest declares the
+	// cadence as intent, every tick is an ordinary attributed activation
+	// through the caller path, and runtime control rides NATS settings —
+	// the app config bucket the caller can already write.
+	t.Run("ScheduledTicks", func(t *testing.T) {
+		t.Parallel()
+		manifest := `{"kind":"bundle.manifest","name":"t","scripts":[{"name":"run","file":"scripts/run.sh","command":"/bin/sh","projections":["state"],"boot":true,"every":"300ms"}]}`
+		script := "#!/bin/sh\nns=$(date +%s%N)\n" +
+			`b1="{\"kind\":\"script.effect\",\"effectType\":\"projection\",\"projectionId\":\"bundle.t.state\",\"snapshotRevision\":\"snap-$ns\",\"artifactRevision\":\"r1\",\"sequence\":$ns,\"value\":{\"ns\":$ns}}"` + "\n" +
+			`printf 'Content-Length: %s\r\n\r\n%s' "${#b1}" "$b1"` + "\n"
+		cfg := cfgFor(t.TempDir())
+		cfg.BundleDir = writeBundleScript(t, manifest, script)
+		app, err := boot(t, cfg)
+		if err != nil {
+			t.Fatal(err)
+		}
+		shell := app.Posture().Shell.URL
+		url := shell + "/projections/bundle.t.state"
+
+		_, p1 := waitFor200(t, url, 15*time.Second)
+		first := nsOf(t, p1)
+		waitAdvance(t, url, first, 10*time.Second) // no manual trigger anywhere
+
+		// Pause through the settings surface with plain caller authority.
+		cnc, err := nats.Connect(app.Posture().NATS.ClientURL, nats.UserCredentials(app.CredsFile(RoleCaller)))
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer cnc.Close()
+		cjs, err := cnc.JetStream()
+		if err != nil {
+			t.Fatal(err)
+		}
+		settings, err := cjs.KeyValue("config_bucket")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := settings.Put("bundle.t.run.every", []byte("off")); err != nil {
+			t.Fatal(err)
+		}
+		paused := false
+		deadline := time.Now().Add(10 * time.Second)
+		for time.Now().Before(deadline) {
+			_, pa := waitFor200(t, url, 5*time.Second)
+			a := nsOf(t, pa)
+			time.Sleep(1200 * time.Millisecond)
+			_, pb := waitFor200(t, url, 5*time.Second)
+			if nsOf(t, pb) == a {
+				paused = true
+				break
+			}
+		}
+		if !paused {
+			t.Fatal("ticks did not pause on settings off")
+		}
+
+		// Resume at a new cadence through the same settings key.
+		if _, err := settings.Put("bundle.t.run.every", []byte("200ms")); err != nil {
+			t.Fatal(err)
+		}
+		_, pc := waitFor200(t, url, 5*time.Second)
+		waitAdvance(t, url, nsOf(t, pc), 10*time.Second)
+	})
+
 	// Authority is derived, never declared: a manifest cannot even spell a
 	// collision with durable claims — free-form naming fields are unknown
 	// fields, and the only name a bundle controls must parse as a name.
@@ -212,6 +276,10 @@ func TestBundle(t *testing.T) {
 				`{"name":"t","file":"scripts/noop.sh","command":"/bin/sh","trigger":"tb.proof.runtime.execute"}]}`},
 			{"MissingCommand", `{"kind":"bundle.manifest","name":"t","scripts":[` +
 				`{"name":"t","file":"scripts/noop.sh"}]}`},
+			{"MalformedEvery", `{"kind":"bundle.manifest","name":"t","scripts":[` +
+				`{"name":"t","file":"scripts/noop.sh","command":"/bin/sh","every":"soon"}]}`},
+			{"OverEagerEvery", `{"kind":"bundle.manifest","name":"t","scripts":[` +
+				`{"name":"t","file":"scripts/noop.sh","command":"/bin/sh","every":"5ms"}]}`},
 			{"WrongKind", `{"kind":"script.record","name":"t","scripts":[]}`},
 		}
 		for _, c := range cases {
@@ -240,17 +308,52 @@ func bundleEntry(name, projections string) string {
 
 func writeBundle(t *testing.T, manifest string) string {
 	t.Helper()
+	return writeBundleScript(t, manifest, "#!/bin/sh\n")
+}
+
+func writeBundleScript(t *testing.T, manifest, script string) string {
+	t.Helper()
 	dir := t.TempDir()
 	if err := os.MkdirAll(filepath.Join(dir, "scripts"), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(dir, "scripts", "noop.sh"), []byte("#!/bin/sh\n"), 0o755); err != nil {
-		t.Fatal(err)
+	for _, name := range []string{"noop.sh", "run.sh"} {
+		if err := os.WriteFile(filepath.Join(dir, "scripts", name), []byte(script), 0o755); err != nil {
+			t.Fatal(err)
+		}
 	}
 	if err := os.WriteFile(filepath.Join(dir, "bundle.json"), []byte(manifest), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	return dir
+}
+
+func nsOf(t *testing.T, projection []byte) int64 {
+	t.Helper()
+	var p struct {
+		Value struct {
+			NS int64 `json:"ns"`
+		} `json:"value"`
+	}
+	if err := json.Unmarshal(projection, &p); err != nil {
+		t.Fatalf("projection is not the stored record: %v: %s", err, projection)
+	}
+	return p.Value.NS
+}
+
+func waitAdvance(t *testing.T, url string, past int64, timeout time.Duration) {
+	t.Helper()
+	deadline := time.Now().Add(timeout)
+	for {
+		_, p := waitFor200(t, url, timeout)
+		if nsOf(t, p) > past {
+			return
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("projection did not advance past %d within %s", past, timeout)
+		}
+		time.Sleep(100 * time.Millisecond)
+	}
 }
 
 func httpGet(t *testing.T, url string) (int, http.Header, []byte) {
