@@ -502,6 +502,10 @@ func bundleServicePerms() core.Permissions {
 		"$JS.API.STREAM.CREATE.KV_" + bundleMaterialBucket,
 		"$JS.API.STREAM.CREATE.KV_" + bundleLedgerBucket,
 		"$JS.API.STREAM.CREATE.OBJ_" + bundleArtifactBucket,
+		// Overwriting an artifact under a stable name purges the prior
+		// object's chunks (nats.go Put), so the filter chain that rebuilds an
+		// app on every change needs PURGE on its own artifact bucket.
+		"$JS.API.STREAM.PURGE.OBJ_" + bundleArtifactBucket,
 		"$KV." + bundleBucket + ".>",
 		"$KV." + bundleMaterialBucket + ".>",
 		"$O." + bundleArtifactBucket + ".>",

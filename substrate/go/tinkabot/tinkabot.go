@@ -566,7 +566,10 @@ func routerPerms(w Wiring) core.Permissions {
 // servicePerms is the materializer principal's enumerated authority: create
 // the assembly's stores, read scripts, write material/artifact state. No
 // account-wide JetStream admin — deletion/purge of the ledger and script
-// streams stays beyond this principal's reach.
+// streams stays beyond this principal's reach. PURGE is granted narrowly on
+// the artifact OBJ stream only, because object-store overwrite purges the
+// prior object's chunks (nats.go Put); without it, re-emitting an artifact
+// under a stable name fails ArtifactWriteFailed.
 func servicePerms(w Wiring) core.Permissions {
 	pub := []string{
 		"$JS.API.INFO", "_INBOX.>",
@@ -577,6 +580,7 @@ func servicePerms(w Wiring) core.Permissions {
 		"$JS.API.STREAM.CREATE.KV_" + w.ScriptBucket,
 		"$JS.API.STREAM.CREATE.KV_" + w.MaterialBucket,
 		"$JS.API.STREAM.CREATE.OBJ_" + w.ArtifactBucket,
+		"$JS.API.STREAM.PURGE.OBJ_" + w.ArtifactBucket,
 		"$KV." + w.MaterialBucket + ".>",
 		"$O." + w.ArtifactBucket + ".>",
 	}
