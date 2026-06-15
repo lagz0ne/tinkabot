@@ -1,0 +1,7 @@
+{
+  "name": "builder-bundle",
+  "private": true,
+  "dependencies": {
+    "vite": "^7.2.7"
+  }
+}
