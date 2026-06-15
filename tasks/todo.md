@@ -15,7 +15,7 @@
 
 ## Active Goal
 
-Implement the `session-v2` program end to end: all seven slices of `docs/matched-abstraction/plan/session-v2.md`, each fully tested with inside-out ownership proof (one owning test per declared failure family) and outside-in proof where the seam is real embedded NATS (embednats runtime, JetStream KV/Object/streams, output-parsed denial oracles), code inspected per `.codex/skills/be-lazy/`, every slice driven through the `quality-slice` workflow (RED-GREEN-TDD plus the six gates: real-nats, parallel-safety, coverage, be-lazy, no-slop, security), closing with the release-evidence extension in slice 7.
+Implement `docs/matched-abstraction/approach/product-success.md` — the product-first success contract that defines what Tinkabot must achieve with real operators running real automation against real systems. The file is now authored and validates cleanly (`bun run validate:layers`). The active implementation question is: which existing v1 behaviors already clear bars in this contract, and which gaps remain between the current platform state and the minimum product bar defined here.
 
 ## Active Session
 
