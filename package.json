@@ -29,7 +29,7 @@
     "gate:coverage": "bun scripts/gate-coverage.ts",
     "gate:scenarios": "bun scripts/gate-scenarios.ts",
     "gate:manual": "bun scripts/gate-manual.ts",
-    "test:layers": "python3 -B -m unittest tests/test_validate_layers.py",
-    "validate:layers": "python3 -B .codex/skills/matched-abstraction-thinking/scripts/validate_layers.py docs/matched-abstraction"
+    "test:layers": "node .claude/skills/matched-abstraction/scripts/validate-layers.mjs docs/matched-abstraction",
+    "validate:layers": "node .claude/skills/matched-abstraction/scripts/validate-layers.mjs docs/matched-abstraction"
   }
 }

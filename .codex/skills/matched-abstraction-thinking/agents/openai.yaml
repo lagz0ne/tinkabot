@@ -1,4 +1,0 @@
-interface:
-  display_name: "Matched Abstraction Thinking"
-  short_description: "Keep Approach, Plan, and Task layers aligned"
-  default_prompt: "Use $matched-abstraction-thinking to structure this work through Approach, Plan, and Task artifacts."

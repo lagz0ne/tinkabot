@@ -1,0 +1,23 @@
+{
+  "version": 1,
+  "skills": {
+    "efficient-fable": {
+      "source": "builderio/skills",
+      "sourceType": "github",
+      "skillPath": "skills/efficient-fable/SKILL.md",
+      "computedHash": "0f92029f08ae7350a9a6655e89a43aff69e1399d64a76267c69f62338e218ac8"
+    },
+    "matched-abstraction": {
+      "source": "lagz0ne/matched-abstraction",
+      "sourceType": "github",
+      "skillPath": "SKILL.md",
+      "computedHash": "af4ee12b0fdfd156a5c79b82ec1a0d7ed4f5fdb8b893d201e1373e04508d1142"
+    },
+    "visual-plan": {
+      "source": "builderio/skills",
+      "sourceType": "github",
+      "skillPath": "skills/visual-plan/SKILL.md",
+      "computedHash": "cac5dce18f159718e5c6364d568ec5b01248f93b6fbc9dfc7d8094e3969a5891"
+    }
+  }
+}
