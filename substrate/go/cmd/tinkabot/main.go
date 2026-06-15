@@ -34,6 +34,7 @@ func run(args []string, out io.Writer, sig <-chan os.Signal) error {
 	store := fs.String("store", "", "durable store directory (operator key, JetStream state, role creds)")
 	shell := fs.String("shell", "127.0.0.1:8419", "loopback address for the embedded shell")
 	bundle := fs.String("bundle", "", "bundle directory served as an ephemeral app for this run")
+	bundleSandbox := fs.String("bundle-sandbox", "", `bundle sandbox tier: "" (default, bwrap, fail-closed) or "none" (trusted, UNSANDBOXED — explicit opt-in)`)
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
@@ -41,11 +42,12 @@ func run(args []string, out io.Writer, sig <-chan os.Signal) error {
 		return errors.New("--store is required")
 	}
 	app, err := tinkabot.Start(tinkabot.Config{
-		StoreDir:    *store,
-		Exposure:    embednats.Loopback(),
-		ShellAddr:   *shell,
-		DemoSession: os.Getenv("TB_DEMO_SESSION"),
-		BundleDir:   *bundle,
+		StoreDir:      *store,
+		Exposure:      embednats.Loopback(),
+		ShellAddr:     *shell,
+		DemoSession:   os.Getenv("TB_DEMO_SESSION"),
+		BundleDir:     *bundle,
+		BundleSandbox: *bundleSandbox,
 	})
 	if err != nil {
 		return err

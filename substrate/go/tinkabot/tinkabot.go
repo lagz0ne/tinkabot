@@ -77,6 +77,11 @@ type Config struct {
 	// for this run: manifest-declared scripts wired to triggers, nothing
 	// durable mutated (docs/matched-abstraction/approach/bundle-v1.md).
 	BundleDir string
+	// BundleSandbox selects the bundle sandbox tier. "" (default) is the
+	// bwrap jail, fail-closed when bwrap is unavailable. "none" is the trusted
+	// (unsandboxed) tier — an explicit opt-in for hosts without user
+	// namespaces, which runs bundle processes BARE. Any other value is rejected.
+	BundleSandbox string
 }
 
 // Wiring names every NATS-visible surface the manual operates against this
@@ -145,11 +150,12 @@ func wiring() Wiring {
 }
 
 type App struct {
-	rt       *embednats.Runtime
-	posture  Posture
-	creds    map[string]embednats.UserCreds
-	files    map[string]string
-	storeDir string
+	rt            *embednats.Runtime
+	posture       Posture
+	creds         map[string]embednats.UserCreds
+	files         map[string]string
+	storeDir      string
+	bundleSandbox string
 
 	shell           *http.Server
 	route           *embednats.Route
@@ -198,6 +204,12 @@ func Start(cfg Config) (*App, error) {
 			return nil, err
 		}
 		bun = b
+		// Reject an unknown sandbox tier up front, before any plane exists.
+		switch cfg.BundleSandbox {
+		case "", "none":
+		default:
+			return nil, rejectBundle("bundle sandbox tier is unknown", map[string]string{"tier": cfg.BundleSandbox}, nil)
+		}
 	}
 	rt, err := embednats.Start(embednats.Config{
 		Core: core.Config{
@@ -221,7 +233,7 @@ func Start(cfg Config) (*App, error) {
 	if err != nil {
 		return nil, fail(StartupMaterializationFailed, "Start", "embedded runtime did not start", nil, err)
 	}
-	app := &App{rt: rt, creds: map[string]embednats.UserCreds{}, files: map[string]string{}, storeDir: cfg.StoreDir}
+	app := &App{rt: rt, creds: map[string]embednats.UserCreds{}, files: map[string]string{}, storeDir: cfg.StoreDir, bundleSandbox: cfg.BundleSandbox}
 	ok := false
 	defer func() {
 		if !ok {

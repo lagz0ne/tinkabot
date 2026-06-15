@@ -20,7 +20,8 @@ type FilterLoop struct {
 	rtm     *core.ScriptRuntime
 	mat     *core.Materializer
 	status  core.StatusSink
-	sandbox *SandboxConfig
+	sandbox Sandbox
+	bundle  SandboxConfig
 }
 
 type filterProc struct {
@@ -35,9 +36,11 @@ func NewFilterLoop(rec core.ScriptRecord, rtm *core.ScriptRuntime, mat *core.Mat
 }
 
 // WithSandbox makes filter runs jailed (opt-in): nil leaves the loop unjailed
-// so NewFilterLoop callers stay unchanged; non-nil wraps the process in bwrap.
-func (l *FilterLoop) WithSandbox(cfg *SandboxConfig) *FilterLoop {
-	l.sandbox = cfg
+// so NewFilterLoop callers stay unchanged; non-nil wraps the process via the
+// Sandbox contract. bundle carries the bundle-fixed half of the runtime spec.
+func (l *FilterLoop) WithSandbox(sb Sandbox, bundle SandboxConfig) *FilterLoop {
+	l.sandbox = sb
+	l.bundle = bundle
 	return l
 }
 
@@ -168,8 +171,15 @@ func (l *FilterLoop) start(acc func() core.AcceptedActivation, emit func(ScriptR
 	cmd := exec.Command(command, args...)
 	cmd.Dir = l.rec.Process.Cwd
 	if l.sandbox != nil {
-		// bwrap --chdir owns the working dir, so the outer cmd.Dir stays empty.
-		command, args = sandboxCommand(*l.sandbox, command, args, l.rec.Process.Cwd, outDir)
+		// The sandbox's --chdir owns the working dir, so the outer cmd.Dir stays empty.
+		command, args = l.sandbox.Wrap(SandboxSpec{
+			Command:   command,
+			Args:      args,
+			Cwd:       l.rec.Process.Cwd,
+			OutDir:    outDir,
+			BundleDir: l.bundle.BundleDir,
+			StoreDir:  l.bundle.StoreDir,
+		})
 		cmd = exec.Command(command, args...)
 	}
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}

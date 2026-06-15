@@ -275,49 +275,60 @@ type bundleDeps struct {
 // plane (memory storage, dead with the process), and the only crossing into
 // TB_APP is the service export/import per trigger. The account boundary —
 // not naming — is what keeps bundle and app state apart.
-// preflightSandbox resolves the bwrap binary (TB_BWRAP override, else PATH)
-// and proves it actually jails before any bundle entry is wired. Fail-closed:
-// a missing binary or a failed smoke run rejects the bundle rather than
-// letting it run unjailed.
-func preflightSandbox() (string, error) {
-	bin := os.Getenv("TB_BWRAP")
-	if bin == "" {
-		resolved, err := exec.LookPath("bwrap")
-		if err != nil {
-			return "", err
-		}
-		bin = resolved
+// resolveBwrap resolves the bwrap binary (TB_BWRAP override, else PATH). The
+// actual jail smoke test lives in embednats.BwrapSandbox.Preflight; this only
+// finds the binary the default tier will preflight.
+func resolveBwrap() (string, error) {
+	if bin := os.Getenv("TB_BWRAP"); bin != "" {
+		return bin, nil
 	}
-	smoke := exec.Command(bin, "--ro-bind", "/", "/", "--unshare-all", "true")
-	if err := smoke.Run(); err != nil {
-		return "", err
-	}
-	return bin, nil
+	return exec.LookPath("bwrap")
 }
 
-// installDeps runs `bun install` at load. It runs JAILED, not on the bare host:
-// an install runs package lifecycle scripts, which would be host RCE with full
-// env. The install jail differs from the runtime jail in one way only — it
-// SHARES the network so deps download — while still masking the substrate store
-// and the user's $HOME so a lifecycle script can neither read secrets nor write
-// outside the bundle.
+// buildSandbox selects the bundle sandbox tier. The trusted tier ("none") is
+// NEVER auto-selected — only an explicit opt-in — and the assembly logs a loud
+// stderr warning when it is chosen, because an unsandboxed bundle process has
+// full host access. The default ("") is the bwrap jail and stays fail-closed:
+// a missing binary or a failed jail smoke test rejects the bundle rather than
+// letting it run unjailed.
+func (a *App) buildSandbox(name string) (embednats.Sandbox, error) {
+	if a.bundleSandbox == "none" {
+		fmt.Fprintf(os.Stderr, "WARNING: bundle %q running UNSANDBOXED (--bundle-sandbox none)\n", name)
+		return embednats.TrustedSandbox{}, nil
+	}
+	bwrapBin, err := resolveBwrap()
+	if err != nil {
+		return nil, rejectBundle("bundle sandbox unavailable", map[string]string{"dir": a.storeDir}, err)
+	}
+	sb := embednats.BwrapSandbox{Bwrap: bwrapBin}
+	if err := sb.Preflight(); err != nil {
+		return nil, rejectBundle("bundle sandbox unavailable", map[string]string{"dir": a.storeDir}, err)
+	}
+	return sb, nil
+}
+
+// installDeps runs `bun install` at load through the same Sandbox contract the
+// runtime uses. Under the default (bwrap) tier it runs JAILED, not on the bare
+// host: an install runs package lifecycle scripts, which would be host RCE with
+// full env. The install spec differs from the runtime spec only by binding the
+// bundle dir READ-WRITE (node_modules lands there) and SHARING the network (deps
+// download) — the same masks over $HOME and the store dir keep secrets unreadable
+// and writes confined. Under the trusted tier it runs bare, which is the
+// acceptable cost of that explicit opt-in.
 //
 // --ignore-scripts skips ALL package lifecycle scripts (both the bundle's own
 // and dependencies'), which is the arbitrary-code-at-install hole closed. It
 // does NOT break the builder: vite/esbuild ship their native binaries as
 // per-platform optionalDependency packages (e.g. @esbuild/linux-x64), which
 // need no postinstall — verified against bun 1.3 (esbuild --version works
-// after --ignore-scripts). The jail is defense-in-depth: even the dependency
-// resolution/download bun does runs with secrets masked and writes confined.
+// after --ignore-scripts).
 //
-// Layout: --ro-bind / / for the toolchain, then the bundle dir bound READ-WRITE
-// (node_modules lands there), --tmpfs over $HOME and the store dir (secrets
-// masked; a fresh HOME is set so bun has a clean writable cache), --tmpfs /tmp,
-// share-net kept (only --unshare-pid/--uts), a 120s timeout, and a scrubbed env
-// exposing only PATH + HOME so bun finds itself but inherits no host secrets.
+// The scrubbed env exposes only PATH + HOME so bun finds itself and uses the
+// jail's writable $HOME (the bwrap tmpfs) for its cache, inheriting no host
+// secrets. 120s timeout.
 //
 // Skipped silently when the bundle declares no package.json.
-func installDeps(dir, bwrapBin, storeDir string) error {
+func installDeps(sb embednats.Sandbox, dir, storeDir string) error {
 	if _, err := os.Stat(filepath.Join(dir, "package.json")); err != nil {
 		return nil
 	}
@@ -325,44 +336,25 @@ func installDeps(dir, bwrapBin, storeDir string) error {
 	if err != nil {
 		return rejectBundle("bundle dependency install needs bun", map[string]string{"dir": dir}, err)
 	}
-	home := os.Getenv("HOME")
-	// A fresh writable HOME inside the jail: bun's cache/config live under $HOME,
-	// but the host $HOME (with the user's secrets) stays masked by --tmpfs.
-	jailHome := "/tmp/tb-bun-home"
-
-	argv := []string{
-		"--ro-bind", "/", "/",
-		"--dev", "/dev",
-		"--proc", "/proc",
-	}
-	if home != "" {
-		// Mask the user's HOME (ssh/aws/etc.) BEFORE the binds below: in dev
-		// setups the bundle dir AND the bun binary live UNDER $HOME, so the
-		// tmpfs must precede their re-binds or it clobbers them (chdir would
-		// then fail). Order is load-bearing.
-		argv = append(argv, "--tmpfs", home)
-	}
-	// /tmp tmpfs, then the writable bun HOME inside it (tmpfs before --dir).
-	argv = append(argv, "--tmpfs", "/tmp", "--dir", jailHome)
-	// Re-expose the bundle dir (rw — node_modules lands here) and the bun
-	// binary dir (ro) AFTER the HOME mask above.
-	argv = append(argv, "--bind", dir, dir, "--ro-bind", filepath.Dir(bunBin), filepath.Dir(bunBin))
-	if storeDir != "" {
-		argv = append(argv, "--tmpfs", storeDir) // explicit store mask if not under HOME
-	}
-	argv = append(argv,
-		"--chdir", dir,
-		"--unshare-pid", "--unshare-uts",
-		"--die-with-parent",
-		"--clearenv",
-		"--setenv", "PATH", os.Getenv("PATH"),
-		"--setenv", "HOME", jailHome,
-		"--", bunBin, "install", "--ignore-scripts",
-	)
-
+	command, args := sb.Wrap(embednats.SandboxSpec{
+		Command:        bunBin,
+		Args:           []string{"install", "--ignore-scripts"},
+		Cwd:            dir,
+		BundleDir:      dir,
+		StoreDir:       storeDir,
+		BundleWritable: true,
+		Network:        true,
+	})
 	ctx, cancel := context.WithTimeout(context.Background(), 120*time.Second)
 	defer cancel()
-	cmd := exec.CommandContext(ctx, bwrapBin, argv...)
+	cmd := exec.CommandContext(ctx, command, args...)
+	// Scrubbed env: only PATH + HOME. Under bwrap the $HOME path is a writable
+	// tmpfs (the mask), so bun's cache lands there with no host secrets exposed.
+	env := []string{"PATH=" + os.Getenv("PATH")}
+	if home := os.Getenv("HOME"); home != "" {
+		env = append(env, "HOME="+home)
+	}
+	cmd.Env = env
 	if out, err := cmd.CombinedOutput(); err != nil {
 		return rejectBundle("bundle dependency install failed", map[string]string{"dir": dir, "output": string(out)}, err)
 	}
@@ -370,22 +362,20 @@ func installDeps(dir, bwrapBin, storeDir string) error {
 }
 
 func (a *App) startBundle(b *bundle, deps bundleDeps) error {
-	// Fail-closed: bundle processes only run jailed. If the host cannot
-	// sandbox, the bundle refuses to start.
-	bwrapBin, err := preflightSandbox()
-	if err != nil {
-		return rejectBundle("bundle sandbox unavailable", map[string]string{"dir": b.dir}, err)
-	}
 	// Mask the substrate store dir inside the runtime jail: --ro-bind / / would
 	// otherwise let a jailed script read operator.nk / role creds.
 	storeDir, err := filepath.Abs(a.storeDir)
 	if err != nil {
 		return rejectBundle("bundle store dir could not be resolved", map[string]string{"dir": a.storeDir}, err)
 	}
-	sandbox := &embednats.SandboxConfig{BundleDir: b.dir, Bwrap: bwrapBin, StoreDir: storeDir}
-	// Install deps in a jail that shares net (deps download) but masks the
-	// store + $HOME so a package lifecycle script cannot read or write secrets.
-	if err := installDeps(b.dir, bwrapBin, storeDir); err != nil {
+	bundleCfg := embednats.SandboxConfig{BundleDir: b.dir, StoreDir: storeDir}
+	sandbox, err := a.buildSandbox(b.manifest.Name)
+	if err != nil {
+		return err
+	}
+	// Install deps through the chosen sandbox (bwrap: a jail that shares net so
+	// deps download but masks the store + $HOME; trusted: bare).
+	if err := installDeps(sandbox, b.dir, storeDir); err != nil {
 		return err
 	}
 	acct := b.account()
@@ -478,7 +468,7 @@ func (a *App) startBundle(b *bundle, deps bundleDeps) error {
 			return rejectBundle("bundle record could not be landed", map[string]string{"script": e.Name}, err)
 		}
 
-		rtm, err := core.NewScriptRuntime(core.ScriptPolicy{AllowedProjections: b.projections(e), ProjectionPrefix: "bundle." + b.manifest.Name + ".", ArtifactPrefix: b.artifactPrefix()}, embednats.LocalScriptRunner{Sandbox: sandbox})
+		rtm, err := core.NewScriptRuntime(core.ScriptPolicy{AllowedProjections: b.projections(e), ProjectionPrefix: "bundle." + b.manifest.Name + ".", ArtifactPrefix: b.artifactPrefix()}, embednats.LocalScriptRunner{Sandbox: sandbox, Bundle: bundleCfg})
 		if err != nil {
 			return rejectBundle("bundle script policy was denied", map[string]string{"script": e.Name}, err)
 		}
@@ -525,7 +515,7 @@ func (a *App) startBundle(b *bundle, deps bundleDeps) error {
 				return rejectBundle("bundle filter route could not be wired", map[string]string{"script": e.Name}, err)
 			}
 			a.routes = append(a.routes, route)
-			runs, stopLoop := embednats.NewFilterLoop(rec, rtm, mat, materials).WithSandbox(sandbox).Watch(results)
+			runs, stopLoop := embednats.NewFilterLoop(rec, rtm, mat, materials).WithSandbox(sandbox, bundleCfg).Watch(results)
 			a.stopLoops = append(a.stopLoops, stopLoop)
 			go func() {
 				for range runs {

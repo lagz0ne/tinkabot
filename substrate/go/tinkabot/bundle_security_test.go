@@ -167,3 +167,26 @@ func TestBundleSandboxHidesHomeSecrets(t *testing.T) {
 		t.Fatalf("jailed bundle exfiltrated a $HOME secret: %s", body)
 	}
 }
+
+// The trusted (unsandboxed) tier is an explicit opt-in for hosts without
+// user namespaces: with it selected, a bundle runs even when bwrap is
+// unavailable — whereas the default stays fail-closed (TestBundleSandboxFailClosed).
+// gate:serial — sets TB_BWRAP via t.Setenv, which forbids t.Parallel.
+func TestBundleTrustedSandboxTier(t *testing.T) {
+	t.Setenv("TB_BWRAP", "/nonexistent/bwrap") // bwrap unavailable
+	manifest := `{"kind":"bundle.manifest","name":"t","scripts":[{"name":"gen","file":"scripts/run.sh","command":"/bin/sh","projections":["ok"],"boot":true}]}`
+	script := "#!/bin/sh\n" +
+		`b="{\"kind\":\"script.effect\",\"effectType\":\"projection\",\"projectionId\":\"ok\",\"snapshotRevision\":\"s1\",\"artifactRevision\":\"r1\",\"sequence\":1,\"value\":{\"ran\":1}}"` + "\n" +
+		`printf 'Content-Length: %s\r\n\r\n%s' "${#b}" "$b"` + "\n"
+	cfg := cfgFor(t.TempDir())
+	cfg.BundleDir = writeBundleScript(t, manifest, script)
+	cfg.BundleSandbox = "none" // explicit opt-in to the trusted tier
+	app, err := boot(t, cfg)
+	if err != nil {
+		t.Fatalf("trusted tier should run without bwrap, got: %v", err)
+	}
+	_, body := waitFor200(t, app.Posture().Shell.URL+"/projections/bundle.t.ok", 15*time.Second)
+	if !strings.Contains(string(body), `"ran":1`) {
+		t.Fatalf("bundle did not run under the trusted tier: %s", body)
+	}
+}

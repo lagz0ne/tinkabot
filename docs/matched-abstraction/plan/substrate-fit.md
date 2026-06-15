@@ -49,6 +49,20 @@ fetch paths and Vite a relative base (`./`); the server resolves
 (fixed convention, user decision), so the page hardcodes no derived name
 either. examples/clock and examples/builder migrated to pure local refs.
 
+### Slice E: sandbox backend seam
+
+(Added 2026-06-15, user decision.) Extract a `Sandbox` interface — the
+guarantee contract the substrate depends on (fail-closed preflight; no
+network at runtime / network only for install; read-only host except outDir
++ /tmp; store + $HOME masked; process-group killable). bwrap becomes one
+implementation behind it (the default, fail-closed when unavailable). A
+`trusted` (unsandboxed) implementation is selectable only by EXPLICIT,
+LOUD opt-in (`Config.BundleSandbox="none"` / a `--bundle-sandbox` flag) so
+bundles can run on hosts without user namespaces (macOS, locked-down CI) —
+the default never silently degrades. Stronger backends (gVisor/runsc,
+microVM) are future tiers against the same contract, added only when the
+posture changes (untrusted/multi-tenant/networked); not built speculatively.
+
 ### Slice C: content-addressed serving
 
 The artifact HTTP route serves `ETag: "<digest>"` (the sha256 the Object

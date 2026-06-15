@@ -42,10 +42,14 @@ type KVMaterialStore struct {
 }
 
 // LocalScriptRunner spawns the script directly. Sandbox is opt-in: nil (the
-// zero value) runs unjailed (the wired app slot); non-nil wraps every run in
-// bubblewrap (bundles), binding the run's outDir as the only writable path.
+// zero value) runs unjailed (the wired app slot); non-nil wraps every run via
+// the Sandbox contract (bundles), binding the run's outDir as the only
+// writable path.
 type LocalScriptRunner struct {
-	Sandbox *SandboxConfig
+	Sandbox Sandbox
+	// Bundle carries the bundle-fixed half of the runtime spec (bundle dir +
+	// store dir to mask); zero value when Sandbox is nil.
+	Bundle SandboxConfig
 }
 
 type ScriptLoop struct {
@@ -308,8 +312,15 @@ func (r LocalScriptRunner) Run(inv core.ScriptInvocation) (core.ScriptRun, error
 	cmd := exec.CommandContext(ctx, command, args...)
 	cmd.Dir = inv.Record.Process.Cwd
 	if r.Sandbox != nil {
-		// bwrap --chdir owns the working dir, so the outer cmd.Dir stays empty.
-		command, args = sandboxCommand(*r.Sandbox, command, args, inv.Record.Process.Cwd, outDir)
+		// The sandbox's --chdir owns the working dir, so the outer cmd.Dir stays empty.
+		command, args = r.Sandbox.Wrap(SandboxSpec{
+			Command:   command,
+			Args:      args,
+			Cwd:       inv.Record.Process.Cwd,
+			OutDir:    outDir,
+			BundleDir: r.Bundle.BundleDir,
+			StoreDir:  r.Bundle.StoreDir,
+		})
 		cmd = exec.CommandContext(ctx, command, args...)
 	}
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
