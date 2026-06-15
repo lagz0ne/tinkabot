@@ -23,6 +23,9 @@ import (
 const (
 	maxScriptOutput = 1 << 20
 	maxFrameBody    = 256 << 10
+	// maxArtifactFile caps a path-artifact body read host-side, so a jailed
+	// script cannot OOM the host by referencing an arbitrarily large file.
+	maxArtifactFile = 32 << 20
 )
 
 type KVScriptStore struct {
@@ -356,6 +359,12 @@ func (r LocalScriptRunner) Run(inv core.ScriptInvocation) (core.ScriptRun, error
 // resolveArtifactPath reads a path-artifact's file into its Body. Resolution
 // lives in the runner, not the materializer, because only the process boundary
 // knows the per-run output dir it handed the child via TB_ARTIFACT_OUT.
+//
+// This read runs host-side, where the whole FS is reachable, so a jailed script
+// can plant `ln -s <secret> $TB_ARTIFACT_OUT/x` and exfiltrate the target. The
+// string-confinement below bounds the path; os.OpenInRoot then refuses to
+// FOLLOW any symlink out of outDir (it resolves every component within the
+// root), closing the no-follow hole. The size cap stops an OOM via a huge file.
 func resolveArtifactPath(outDir string, eff *core.ScriptEffect) error {
 	if eff.Type != core.ArtifactEffect || eff.Path == "" {
 		return nil
@@ -367,9 +376,23 @@ func resolveArtifactPath(outDir string, eff *core.ScriptEffect) error {
 	if target != outDir && !strings.HasPrefix(target, prefix) {
 		return core.ProtocolErr("ReadFrame", "artifact path escapes output dir", nil)
 	}
-	body, err := os.ReadFile(target)
+	// Resolve relative to outDir: OpenInRoot blocks symlink traversal that would
+	// leave the root, so a symlink planted in outDir cannot read a host file.
+	rel := strings.TrimPrefix(target, prefix)
+	f, err := os.OpenInRoot(outDir, rel)
 	if err != nil {
 		return core.ProtocolErr("ReadFrame", "artifact path could not be read", err)
+	}
+	defer f.Close()
+	if info, err := f.Stat(); err == nil && info.Size() > maxArtifactFile {
+		return core.ProtocolErr("ReadFrame", "artifact path body exceeded limit", nil)
+	}
+	body, err := io.ReadAll(io.LimitReader(f, maxArtifactFile+1))
+	if err != nil {
+		return core.ProtocolErr("ReadFrame", "artifact path could not be read", err)
+	}
+	if len(body) > maxArtifactFile {
+		return core.ProtocolErr("ReadFrame", "artifact path body exceeded limit", nil)
 	}
 	eff.Body = body
 	eff.Path = ""

@@ -3,6 +3,7 @@ package core
 import (
 	"encoding/json"
 	"errors"
+	"path"
 	"slices"
 	"strconv"
 	"strings"
@@ -346,8 +347,37 @@ func (r *ScriptRuntime) env(act Activation, rec ScriptRecord) map[string]string 
 // the effect that gets materialized carries the resolved names. Both apply
 // paths (ScriptRuntime.Run and the filter loop) call it before materializing.
 func (r *ScriptRuntime) Allow(eff *ScriptEffect) error {
+	if eff.Type == ArtifactEffect {
+		if err := checkArtifactName(r.policy.ArtifactPrefix, eff.ArtifactName); err != nil {
+			return err
+		}
+	}
 	r.resolve(eff)
 	return r.allow(*eff)
+}
+
+// checkArtifactName gates the script-supplied artifact name before it is
+// prefixed into the bundle's derived form. The relative part (what the script
+// controls) must path.Clean to itself and stay relative — `../x` and a leading
+// `/` are contained by account isolation but are rejected here too. The first
+// segment must not be `_p`, which the artifact HTTP route reserves for the
+// scoped projection lookup (`bundle/<bname>/_p/<short>`); an artifact literally
+// named `_p/...` would otherwise shadow that route.
+func checkArtifactName(prefix, name string) error {
+	rel := name
+	if prefix != "" {
+		rel = strings.TrimPrefix(name, prefix)
+	}
+	if rel == "" {
+		return nil
+	}
+	if cleaned := path.Clean(rel); cleaned != rel || strings.HasPrefix(rel, "/") || strings.HasPrefix(rel, "../") || rel == ".." {
+		return fail(ProtocolFrameInvalid, "ScriptRuntime", "ApplyEffect", "artifact name is not a clean relative path", map[string]string{"artifactName": name})
+	}
+	if seg, _, _ := strings.Cut(rel, "/"); seg == "_p" {
+		return fail(FacadeEffectDenied, "ScriptFacade", "ApplyEffect", "artifact name uses the reserved _p route segment", map[string]string{"artifactName": name})
+	}
+	return nil
 }
 
 // resolve prefixes a short projection id or relative artifact name to its

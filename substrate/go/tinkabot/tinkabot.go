@@ -145,10 +145,11 @@ func wiring() Wiring {
 }
 
 type App struct {
-	rt      *embednats.Runtime
-	posture Posture
-	creds   map[string]embednats.UserCreds
-	files   map[string]string
+	rt       *embednats.Runtime
+	posture  Posture
+	creds    map[string]embednats.UserCreds
+	files    map[string]string
+	storeDir string
 
 	shell           *http.Server
 	route           *embednats.Route
@@ -220,7 +221,7 @@ func Start(cfg Config) (*App, error) {
 	if err != nil {
 		return nil, fail(StartupMaterializationFailed, "Start", "embedded runtime did not start", nil, err)
 	}
-	app := &App{rt: rt, creds: map[string]embednats.UserCreds{}, files: map[string]string{}}
+	app := &App{rt: rt, creds: map[string]embednats.UserCreds{}, files: map[string]string{}, storeDir: cfg.StoreDir}
 	ok := false
 	defer func() {
 		if !ok {

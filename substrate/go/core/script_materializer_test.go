@@ -225,6 +225,53 @@ func TestScriptRuntimeAttributesFailures(t *testing.T) {
 	})
 }
 
+// TestArtifactNameGate pins the gate hardening: a script-supplied artifact
+// name must clean to a relative path (no `..`, no leading `/`) and must not
+// claim the `_p` route segment the artifact HTTP handler reserves for scoped
+// projections (bundle/<bname>/_p/<short>). Clean relative names still pass.
+func TestArtifactNameGate(t *testing.T) {
+	t.Parallel()
+	rt, err := NewScriptRuntime(ScriptPolicy{ArtifactPrefix: "bundle/t/"}, ScriptRunnerFunc(func(ScriptInvocation) (ScriptRun, error) {
+		return ScriptRun{}, nil
+	}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	art := func(name string) *ScriptEffect {
+		return &ScriptEffect{Type: ArtifactEffect, ArtifactName: name, ArtifactRevision: "r1", MediaType: "text/html", Body: []byte("x")}
+	}
+
+	t.Run("RejectReservedRoute", func(t *testing.T) {
+		assertKind(t, rt.Allow(art("_p/state")), FacadeEffectDenied)
+	})
+	t.Run("RejectReservedRouteAlreadyPrefixed", func(t *testing.T) {
+		assertKind(t, rt.Allow(art("bundle/t/_p/state")), FacadeEffectDenied)
+	})
+	t.Run("RejectTraversal", func(t *testing.T) {
+		assertKind(t, rt.Allow(art("../escape")), ProtocolFrameInvalid)
+	})
+	t.Run("RejectAbsolute", func(t *testing.T) {
+		assertKind(t, rt.Allow(art("/etc/passwd")), ProtocolFrameInvalid)
+	})
+	t.Run("RejectUncleanInterior", func(t *testing.T) {
+		assertKind(t, rt.Allow(art("a/../../b")), ProtocolFrameInvalid)
+	})
+	t.Run("AllowCleanRelative", func(t *testing.T) {
+		eff := art("app/index.html")
+		if err := rt.Allow(eff); err != nil {
+			t.Fatalf("clean relative name was rejected: %v", err)
+		}
+		if eff.ArtifactName != "bundle/t/app/index.html" {
+			t.Fatalf("name not prefixed as expected: %q", eff.ArtifactName)
+		}
+	})
+	t.Run("AllowPlainName", func(t *testing.T) {
+		if err := rt.Allow(art("index.html")); err != nil {
+			t.Fatalf("plain name was rejected: %v", err)
+		}
+	})
+}
+
 func runtimeWith(t *testing.T, run ScriptRun) *ScriptRuntime {
 	t.Helper()
 	rt, err := NewScriptRuntime(ScriptPolicy{AllowedProjections: []string{"main"}}, ScriptRunnerFunc(func(ScriptInvocation) (ScriptRun, error) {

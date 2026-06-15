@@ -1,10 +1,12 @@
 package embednats
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"testing"
@@ -131,6 +133,58 @@ func TestScriptMaterializerLoopFromNATSCLI(t *testing.T) {
 	if dup.Err != nil || dup.Record.Status != core.Duplicate || dup.Run.Status != "" {
 		t.Fatalf("duplicate executed script: %#v", dup)
 	}
+}
+
+// TestResolveArtifactPathHardening pins the host-side path-artifact read: a
+// regular in-dir file reads through, a symlink that points OUT of outDir is
+// refused (not followed), and a body over the size cap is rejected typed.
+func TestResolveArtifactPathHardening(t *testing.T) {
+	t.Parallel()
+
+	t.Run("ReadsRegularInDir", func(t *testing.T) {
+		t.Parallel()
+		out := t.TempDir()
+		if err := os.WriteFile(filepath.Join(out, "ok.txt"), []byte("hello"), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		eff := core.ScriptEffect{Type: core.ArtifactEffect, Path: "ok.txt"}
+		if err := resolveArtifactPath(out, &eff); err != nil {
+			t.Fatalf("regular in-dir artifact was rejected: %v", err)
+		}
+		if string(eff.Body) != "hello" || eff.Path != "" {
+			t.Fatalf("body/path not resolved: %q %q", eff.Body, eff.Path)
+		}
+	})
+
+	t.Run("RefusesSymlinkOutOfDir", func(t *testing.T) {
+		t.Parallel()
+		secretDir := t.TempDir()
+		secret := filepath.Join(secretDir, "secret.txt")
+		if err := os.WriteFile(secret, []byte("TOP-SECRET"), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		out := t.TempDir()
+		if err := os.Symlink(secret, filepath.Join(out, "leak")); err != nil {
+			t.Fatal(err)
+		}
+		eff := core.ScriptEffect{Type: core.ArtifactEffect, Path: "leak"}
+		err := resolveArtifactPath(out, &eff)
+		assertCore(t, err, core.ProtocolFrameInvalid)
+		if string(eff.Body) != "" {
+			t.Fatalf("symlink leaked a host secret: %q", eff.Body)
+		}
+	})
+
+	t.Run("RejectsOverCap", func(t *testing.T) {
+		t.Parallel()
+		out := t.TempDir()
+		big := filepath.Join(out, "big.bin")
+		if err := os.WriteFile(big, bytes.Repeat([]byte{0}, maxArtifactFile+1), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		eff := core.ScriptEffect{Type: core.ArtifactEffect, Path: "big.bin"}
+		assertCore(t, resolveArtifactPath(out, &eff), core.ProtocolFrameInvalid)
+	})
 }
 
 func TestLocalScriptRunnerRejectsMalformedFrame(t *testing.T) {
