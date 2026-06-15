@@ -76,7 +76,11 @@ type ScriptEffect struct {
 	ArtifactName     string
 	MediaType        string
 	Body             []byte
-	Subject          string
+	// Path is a runner-relative filename under TB_ARTIFACT_OUT; the runner
+	// reads it into Body before the effect leaves the process boundary, so an
+	// artifact carries EITHER an inline Body OR a Path, never a body on stdout.
+	Path    string
+	Subject string
 }
 
 type ScriptRun struct {
@@ -354,7 +358,9 @@ func (r *ScriptRuntime) allow(eff ScriptEffect) error {
 		}
 		return nil
 	case ArtifactEffect:
-		if eff.ArtifactName == "" || eff.ArtifactRevision == "" || eff.MediaType == "" || len(eff.Body) == 0 {
+		// An artifact is complete with EITHER an inline Body OR a Path the
+		// runner will resolve to bytes; require one, not both.
+		if eff.ArtifactName == "" || eff.ArtifactRevision == "" || eff.MediaType == "" || (len(eff.Body) == 0 && eff.Path == "") {
 			return fail(ProtocolFrameInvalid, "ScriptRuntime", "ApplyEffect", "artifact effect is incomplete", map[string]string{"artifactName": eff.ArtifactName})
 		}
 		if r.policy.ArtifactPrefix != "" && !strings.HasPrefix(eff.ArtifactName, r.policy.ArtifactPrefix) {

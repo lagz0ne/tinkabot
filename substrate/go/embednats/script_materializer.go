@@ -38,7 +38,12 @@ type KVMaterialStore struct {
 	artifactBucket string
 }
 
-type LocalScriptRunner struct{}
+// LocalScriptRunner spawns the script directly. Sandbox is opt-in: nil (the
+// zero value) runs unjailed (the wired app slot); non-nil wraps every run in
+// bubblewrap (bundles), binding the run's outDir as the only writable path.
+type LocalScriptRunner struct {
+	Sandbox *SandboxConfig
+}
 
 type ScriptLoop struct {
 	store interface {
@@ -285,16 +290,30 @@ func (s *KVMaterialStore) ClaimRun(acc core.AcceptedActivation, rec core.ScriptR
 	return true, nil
 }
 
-func (LocalScriptRunner) Run(inv core.ScriptInvocation) (core.ScriptRun, error) {
+func (r LocalScriptRunner) Run(inv core.ScriptInvocation) (core.ScriptRun, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(inv.Record.Process.TimeoutMs)*time.Millisecond)
 	defer cancel()
 
-	cmd := exec.CommandContext(ctx, inv.Record.Process.Command, inv.Record.Process.Args...)
+	// Per-run output dir for path-artifacts; removed after its files are read.
+	outDir, err := os.MkdirTemp("", "tb-artifact-out-")
+	if err != nil {
+		return core.ScriptRun{}, core.ProtocolErr("Run", "artifact output dir could not be created", err)
+	}
+	defer os.RemoveAll(outDir)
+
+	command, args := inv.Record.Process.Command, inv.Record.Process.Args
+	cmd := exec.CommandContext(ctx, command, args...)
 	cmd.Dir = inv.Record.Process.Cwd
+	if r.Sandbox != nil {
+		// bwrap --chdir owns the working dir, so the outer cmd.Dir stays empty.
+		command, args = sandboxCommand(*r.Sandbox, command, args, inv.Record.Process.Cwd, outDir)
+		cmd = exec.CommandContext(ctx, command, args...)
+	}
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
 	for k, v := range inv.Env {
 		cmd.Env = append(cmd.Env, k+"="+v)
 	}
+	cmd.Env = append(cmd.Env, "TB_ARTIFACT_OUT="+outDir)
 
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
@@ -326,7 +345,35 @@ func (LocalScriptRunner) Run(inv core.ScriptInvocation) (core.ScriptRun, error) 
 	if err != nil {
 		return core.ScriptRun{}, err
 	}
+	for i := range effects {
+		if err := resolveArtifactPath(outDir, &effects[i]); err != nil {
+			return core.ScriptRun{}, err
+		}
+	}
 	return core.ScriptRun{Status: "applied", Effects: effects}, nil
+}
+
+// resolveArtifactPath reads a path-artifact's file into its Body. Resolution
+// lives in the runner, not the materializer, because only the process boundary
+// knows the per-run output dir it handed the child via TB_ARTIFACT_OUT.
+func resolveArtifactPath(outDir string, eff *core.ScriptEffect) error {
+	if eff.Type != core.ArtifactEffect || eff.Path == "" {
+		return nil
+	}
+	// Confine the script-supplied path under the run's output dir: a cleaned
+	// relative join must still live inside outDir, so "../" cannot escape.
+	target := filepath.Join(outDir, filepath.Clean("/"+eff.Path))
+	prefix := outDir + string(os.PathSeparator)
+	if target != outDir && !strings.HasPrefix(target, prefix) {
+		return core.ProtocolErr("ReadFrame", "artifact path escapes output dir", nil)
+	}
+	body, err := os.ReadFile(target)
+	if err != nil {
+		return core.ProtocolErr("ReadFrame", "artifact path could not be read", err)
+	}
+	eff.Body = body
+	eff.Path = ""
+	return nil
 }
 
 func NewScriptLoop(store interface {
@@ -399,6 +446,7 @@ type frame struct {
 	ArtifactName     string          `json:"artifactName"`
 	MediaType        string          `json:"mediaType"`
 	Body             string          `json:"body"`
+	Path             string          `json:"path"`
 	Subject          string          `json:"subject"`
 }
 
@@ -432,6 +480,7 @@ func frames(out []byte) ([]core.ScriptEffect, error) {
 			ArtifactName:     f.ArtifactName,
 			MediaType:        f.MediaType,
 			Body:             []byte(f.Body),
+			Path:             f.Path,
 			Subject:          f.Subject,
 		})
 	}
@@ -454,7 +503,7 @@ func checkFrameShape(body []byte) error {
 			allowed[k] = true
 		}
 	case core.ArtifactEffect:
-		for _, k := range []string{"artifactName", "artifactRevision", "mediaType", "body"} {
+		for _, k := range []string{"artifactName", "artifactRevision", "mediaType", "body", "path"} {
 			allowed[k] = true
 		}
 	case core.PublishEffect:

@@ -15,6 +15,7 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"regexp"
 	"strconv"
@@ -273,7 +274,54 @@ type bundleDeps struct {
 // plane (memory storage, dead with the process), and the only crossing into
 // TB_APP is the service export/import per trigger. The account boundary —
 // not naming — is what keeps bundle and app state apart.
+// preflightSandbox resolves the bwrap binary (TB_BWRAP override, else PATH)
+// and proves it actually jails before any bundle entry is wired. Fail-closed:
+// a missing binary or a failed smoke run rejects the bundle rather than
+// letting it run unjailed.
+func preflightSandbox() (string, error) {
+	bin := os.Getenv("TB_BWRAP")
+	if bin == "" {
+		resolved, err := exec.LookPath("bwrap")
+		if err != nil {
+			return "", err
+		}
+		bin = resolved
+	}
+	smoke := exec.Command(bin, "--ro-bind", "/", "/", "--unshare-all", "true")
+	if err := smoke.Run(); err != nil {
+		return "", err
+	}
+	return bin, nil
+}
+
+// installDeps runs `bun install` at load — before the jail — so the sandboxed
+// runtime needs no network. Unsandboxed by design (it fetches); skipped
+// silently when the bundle declares no package.json.
+func installDeps(dir string) error {
+	if _, err := os.Stat(filepath.Join(dir, "package.json")); err != nil {
+		return nil
+	}
+	cmd := exec.Command("bun", "install")
+	cmd.Dir = dir
+	cmd.Env = os.Environ()
+	if out, err := cmd.CombinedOutput(); err != nil {
+		return rejectBundle("bundle dependency install failed", map[string]string{"dir": dir, "output": string(out)}, err)
+	}
+	return nil
+}
+
 func (a *App) startBundle(b *bundle, deps bundleDeps) error {
+	// Fail-closed: bundle processes only run jailed. If the host cannot
+	// sandbox, the bundle refuses to start.
+	bwrapBin, err := preflightSandbox()
+	if err != nil {
+		return rejectBundle("bundle sandbox unavailable", map[string]string{"dir": b.dir}, err)
+	}
+	sandbox := &embednats.SandboxConfig{BundleDir: b.dir, Bwrap: bwrapBin}
+	// Install deps before the jail; the sandboxed runtime gets no network.
+	if err := installDeps(b.dir); err != nil {
+		return err
+	}
 	acct := b.account()
 	if err := a.rt.MintAccount(acct); err != nil {
 		return rejectBundle("bundle account could not be minted", map[string]string{"account": acct}, err)
@@ -364,7 +412,7 @@ func (a *App) startBundle(b *bundle, deps bundleDeps) error {
 			return rejectBundle("bundle record could not be landed", map[string]string{"script": e.Name}, err)
 		}
 
-		rtm, err := core.NewScriptRuntime(core.ScriptPolicy{AllowedProjections: b.projections(e), ArtifactPrefix: b.artifactPrefix()}, embednats.LocalScriptRunner{})
+		rtm, err := core.NewScriptRuntime(core.ScriptPolicy{AllowedProjections: b.projections(e), ArtifactPrefix: b.artifactPrefix()}, embednats.LocalScriptRunner{Sandbox: sandbox})
 		if err != nil {
 			return rejectBundle("bundle script policy was denied", map[string]string{"script": e.Name}, err)
 		}
@@ -411,7 +459,7 @@ func (a *App) startBundle(b *bundle, deps bundleDeps) error {
 				return rejectBundle("bundle filter route could not be wired", map[string]string{"script": e.Name}, err)
 			}
 			a.routes = append(a.routes, route)
-			runs, stopLoop := embednats.NewFilterLoop(rec, rtm, mat, materials).Watch(results)
+			runs, stopLoop := embednats.NewFilterLoop(rec, rtm, mat, materials).WithSandbox(sandbox).Watch(results)
 			a.stopLoops = append(a.stopLoops, stopLoop)
 			go func() {
 				for range runs {
@@ -713,9 +761,22 @@ func (a *App) serveArtifact(rw http.ResponseWriter, r *http.Request) {
 	}
 	rw.Header().Set("Content-Type", ct)
 	rw.Header().Set("Content-Security-Policy", "sandbox allow-scripts")
-	rw.Header().Set("Cache-Control", "no-store")
+	// no-cache (not no-store) so the body is cacheable but always revalidated;
+	// the digest ETag lets a revalidation short-circuit to 304.
+	rw.Header().Set("Cache-Control", "no-cache")
 	rw.Header().Set("X-Content-Type-Options", "nosniff")
 	rw.Header().Set("Access-Control-Allow-Origin", "*")
+	// Content-addressed revalidation: the Object Store already digests every
+	// artifact body, so the digest is the strong validator. A revalidating GET
+	// that matches short-circuits to 304 with no body.
+	if art.Digest != "" {
+		etag := "\"" + art.Digest + "\""
+		rw.Header().Set("ETag", etag)
+		if r.Header.Get("If-None-Match") == etag {
+			rw.WriteHeader(http.StatusNotModified)
+			return
+		}
+	}
 	_, _ = rw.Write(body)
 }
 

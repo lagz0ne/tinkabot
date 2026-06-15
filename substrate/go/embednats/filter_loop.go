@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"os"
 	"os/exec"
 	"sync"
 	"sync/atomic"
@@ -15,20 +16,29 @@ import (
 )
 
 type FilterLoop struct {
-	rec    core.ScriptRecord
-	rtm    *core.ScriptRuntime
-	mat    *core.Materializer
-	status core.StatusSink
+	rec     core.ScriptRecord
+	rtm     *core.ScriptRuntime
+	mat     *core.Materializer
+	status  core.StatusSink
+	sandbox *SandboxConfig
 }
 
 type filterProc struct {
 	cmd    *exec.Cmd
 	stdin  io.WriteCloser
+	outDir string
 	closed chan struct{}
 }
 
 func NewFilterLoop(rec core.ScriptRecord, rtm *core.ScriptRuntime, mat *core.Materializer, status core.StatusSink) *FilterLoop {
 	return &FilterLoop{rec: rec, rtm: rtm, mat: mat, status: status}
+}
+
+// WithSandbox makes filter runs jailed (opt-in): nil leaves the loop unjailed
+// so NewFilterLoop callers stay unchanged; non-nil wraps the process in bwrap.
+func (l *FilterLoop) WithSandbox(cfg *SandboxConfig) *FilterLoop {
+	l.sandbox = cfg
+	return l
 }
 
 func (l *FilterLoop) Watch(in <-chan RouterResult) (<-chan ScriptRunResult, func()) {
@@ -66,6 +76,9 @@ func (l *FilterLoop) Watch(in <-chan RouterResult) (<-chan ScriptRunResult, func
 		}
 		_ = p.stdin.Close()
 		killGroup(p.cmd)
+		if p.outDir != "" {
+			_ = os.RemoveAll(p.outDir)
+		}
 	}
 	start := func() (*filterProc, error) {
 		if proc != nil {
@@ -145,28 +158,44 @@ func (l *FilterLoop) start(acc func() core.AcceptedActivation, emit func(ScriptR
 	if _, err := core.CheckProcess(l.rec.Process); err != nil {
 		return nil, err
 	}
-	cmd := exec.Command(l.rec.Process.Command, l.rec.Process.Args...)
+	// One per-spawn output dir for path-artifacts; removed when the long-lived
+	// filter process is stopped (stopProc), since the runner is what knows it.
+	outDir, err := os.MkdirTemp("", "tb-artifact-out-")
+	if err != nil {
+		return nil, core.ScriptRecordErr(core.ScriptProcessFailed, "Run", "filter artifact output dir failed", map[string]string{"scriptKey": l.rec.Key}, err)
+	}
+	command, args := l.rec.Process.Command, l.rec.Process.Args
+	cmd := exec.Command(command, args...)
 	cmd.Dir = l.rec.Process.Cwd
+	if l.sandbox != nil {
+		// bwrap --chdir owns the working dir, so the outer cmd.Dir stays empty.
+		command, args = sandboxCommand(*l.sandbox, command, args, l.rec.Process.Cwd, outDir)
+		cmd = exec.Command(command, args...)
+	}
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
+	cmd.Env = append(os.Environ(), "TB_ARTIFACT_OUT="+outDir)
 	stdin, err := cmd.StdinPipe()
 	if err != nil {
+		_ = os.RemoveAll(outDir)
 		return nil, core.ScriptRecordErr(core.ScriptProcessFailed, "Run", "filter stdin pipe failed", map[string]string{"scriptKey": l.rec.Key}, err)
 	}
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
 		_ = stdin.Close()
+		_ = os.RemoveAll(outDir)
 		return nil, core.ScriptRecordErr(core.ScriptProcessFailed, "Run", "filter stdout pipe failed", map[string]string{"scriptKey": l.rec.Key}, err)
 	}
 	if err := cmd.Start(); err != nil {
 		_ = stdin.Close()
+		_ = os.RemoveAll(outDir)
 		return nil, core.ScriptRecordErr(core.ScriptProcessFailed, "Run", "filter process could not start", map[string]string{"scriptKey": l.rec.Key}, err)
 	}
-	p := &filterProc{cmd: cmd, stdin: stdin, closed: make(chan struct{})}
+	p := &filterProc{cmd: cmd, stdin: stdin, outDir: outDir, closed: make(chan struct{})}
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
 		defer close(p.closed)
-		readErr := l.read(stdout, acc, emit, stopped)
+		readErr := l.read(stdout, outDir, acc, emit, stopped)
 		if readErr != nil && !stopped.Load() {
 			killGroup(cmd)
 		}
@@ -179,7 +208,7 @@ func (l *FilterLoop) start(acc func() core.AcceptedActivation, emit func(ScriptR
 	return p, nil
 }
 
-func (l *FilterLoop) read(stdout io.Reader, acc func() core.AcceptedActivation, emit func(ScriptRunResult) bool, stopped *atomic.Bool) error {
+func (l *FilterLoop) read(stdout io.Reader, outDir string, acc func() core.AcceptedActivation, emit func(ScriptRunResult) bool, stopped *atomic.Bool) error {
 	br := bufio.NewReader(stdout)
 	for {
 		body, err := streamFrame(br)
@@ -192,6 +221,10 @@ func (l *FilterLoop) read(stdout io.Reader, acc func() core.AcceptedActivation, 
 		}
 		eff, err := decodeEffect(body)
 		if err != nil {
+			emit(ScriptRunResult{Activation: acc().Activation, Record: acc().Record, Err: err})
+			continue
+		}
+		if err := resolveArtifactPath(outDir, &eff); err != nil {
 			emit(ScriptRunResult{Activation: acc().Activation, Record: acc().Record, Err: err})
 			continue
 		}
@@ -273,6 +306,7 @@ func decodeEffect(body []byte) (core.ScriptEffect, error) {
 		ArtifactName:     f.ArtifactName,
 		MediaType:        f.MediaType,
 		Body:             []byte(f.Body),
+		Path:             f.Path,
 		Subject:          f.Subject,
 	}, nil
 }

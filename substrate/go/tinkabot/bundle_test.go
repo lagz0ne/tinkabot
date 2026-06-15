@@ -240,6 +240,86 @@ func TestBundle(t *testing.T) {
 		waitAdvance(t, url, nsOf(t, pc), 10*time.Second)
 	})
 
+	// Bundle processes run jailed (bwrap): the bundle dir is read-only inside,
+	// so a script cannot write back into its own directory. Proves isolation
+	// without needing the network.
+	t.Run("SandboxBlocksHostWrite", func(t *testing.T) {
+		t.Parallel()
+		manifest := `{"kind":"bundle.manifest","name":"t","scripts":[{"name":"gen","file":"scripts/run.sh","command":"/bin/sh","projections":["probe"],"boot":true}]}`
+		script := "#!/bin/sh\n" +
+			"if echo x > ./escape-probe 2>/dev/null; then p=WROTE; else p=BLOCKED; fi\n" +
+			`b="{\"kind\":\"script.effect\",\"effectType\":\"projection\",\"projectionId\":\"bundle.t.probe\",\"snapshotRevision\":\"s1\",\"artifactRevision\":\"r1\",\"sequence\":1,\"value\":{\"probe\":\"$p\"}}"` + "\n" +
+			`printf 'Content-Length: %s\r\n\r\n%s' "${#b}" "$b"` + "\n"
+		cfg := cfgFor(t.TempDir())
+		cfg.BundleDir = writeBundleScript(t, manifest, script)
+		app, err := boot(t, cfg)
+		if err != nil {
+			t.Fatal(err)
+		}
+		_, body := waitFor200(t, app.Posture().Shell.URL+"/projections/bundle.t.probe", 15*time.Second)
+		if !strings.Contains(string(body), "BLOCKED") {
+			t.Fatalf("bundle script wrote to its host bundle dir — not sandboxed: %s", body)
+		}
+	})
+
+	// Served artifacts carry an ETag (the Object Store sha256 digest) and a
+	// matching If-None-Match revalidates to 304 — caching via the digest the
+	// store already computes, no content-hashed URLs needed.
+	t.Run("ArtifactETag", func(t *testing.T) {
+		t.Parallel()
+		manifest := `{"kind":"bundle.manifest","name":"t","scripts":[{"name":"gen","file":"scripts/run.sh","command":"/bin/sh","boot":true}]}`
+		script := "#!/bin/sh\n" +
+			`b="{\"kind\":\"script.effect\",\"effectType\":\"artifact\",\"artifactName\":\"bundle/t/x.txt\",\"artifactRevision\":\"r1\",\"mediaType\":\"text/plain\",\"body\":\"hello\"}"` + "\n" +
+			`printf 'Content-Length: %s\r\n\r\n%s' "${#b}" "$b"` + "\n"
+		cfg := cfgFor(t.TempDir())
+		cfg.BundleDir = writeBundleScript(t, manifest, script)
+		app, err := boot(t, cfg)
+		if err != nil {
+			t.Fatal(err)
+		}
+		url := app.Posture().Shell.URL + "/artifacts/bundle/t/x.txt"
+		hdr, _ := waitFor200(t, url, 15*time.Second)
+		etag := hdr.Get("ETag")
+		if etag == "" {
+			t.Fatal("artifact response carried no ETag")
+		}
+		req, _ := http.NewRequest("GET", url, nil)
+		req.Header.Set("If-None-Match", etag)
+		resp, err := http.DefaultClient.Do(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		resp.Body.Close()
+		if resp.StatusCode != http.StatusNotModified {
+			t.Fatalf("conditional GET got %d, want 304", resp.StatusCode)
+		}
+	})
+
+	// A script emits a large artifact by writing it to the run's output dir
+	// ($TB_ARTIFACT_OUT) and referencing it by path — the body never rides a
+	// stdout frame, so the 256 KiB frame ceiling does not bound artifact size.
+	t.Run("LargeArtifactByPath", func(t *testing.T) {
+		t.Parallel()
+		manifest := `{"kind":"bundle.manifest","name":"t","scripts":[{"name":"gen","file":"scripts/run.sh","command":"/bin/sh","boot":true}]}`
+		script := "#!/bin/sh\n" +
+			"head -c 300000 /dev/zero | tr '\\0' x > \"$TB_ARTIFACT_OUT/big.js\"\n" +
+			`b="{\"kind\":\"script.effect\",\"effectType\":\"artifact\",\"artifactName\":\"bundle/t/big.js\",\"artifactRevision\":\"r1\",\"mediaType\":\"application/javascript\",\"path\":\"big.js\"}"` + "\n" +
+			`printf 'Content-Length: %s\r\n\r\n%s' "${#b}" "$b"` + "\n"
+		cfg := cfgFor(t.TempDir())
+		cfg.BundleDir = writeBundleScript(t, manifest, script)
+		app, err := boot(t, cfg)
+		if err != nil {
+			t.Fatal(err)
+		}
+		hdr, body := waitFor200(t, app.Posture().Shell.URL+"/artifacts/bundle/t/big.js", 15*time.Second)
+		if len(body) != 300000 {
+			t.Fatalf("served %d bytes, want 300000 (large artifact by path)", len(body))
+		}
+		if !strings.Contains(hdr.Get("Content-Type"), "javascript") {
+			t.Fatalf("media type drift: %q", hdr.Get("Content-Type"))
+		}
+	})
+
 	// Chain-reaction: an entry with `watches` is a long-lived filter fed each
 	// watched-projection change on stdin (one JSON value per line), emitting
 	// framed effects through the same materializer gate into its own granted
@@ -496,4 +576,18 @@ func unixOf(t *testing.T, projection []byte) int64 {
 		t.Fatalf("projection is not the stored record: %v: %s", err, projection)
 	}
 	return p.Value.Unix
+}
+
+// TestBundleSandboxFailClosed: when the host cannot sandbox (bwrap missing),
+// a bundle refuses to start rather than running unjailed. TB_BWRAP overrides
+// the bwrap binary path; pointing it at a nonexistent file forces the
+// preflight to fail.
+// gate:serial — sets TB_BWRAP via t.Setenv, which forbids t.Parallel.
+func TestBundleSandboxFailClosed(t *testing.T) {
+	t.Setenv("TB_BWRAP", "/nonexistent/bwrap")
+	manifest := `{"kind":"bundle.manifest","name":"t","scripts":[{"name":"gen","file":"scripts/run.sh","command":"/bin/sh","boot":true}]}`
+	cfg := cfgFor(t.TempDir())
+	cfg.BundleDir = writeBundleScript(t, manifest, "#!/bin/sh\n")
+	_, err := boot(t, cfg)
+	assertKind(t, err, BundleRejected)
 }
