@@ -240,6 +240,27 @@ func TestBundle(t *testing.T) {
 		waitAdvance(t, url, nsOf(t, pc), 10*time.Second)
 	})
 
+	// Serve-side resolution: a page served under its bundle's artifact base
+	// fetches a projection relatively as `_p/<short>`; the server resolves
+	// /artifacts/bundle/<name>/_p/<short> to projection bundle.<name>.<short>.
+	t.Run("ScopedProjectionRoute", func(t *testing.T) {
+		t.Parallel()
+		manifest := `{"kind":"bundle.manifest","name":"t","scripts":[{"name":"gen","file":"scripts/run.sh","command":"/bin/sh","projections":["view"],"boot":true}]}`
+		script := "#!/bin/sh\n" +
+			`p="{\"kind\":\"script.effect\",\"effectType\":\"projection\",\"projectionId\":\"view\",\"snapshotRevision\":\"s1\",\"artifactRevision\":\"r1\",\"sequence\":1,\"value\":{\"hi\":1}}"` + "\n" +
+			`printf 'Content-Length: %s\r\n\r\n%s' "${#p}" "$p"` + "\n"
+		cfg := cfgFor(t.TempDir())
+		cfg.BundleDir = writeBundleScript(t, manifest, script)
+		app, err := boot(t, cfg)
+		if err != nil {
+			t.Fatal(err)
+		}
+		_, body := waitFor200(t, app.Posture().Shell.URL+"/artifacts/bundle/t/_p/view", 15*time.Second)
+		if !strings.Contains(string(body), `"hi":1`) {
+			t.Fatalf("scoped projection route did not resolve: %s", body)
+		}
+	})
+
 	// The bundle declares only its own hierarchy: a script emits a SHORT
 	// projection id ("view") and a RELATIVE artifact name ("page.html"), and
 	// the substrate resolves them to the derived global names at the gate.

@@ -42,12 +42,16 @@ nats kv del config_bucket bundle.clock.tick.every --creds /tmp/tb-clock/caller.c
   `tb.bundle.clock.tick`, script key `scripts.bundle.clock.tick`, projection
   ids under `bundle.clock.`, and artifacts under `bundle/clock/` — a
   manifest cannot even spell a collision with durable claims. `boot: true`
-  fires the entry once at startup.
+  fires the entry once at startup. The bundle uses LOCAL refs only: scripts
+  emit short projection ids (`state`, `view`), relative artifact names
+  (`index.html`), and the page fetches its projection relatively (`_p/view`);
+  the substrate resolves each to the derived global name (`bundle.clock.state`,
+  `bundle/clock/index.html`, `/artifacts/bundle/clock/_p/view`).
 - `scripts/tick.sh` — a plain process emitting length-framed JSON effects on
   stdout; it never sees NATS, credentials, or store handles. Writes raw state
-  to `bundle.clock.state`.
+  to the short id `state` (resolved to `bundle.clock.state`).
 - `scripts/present.sh` — a long-lived filter: the platform pipes one JSON line
-  per state change into its stdin, it derives `bundle.clock.view` and emits
-  a framed projection effect back on stdout. Chain-reaction: raw KV →
-  transform → derived KV → frontend. The page consumes only the view; it
-  never reads raw state directly.
+  per state change into its stdin, it derives the short `view` (resolved to
+  `bundle.clock.view`) and emits a framed projection effect back on stdout.
+  Chain-reaction: raw KV → transform → derived KV → frontend. The page
+  consumes only the view; it never reads raw state directly.

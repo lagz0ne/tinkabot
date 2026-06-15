@@ -43,10 +43,11 @@ Emit side (done): `ScriptPolicy.ProjectionPrefix`; the gate prefixes short
 projection ids and relative artifact names to the derived form
 (`bundle.<name>.<id>`, `bundle/<name>/<path>`) before the policy check and
 materialization, backward-compatible with already-full emits and a no-op for
-the wired slot (empty prefix). Serve side (pending a manifest-config
-decision): the frontend uses relative fetch paths and Vite a relative base
-(`./`); the server resolves them within the bundle's scope per a
-manifest-declared mapping, so the page hardcodes no derived name either.
+the wired slot (empty prefix). Serve side (done): the frontend uses relative
+fetch paths and Vite a relative base (`./`); the server resolves
+`/artifacts/bundle/<name>/_p/<short>` to projection `bundle.<name>.<short>`
+(fixed convention, user decision), so the page hardcodes no derived name
+either. examples/clock and examples/builder migrated to pure local refs.
 
 ### Slice C: content-addressed serving
 

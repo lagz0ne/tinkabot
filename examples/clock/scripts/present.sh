@@ -7,6 +7,6 @@ while IFS= read -r line; do
   unix=$(printf '%s' "$line" | sed -n 's/.*"unix":\([0-9]*\).*/\1/p')
   [ -z "$rendered" ] && continue
   [ -z "$unix" ] && continue
-  b="{\"kind\":\"script.effect\",\"effectType\":\"projection\",\"projectionId\":\"bundle.clock.view\",\"snapshotRevision\":\"snap-v-$unix\",\"artifactRevision\":\"clock.rev.1\",\"sequence\":$unix,\"value\":{\"display\":\"clock at $rendered\",\"tick\":$unix}}"
+  b="{\"kind\":\"script.effect\",\"effectType\":\"projection\",\"projectionId\":\"view\",\"snapshotRevision\":\"snap-v-$unix\",\"artifactRevision\":\"clock.rev.1\",\"sequence\":$unix,\"value\":{\"display\":\"clock at $rendered\",\"tick\":$unix}}"
   printf 'Content-Length: %s\r\n\r\n%s' "${#b}" "$b"
 done

@@ -742,6 +742,32 @@ func (a *App) serveArtifact(rw http.ResponseWriter, r *http.Request) {
 		http.NotFound(rw, r)
 		return
 	}
+	// Scoped projection route: a bundle page served under bundle/<bname>/ may
+	// fetch its own projection relatively as `_p/<short>`. Resolve
+	// bundle/<bname>/_p/<short> to the derived projection id
+	// bundle.<bname>.<short> and serve it as JSON like serveProjection — never
+	// falling through to an artifact lookup for `_p/` paths.
+	if parts := strings.Split(name, "/"); len(parts) == 4 && parts[0] == "bundle" && parts[2] == "_p" && parts[1] != "" && parts[3] != "" {
+		if a.bundleMaterials == nil {
+			http.NotFound(rw, r)
+			return
+		}
+		proj := "bundle." + parts[1] + "." + parts[3]
+		body, ok, err := a.bundleMaterials.LoadProjection(proj)
+		if err != nil {
+			http.Error(rw, "projection unavailable", http.StatusBadGateway)
+			return
+		}
+		if !ok {
+			http.NotFound(rw, r)
+			return
+		}
+		rw.Header().Set("Content-Type", "application/json")
+		rw.Header().Set("Cache-Control", "no-cache")
+		rw.Header().Set("Access-Control-Allow-Origin", "*")
+		_, _ = rw.Write(body)
+		return
+	}
 	store := a.materials
 	if a.bundleMaterials != nil && strings.HasPrefix(name, "bundle/") {
 		store = a.bundleMaterials

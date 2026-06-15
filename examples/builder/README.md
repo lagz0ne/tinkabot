@@ -48,10 +48,14 @@ http://127.0.0.1:8419/projections/bundle.builder.built.
   declared: entry `source` in bundle `builder` gets trigger
   `tb.bundle.builder.source`, projection ids under `bundle.builder.`, and
   artifacts under `bundle/builder/`. `boot: true` fires `source` once at
-  startup so the app exists immediately.
+  startup so the app exists immediately. The bundle uses LOCAL refs only:
+  scripts emit short projection ids (`src`, `built`) and relative artifact
+  names (Vite builds with `base: "./"`, so asset URLs need no bundle name);
+  the substrate resolves each to the derived global name (`bundle.builder.src`,
+  `bundle/builder/<relpath>`).
 - `scripts/source.sh` — a plain process emitting a length-framed JSON effect on
   stdout; it never sees NATS, credentials, or store handles. Writes the app
-  source map to `bundle.builder.src`.
+  source map to the short id `src` (resolved to `bundle.builder.src`).
 - `scripts/build.ts` — a long-lived filter run with `bun`: the platform pipes
   one JSON line per `src` change into its stdin, it runs a programmatic Vite
   build, emits one artifact frame per output file (stable names, so each

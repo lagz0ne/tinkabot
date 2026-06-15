@@ -97,7 +97,7 @@ async function processFeed(feedIndex: number, inputLine: string): Promise<void> 
   try {
     await build({
       root: realSrcDir,
-      base: "/artifacts/bundle/builder/",
+      base: "./",
       logLevel: "silent",
       build: {
         outDir,
@@ -129,7 +129,7 @@ async function processFeed(feedIndex: number, inputLine: string): Promise<void> 
   let emitted = 0;
   for (const { relPath, absPath } of outputFiles) {
     const content = readFileSync(absPath, "utf8");
-    const artifactName = `bundle/builder/${relPath.replace(/\\/g, "/")}`;
+    const artifactName = relPath.replace(/\\/g, "/");
     const mt = mediaType(relPath);
     const bodyBytes = Buffer.byteLength(content, "utf8");
     console.error(`[build] feed ${feedIndex}: artifact ${artifactName} (${mt}) ${bodyBytes} bytes`);
@@ -149,7 +149,7 @@ async function processFeed(feedIndex: number, inputLine: string): Promise<void> 
   emitFrame({
     kind: "script.effect",
     effectType: "projection",
-    projectionId: "bundle.builder.built",
+    projectionId: "built",
     snapshotRevision: `snap-b-${Date.now()}`,
     artifactRevision: `app.rev.${feedIndex}`,
     sequence: Date.now(),
