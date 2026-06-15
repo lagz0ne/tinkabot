@@ -23,3 +23,8 @@ __pycache__/
 .env.*
 !.env.example
 .DS_Store
+
+# Materialized skill installs — reconstructed from skills-lock.json (the
+# committed lockfile) via the skills CLI, like node_modules from a lockfile.
+.agents/
+.claude/skills/
