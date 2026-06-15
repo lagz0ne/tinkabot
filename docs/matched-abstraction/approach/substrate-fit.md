@@ -34,6 +34,13 @@ isolated, and served artifacts must cache cheaply.
 4. **Isolation is fail-closed.** A bundle process that cannot be sandboxed
    does not run. Build steps that need the network run before the jail is
    sealed; the sandboxed runtime has no network.
+5. **Reference resolution is the substrate's.** Lower layers declare local
+   intent — short projection ids, relative artifact names, relative frontend
+   fetch paths — and the substrate resolves them to the derived global
+   namespace at its boundaries: the gate on emit, the scoped server on
+   serve. A layer never re-derives or hardcodes a name the substrate already
+   controls. (The symmetric completion of derive-by-construction: we derive
+   authority from intent, and we hand the resolved reference back.)
 
 ## Non-Goals
 

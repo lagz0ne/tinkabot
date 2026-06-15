@@ -240,6 +240,29 @@ func TestBundle(t *testing.T) {
 		waitAdvance(t, url, nsOf(t, pc), 10*time.Second)
 	})
 
+	// The bundle declares only its own hierarchy: a script emits a SHORT
+	// projection id ("view") and a RELATIVE artifact name ("page.html"), and
+	// the substrate resolves them to the derived global names at the gate.
+	t.Run("RelativeRefsResolved", func(t *testing.T) {
+		t.Parallel()
+		manifest := `{"kind":"bundle.manifest","name":"t","scripts":[{"name":"gen","file":"scripts/run.sh","command":"/bin/sh","projections":["view"],"boot":true}]}`
+		script := "#!/bin/sh\n" +
+			`p="{\"kind\":\"script.effect\",\"effectType\":\"projection\",\"projectionId\":\"view\",\"snapshotRevision\":\"s1\",\"artifactRevision\":\"r1\",\"sequence\":1,\"value\":{\"ok\":1}}"` + "\n" +
+			`a="{\"kind\":\"script.effect\",\"effectType\":\"artifact\",\"artifactName\":\"page.html\",\"artifactRevision\":\"r1\",\"mediaType\":\"text/html\",\"body\":\"<h1>hi</h1>\"}"` + "\n" +
+			`printf 'Content-Length: %s\r\n\r\n%s' "${#p}" "$p"` + "\n" +
+			`printf 'Content-Length: %s\r\n\r\n%s' "${#a}" "$a"` + "\n"
+		cfg := cfgFor(t.TempDir())
+		cfg.BundleDir = writeBundleScript(t, manifest, script)
+		app, err := boot(t, cfg)
+		if err != nil {
+			t.Fatal(err)
+		}
+		shell := app.Posture().Shell.URL
+		// short "view" resolved to bundle.t.view; relative "page.html" resolved under bundle/t/
+		waitFor200(t, shell+"/projections/bundle.t.view", 15*time.Second)
+		waitFor200(t, shell+"/artifacts/bundle/t/page.html", 15*time.Second)
+	})
+
 	// Bundle processes run jailed (bwrap): the bundle dir is read-only inside,
 	// so a script cannot write back into its own directory. Proves isolation
 	// without needing the network.

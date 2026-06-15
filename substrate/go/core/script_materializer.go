@@ -56,6 +56,7 @@ type ScriptRecord struct {
 
 type ScriptPolicy struct {
 	AllowedProjections []string
+	ProjectionPrefix   string
 	ArtifactPrefix     string
 	Env                map[string]string
 }
@@ -317,8 +318,8 @@ func (r *ScriptRuntime) Run(acc AcceptedActivation, rec ScriptRecord) (ScriptRun
 	if run.Status == "" {
 		run.Status = "applied"
 	}
-	for _, eff := range run.Effects {
-		if err := r.Allow(eff); err != nil {
+	for i := range run.Effects {
+		if err := r.Allow(&run.Effects[i]); err != nil {
 			return ScriptRun{}, err
 		}
 	}
@@ -340,8 +341,29 @@ func (r *ScriptRuntime) env(act Activation, rec ScriptRecord) map[string]string 
 	return env
 }
 
-func (r *ScriptRuntime) Allow(eff ScriptEffect) error {
-	return r.allow(eff)
+// Allow resolves an effect's short/relative refs to the bundle's derived
+// global names, then checks it against the policy. It mutates eff in place so
+// the effect that gets materialized carries the resolved names. Both apply
+// paths (ScriptRuntime.Run and the filter loop) call it before materializing.
+func (r *ScriptRuntime) Allow(eff *ScriptEffect) error {
+	r.resolve(eff)
+	return r.allow(*eff)
+}
+
+// resolve prefixes a short projection id or relative artifact name to its
+// derived form. The already-prefixed guard is backward compat: a script that
+// emits the full derived name keeps working untouched.
+func (r *ScriptRuntime) resolve(eff *ScriptEffect) {
+	switch eff.Type {
+	case ProjectionEffect:
+		if !strings.HasPrefix(eff.ProjectionID, r.policy.ProjectionPrefix) {
+			eff.ProjectionID = r.policy.ProjectionPrefix + eff.ProjectionID
+		}
+	case ArtifactEffect:
+		if r.policy.ArtifactPrefix != "" && !strings.HasPrefix(eff.ArtifactName, r.policy.ArtifactPrefix) {
+			eff.ArtifactName = r.policy.ArtifactPrefix + eff.ArtifactName
+		}
+	}
 }
 
 func (r *ScriptRuntime) allow(eff ScriptEffect) error {

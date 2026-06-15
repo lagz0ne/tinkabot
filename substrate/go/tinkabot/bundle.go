@@ -412,7 +412,7 @@ func (a *App) startBundle(b *bundle, deps bundleDeps) error {
 			return rejectBundle("bundle record could not be landed", map[string]string{"script": e.Name}, err)
 		}
 
-		rtm, err := core.NewScriptRuntime(core.ScriptPolicy{AllowedProjections: b.projections(e), ArtifactPrefix: b.artifactPrefix()}, embednats.LocalScriptRunner{Sandbox: sandbox})
+		rtm, err := core.NewScriptRuntime(core.ScriptPolicy{AllowedProjections: b.projections(e), ProjectionPrefix: "bundle." + b.manifest.Name + ".", ArtifactPrefix: b.artifactPrefix()}, embednats.LocalScriptRunner{Sandbox: sandbox})
 		if err != nil {
 			return rejectBundle("bundle script policy was denied", map[string]string{"script": e.Name}, err)
 		}

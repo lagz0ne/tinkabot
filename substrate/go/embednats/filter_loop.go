@@ -230,7 +230,9 @@ func (l *FilterLoop) read(stdout io.Reader, outDir string, acc func() core.Accep
 		}
 		cur := acc()
 		run := core.ScriptRun{ActivationID: cur.Activation.ActivationID, Status: "applied", Effects: []core.ScriptEffect{eff}}
-		if err := l.rtm.Allow(eff); err != nil {
+		// Allow resolves short/relative refs in place, so run.Effects carries the
+		// derived names into Apply below.
+		if err := l.rtm.Allow(&run.Effects[0]); err != nil {
 			emit(ScriptRunResult{Activation: cur.Activation, Record: cur.Record, Run: run, Err: err})
 			continue
 		}
