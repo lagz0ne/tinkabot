@@ -302,12 +302,13 @@ func preflightSandbox() (string, error) {
 // and the user's $HOME so a lifecycle script can neither read secrets nor write
 // outside the bundle.
 //
-// --ignore-scripts is bun-specific: it skips the BUNDLE's OWN package.json
-// lifecycle scripts (the arbitrary-code hole) while STILL running trusted
-// DEPENDENCY scripts — esbuild's postinstall fetches its binary and vite's deps
-// install unchanged (verified empirically against bun 1.3). It is not the npm
-// all-or-nothing flag, so it does not break the builder. The jail is kept as
-// defense-in-depth for the dependency scripts that do still run.
+// --ignore-scripts skips ALL package lifecycle scripts (both the bundle's own
+// and dependencies'), which is the arbitrary-code-at-install hole closed. It
+// does NOT break the builder: vite/esbuild ship their native binaries as
+// per-platform optionalDependency packages (e.g. @esbuild/linux-x64), which
+// need no postinstall — verified against bun 1.3 (esbuild --version works
+// after --ignore-scripts). The jail is defense-in-depth: even the dependency
+// resolution/download bun does runs with secrets masked and writes confined.
 //
 // Layout: --ro-bind / / for the toolchain, then the bundle dir bound READ-WRITE
 // (node_modules lands there), --tmpfs over $HOME and the store dir (secrets

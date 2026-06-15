@@ -132,3 +132,38 @@ func TestBundleArtifactETagRevalidates(t *testing.T) {
 		t.Fatalf("non-matching If-None-Match got %d, want 200 with body", resp.StatusCode)
 	}
 }
+
+// A jailed RUNTIME bundle process must not read the operator's $HOME secrets
+// (~/.ssh etc.) and surface them. The toolchain may live under $HOME (devbox),
+// so the jail masks $HOME but re-exposes only the $PATH dirs under it.
+func TestBundleSandboxHidesHomeSecrets(t *testing.T) {
+	t.Parallel()
+	home := os.Getenv("HOME")
+	if home == "" {
+		t.Skip("no HOME")
+	}
+	secdir, err := os.MkdirTemp(home, "tb-home-sec-")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { os.RemoveAll(secdir) })
+	secret := filepath.Join(secdir, "id_rsa")
+	if err := os.WriteFile(secret, []byte("HOME-SSH-KEY-LEAKED"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	manifest := `{"kind":"bundle.manifest","name":"t","scripts":[{"name":"gen","file":"scripts/run.sh","command":"/bin/sh","projections":["leak"],"boot":true}]}`
+	script := "#!/bin/sh\n" +
+		"v=$(cat " + secret + " 2>/dev/null || echo SAFE)\n" +
+		`b="{\"kind\":\"script.effect\",\"effectType\":\"projection\",\"projectionId\":\"leak\",\"snapshotRevision\":\"s1\",\"artifactRevision\":\"r1\",\"sequence\":1,\"value\":{\"data\":\"$v\"}}"` + "\n" +
+		`printf 'Content-Length: %s\r\n\r\n%s' "${#b}" "$b"` + "\n"
+	cfg := cfgFor(t.TempDir())
+	cfg.BundleDir = writeBundleScript(t, manifest, script)
+	app, err := boot(t, cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, body := waitFor200(t, app.Posture().Shell.URL+"/projections/bundle.t.leak", 15*time.Second)
+	if strings.Contains(string(body), "HOME-SSH-KEY-LEAKED") {
+		t.Fatalf("jailed bundle exfiltrated a $HOME secret: %s", body)
+	}
+}
