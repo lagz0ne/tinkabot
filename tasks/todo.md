@@ -4,8 +4,8 @@
 
 - Repo: `lagz0ne/tinkabot`, private, branch `main`.
 - Remote: `origin git@github.com:lagz0ne/tinkabot.git`.
-- Last completed feature commit: `bb30c70 feat: add quality-v1 program plan`, pushed to `origin/main`.
-- Worktree status at closeout start: clean after `f93b705`.
+- Last completed docs commit: `ce92aa5 docs: add product-success approach — demanding product contract`, pushed to `origin/main`.
+- Worktree status at resume: product-success review follow-up edits are uncommitted; untracked `.agents/skills/matched-abstraction/` is present and matches tracked `.claude/skills/matched-abstraction/`.
 - Root role: orchestration only.
 - Current implementation lives in `packages/sdk` and `substrate/go`.
 - Active/future lanes:
@@ -15,9 +15,11 @@
 
 ## Active Goal
 
-Implement `docs/matched-abstraction/approach/product-success.md` — the product-first success contract that defines what Tinkabot must achieve with real operators running real automation against real systems. The file is now authored and validates cleanly (`bun run validate:layers`). The active implementation question is: which existing v1 behaviors already clear bars in this contract, and which gaps remain between the current platform state and the minimum product bar defined here.
+Implement `docs/matched-abstraction/approach/product-success.md` — the product-first success contract that defines what Tinkabot must achieve with real operators running real automation against real systems. The file is authored, committed, pushed, and review follow-up edits are in the worktree. Current follow-up result: the product bar stays demanding while aligning with sealed technical decisions (bundle authority is derived-by-construction, bundle state is process-ephemeral today, and embedded NATS is the default managed substrate).
 
 ## Active Session
+
+Product success review follow-up — DONE (2026-06-16). Review of `ce92aa5` found three product-contract/handoff issues: the denial-proof bar asked for a bundle subject-collision case that bundle-v1 makes unrepresentable; generated-app durability/update language conflicted with the process-ephemeral bundle plane; and the friction budget overstated NATS installation even though the binary manages embedded NATS by default. Follow-up edits preserve the sealed technical decisions and reframe unmet items as product gaps or explicit product-claim limitations, not retroactive implementation claims. Verified: `bun run validate:layers`, `git diff --check -- docs/matched-abstraction/approach/product-success.md tasks/todo.md`. Untracked duplicate skill dir `.agents/skills/matched-abstraction/` remains untouched.
 
 Product success reinforcement — DONE (2026-06-15). User asked to use subagents to reinforce the product-first success contract and make it even better. Ran triage-three-style subagent review across market/adoption severity, operator trust/retention, and buyer value/category sharpness, with Challenger and Arbiter passes to reject bloat. Strengthened `docs/matched-abstraction/approach/product-success.md`: P0 wedge = governed runtime for generated automation that needs real authority; primary enemy = raw scripts/local agents with shared credentials; added beachhead ICP/non-ICP, canonical paid jobs, first paid-worthy win, trust decision-quality bar, real-risk denial proof, policy/authority authoring, recovery/reconciliation honesty, split generated-app vs steerable-session success, behavioral pull metrics, validation protocol, friction budgets, buyer-readable proof, paid-pilot minimum, and scale-expansion bar. Updated diagram: https://diashort.apps.quickable.co/d/537a1569. Verified: `bun run validate:layers`, `git diff --check -- docs/matched-abstraction/approach/product-success.md tasks/todo.md`.
 

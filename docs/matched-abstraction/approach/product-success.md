@@ -49,15 +49,17 @@ This Approach covers the product success contract for Tinkabot v1 and the immedi
 
 This Approach does not define architecture, substrate design, auth vocabulary, or protocol shape. It does not define which features ship in which slice. It defines the bars those slices must collectively clear before Tinkabot can claim to be a product.
 
+Where this document names behavior the current technical Approaches deliberately do not provide yet, the behavior is a product gap, not a retroactive implementation claim. A later Plan may close the gap, or may narrow the public product claim so that the unmet bar is not promised to operators.
+
 ## Minimum Product Bar
 
 The v1 binary must do all of the following before any success claim is made:
 
-- A script runs inside a bwrap jail with an explicit permission set. The operator can read that permission set and understand what it allows.
-- The script's effects (projections, artifacts) materialize durably in NATS-backed storage and are observable through the `nats` CLI.
+- Product automation that can touch real systems runs inside a bwrap jail with an explicit permission set. The operator can read that permission set and understand what it allows.
+- Non-ephemeral app-plane effects (projections, artifacts) materialize durably in NATS-backed storage and are observable through the `nats` CLI. A bundle plane that remains process-ephemeral is acceptable as a technical/demo posture, but it does not satisfy generated-app product success unless that limitation is explicit in the product claim.
 - Every activation carries traceable provenance: what triggered it, what credential ran it, what it produced or failed to produce.
 - The operator can deny the script's effects at the materializer gate. Denial is logged with the same provenance as acceptance.
-- A bundle (directory of scripts plus a manifest) loads at startup, runs according to its declared manifest, and refuses to start if the manifest is invalid. The operator can inspect the entire authority surface of the bundle from the manifest alone.
+- A bundle (directory of scripts plus a manifest) loads at startup, runs according to its manifest, and refuses to start if the manifest is invalid. The operator can inspect the entire authority surface from the manifest plus the documented derivation rules; no free-form subject or storage authority is hidden in source code.
 - The trusted browser shell renders a bundle's artifacts in a sandboxed iframe. The iframe cannot reach the NATS substrate.
 - A running agent session can be observed by a browser viewer with a leaf-scoped credential. The viewer cannot publish to the session's steering subject without going through command acceptance.
 - The operator can restart the binary and the durable state survives. A session that was running reconciles to a terminal record rather than disappearing silently.
@@ -99,12 +101,12 @@ If any of these five questions requires reading source code, opening a debugger,
 The platform's value proposition rests entirely on its ability to deny an overreaching script at runtime, not retroactively. The proof that denial works must include:
 
 - A script that requests a permission beyond its manifest: the materializer rejects the effect and the denial is logged.
-- A bundle that declares a subject collision with a durable claim: the binary refuses to start and the rejection names the colliding claim.
+- A bundle manifest that tries to declare forbidden free-form authority, duplicate local authority, or invalid namespace material: the binary refuses to start and the rejection names the manifest problem. Bundle authority is derived by construction, so subject collision must be unrepresentable rather than merely detected after declaration.
 - A credential whose lease has expired: the credential's next use is denied and the denial is attributed to the lease, not to a generic error.
 - A script that attempts to write an artifact outside its declared prefix: the write is blocked at the sandbox boundary, not by the script's own cooperation.
 - A session viewer who attempts to steer without a current capability lease: the steer is rejected by the runner, not by the trusted shell alone.
 
-Every one of these must work against a real NATS server with real embedded bwrap jails before the denial posture can be claimed to potential customers.
+Every one of these must work against the real managed NATS runtime and, for process-boundary cases, real bwrap jails before the denial posture can be claimed to potential customers.
 
 ## What Must Feel Excellent
 
@@ -122,7 +124,7 @@ If a 30-day operator cannot make all five statements, the product is not excelle
 
 These are two distinct success shapes that must not be conflated:
 
-**Generated-app success**: an operator ships a bundle whose frontend renders live materialized state and accepts typed commands through the Tinkabot shell. Success means the bundle runs reliably, the permission surface is readable, and the operator can update the bundle without downtime or data loss. The operator never needs to know what NATS subjects the bundle uses internally.
+**Generated-app success**: an operator ships a bundle whose frontend renders live materialized state and accepts typed commands through the Tinkabot shell. Success means the bundle runs reliably, the permission surface is readable, and the operator understands the declared update and persistence posture before relying on it. If the current bundle plane remains process-ephemeral, that is a product limitation to name, not a durability claim. The operator never needs to know what NATS subjects the bundle uses internally.
 
 **Steerable-session success**: an operator runs a long-lived agent session and a human observer can read the agent's output and steer it mid-run with attributed, revocable authority. Success means the session survives substrate restarts, the observer's credential is leaf-scoped and short-lived, and the human-in-the-loop decision is recorded with the same provenance as any other activation.
 
@@ -197,7 +199,7 @@ These outcomes are product failures regardless of technical quality:
 
 The following friction is acceptable at v1 and must not be used to rationalize product failures:
 
-- Operators must install and operate a NATS server. (Acceptable: this is the target audience.)
+- Operators must be comfortable operating through NATS concepts and the `nats` CLI. (Acceptable: this is the target audience; the default binary still manages embedded NATS itself.)
 - Operators must write a manifest. (Acceptable: manifest authoring is the product's policy surface.)
 - Operators must restart the binary to change a manifest. (Acceptable at v1: hot-reload is deferred.)
 - The browser shell is a localhost tool; external exposure requires TLS and a reverse proxy. (Acceptable: external exposure is deferred.)
