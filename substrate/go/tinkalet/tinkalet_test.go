@@ -175,6 +175,17 @@ func TestReactionCommandDenials(t *testing.T) {
 	assertCmd(t, code, out, errOut, 1, "", "reaction approve denied add: profile-not-found\n")
 }
 
+func TestScheduleCommandDenials(t *testing.T) {
+	t.Parallel()
+	env := newEnv(t)
+
+	code, out, errOut := runCmd(t, env.vars, "schedule", "set", "deploytick", "--every", "nope", "--write", "deploy/1/tick")
+	assertCmd(t, code, out, errOut, 1, "", "schedule deploytick denied set: malformed-duration\n")
+
+	code, out, errOut = runCmd(t, env.vars, "schedule", "set", "deploytick", "--every", "1s", "--write", "deploy/1/tick")
+	assertCmd(t, code, out, errOut, 1, "", "schedule deploytick denied set: profile-not-found\n")
+}
+
 func TestTriggerProfileOverrideDoesNotChangeDefault(t *testing.T) {
 	t.Parallel()
 	env := newEnv(t)

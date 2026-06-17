@@ -22,8 +22,9 @@ TINKALET_DATA_DIR=/tmp/tinkalet-data \
   ./tinkalet trigger bundle.clock.tick
 ```
 
-The packaged NATS CLI sidecar is still available for diagnostics and schedule
-settings:
+Use `tinkalet schedule set <name> --every <duration> --write <item-key>` for
+product item schedules. The packaged NATS CLI sidecar is still available for
+diagnostics and bundle-specific config settings:
 
 ```bash
 NATS=./libexec/tinkabot/nats # release package root

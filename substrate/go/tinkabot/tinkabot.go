@@ -98,6 +98,7 @@ type Wiring struct {
 	MaterialBucket string
 	ArtifactBucket string
 	ItemBucket     string
+	ScheduleBucket string
 	ScriptKey      string
 	ScriptRevision int
 }
@@ -147,6 +148,7 @@ func wiring() Wiring {
 		MaterialBucket: "tb_material",
 		ArtifactBucket: "tb_artifacts",
 		ItemBucket:     "tb_items",
+		ScheduleBucket: "tb_schedules",
 		ScriptKey:      "scripts.app.main",
 		ScriptRevision: 1,
 	}
@@ -276,6 +278,10 @@ func Start(cfg Config) (*App, error) {
 	if err != nil {
 		return nil, fail(StartupMaterializationFailed, "Start", "materializer creds could not be minted", nil, err)
 	}
+	scheduleUC, err := rt.MintUser(embednats.AppAccount, principal("principal.runtime.scheduler", "lease-scheduler-"+nonce, schedulePerms(w)), servingTTL)
+	if err != nil {
+		return nil, fail(StartupMaterializationFailed, "Start", "scheduler creds could not be minted", nil, err)
+	}
 	dial := func(uc embednats.UserCreds, use string) (*nats.Conn, error) {
 		nc, err := rt.ConnectCreds(ctx, uc.File)
 		if err != nil {
@@ -300,6 +306,10 @@ func Start(cfg Config) (*App, error) {
 	if err != nil {
 		return nil, err
 	}
+	scheduleNC, err := dial(scheduleUC, "schedule store")
+	if err != nil {
+		return nil, err
+	}
 
 	if err := materialize(ctx, rt, svcUC, w); err != nil {
 		return nil, err
@@ -317,6 +327,9 @@ func Start(cfg Config) (*App, error) {
 		return nil, fail(StartupMaterializationFailed, "Start", "material store could not be materialized", nil, err)
 	}
 	app.materials = materialStore
+	if err := app.startSchedules(scheduleNC, w); err != nil {
+		return nil, err
+	}
 
 	cap := app.creds[RoleCaller].Lease
 	router, err := embednats.NewSourceRouter(sourceAuthority(w, cap), core.NewDurableLedger(ledgerStore))
@@ -515,6 +528,185 @@ func materialize(ctx context.Context, rt *embednats.Runtime, svc embednats.UserC
 	return nil
 }
 
+const (
+	scheduleKind = "tinkabot.schedule.v1"
+	itemKind     = "tinkabot.item.v1"
+)
+
+type scheduleRec struct {
+	Kind       string          `json:"kind"`
+	Name       string          `json:"name"`
+	Status     string          `json:"status"`
+	EveryMs    int64           `json:"everyMs"`
+	WriteItem  string          `json:"writeItem"`
+	Value      json.RawMessage `json:"value"`
+	Sequence   int             `json:"sequence"`
+	LastTickAt string          `json:"lastTickAt,omitempty"`
+	UpdatedAt  string          `json:"updatedAt"`
+	Provenance itemProv        `json:"provenance"`
+}
+
+type itemRec struct {
+	Kind       string          `json:"kind"`
+	Key        string          `json:"key"`
+	Status     string          `json:"status"`
+	Value      json.RawMessage `json:"value"`
+	CreatedAt  string          `json:"createdAt"`
+	UpdatedAt  string          `json:"updatedAt"`
+	Provenance itemProv        `json:"provenance"`
+}
+
+type itemProv struct {
+	Profile string `json:"profile"`
+	Source  string `json:"source"`
+	Writer  string `json:"writer"`
+}
+
+type tickValue struct {
+	Schedule    string          `json:"schedule"`
+	Sequence    int             `json:"sequence"`
+	ScheduledAt string          `json:"scheduledAt"`
+	Value       json.RawMessage `json:"value"`
+}
+
+func (a *App) startSchedules(nc *nats.Conn, w Wiring) error {
+	js, err := nc.JetStream()
+	if err != nil {
+		return fail(StartupMaterializationFailed, "Start", "schedule JetStream context is unavailable", nil, err)
+	}
+	schedules, err := js.KeyValue(w.ScheduleBucket)
+	if err != nil {
+		if !errors.Is(err, nats.ErrStreamNotFound) && !errors.Is(err, nats.ErrBucketNotFound) {
+			return fail(StartupMaterializationFailed, "Start", "schedule bucket could not be opened", map[string]string{"bucket": w.ScheduleBucket}, err)
+		}
+		schedules, err = js.CreateKeyValue(&nats.KeyValueConfig{Bucket: w.ScheduleBucket, Storage: nats.FileStorage})
+		if err != nil {
+			return fail(StartupMaterializationFailed, "Start", "schedule bucket could not be materialized", map[string]string{"bucket": w.ScheduleBucket}, err)
+		}
+	}
+	items, err := js.KeyValue(w.ItemBucket)
+	if err != nil {
+		return fail(StartupMaterializationFailed, "Start", "item bucket could not be opened for schedules", map[string]string{"bucket": w.ItemBucket}, err)
+	}
+	stop := make(chan struct{})
+	done := make(chan struct{})
+	appStop := func() {
+		close(stop)
+		<-done
+	}
+	a.stopLoops = append(a.stopLoops, appStop)
+	go func() {
+		defer close(done)
+		tickSchedules(schedules, items)
+		ticker := time.NewTicker(minEvery)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-stop:
+				return
+			case <-ticker.C:
+				tickSchedules(schedules, items)
+			}
+		}
+	}()
+	return nil
+}
+
+func tickSchedules(schedules, items nats.KeyValue) {
+	keys, err := schedules.Keys()
+	if errors.Is(err, nats.ErrNoKeysFound) {
+		return
+	}
+	if err != nil {
+		return
+	}
+	now := time.Now().UTC()
+	for _, key := range keys {
+		_ = tickSchedule(schedules, items, key, now)
+	}
+}
+
+func tickSchedule(schedules, items nats.KeyValue, key string, now time.Time) error {
+	entry, err := schedules.Get(key)
+	if err != nil {
+		return err
+	}
+	var rec scheduleRec
+	if err := json.Unmarshal(entry.Value(), &rec); err != nil || rec.Kind != scheduleKind || rec.Name != key || rec.Status != "active" {
+		return nil
+	}
+	every := time.Duration(rec.EveryMs) * time.Millisecond
+	if every < minEvery || rec.WriteItem == "" || !scheduleDue(rec, every, now) {
+		return nil
+	}
+	rec.Sequence++
+	at := now.Format(time.RFC3339Nano)
+	rec.LastTickAt = at
+	rec.UpdatedAt = at
+	rec.Provenance.Writer = "tinkabot-schedule"
+	body, err := json.Marshal(rec)
+	if err != nil {
+		return err
+	}
+	if _, err := schedules.Update(key, body, entry.Revision()); err != nil {
+		return err
+	}
+	return writeScheduledItem(items, rec, at)
+}
+
+func scheduleDue(rec scheduleRec, every time.Duration, now time.Time) bool {
+	if rec.LastTickAt == "" {
+		return true
+	}
+	last, err := time.Parse(time.RFC3339Nano, rec.LastTickAt)
+	if err != nil {
+		return false
+	}
+	return !last.Add(every).After(now)
+}
+
+func writeScheduledItem(items nats.KeyValue, rec scheduleRec, at string) error {
+	val, err := json.Marshal(tickValue{Schedule: rec.Name, Sequence: rec.Sequence, ScheduledAt: at, Value: rec.Value})
+	if err != nil {
+		return err
+	}
+	item := itemRec{
+		Kind:      itemKind,
+		Key:       rec.WriteItem,
+		Status:    "resolved",
+		Value:     val,
+		CreatedAt: at,
+		UpdatedAt: at,
+		Provenance: itemProv{
+			Profile: "tinkabot",
+			Source:  "server-schedule:" + rec.Name,
+			Writer:  "tinkabot-schedule",
+		},
+	}
+	entry, err := items.Get(rec.WriteItem)
+	if err == nil {
+		var prev itemRec
+		if json.Unmarshal(entry.Value(), &prev) == nil && prev.Kind == itemKind && prev.CreatedAt != "" {
+			item.CreatedAt = prev.CreatedAt
+		}
+		body, err := json.Marshal(item)
+		if err != nil {
+			return err
+		}
+		_, err = items.Update(rec.WriteItem, body, entry.Revision())
+		return err
+	}
+	if !errors.Is(err, nats.ErrKeyNotFound) {
+		return err
+	}
+	body, err := json.Marshal(item)
+	if err != nil {
+		return err
+	}
+	_, err = items.Create(rec.WriteItem, body)
+	return err
+}
+
 func writeLocalProfile(store string, p Posture) error {
 	abs, err := filepath.Abs(store)
 	if err != nil {
@@ -595,8 +787,9 @@ func principal(user, lease string, perms core.Permissions) core.Auth {
 // writes script records. Deny wins; tb.internal.> stays out of caller reach.
 func rolePerms(w Wiring) map[string]core.Permissions {
 	inbox := core.PermList{Allow: []string{"_INBOX.>"}}
-	caller := append([]string{"$JS.API.INFO", w.TriggerSubject, w.EventsSubject, "$KV." + w.ConfigBucket + ".>", "$KV." + w.ItemBucket + ".>", "$O." + w.UploadBucket + ".>"}, readKV(w.ConfigBucket)...)
+	caller := append([]string{"$JS.API.INFO", w.TriggerSubject, w.EventsSubject, "$KV." + w.ConfigBucket + ".>", "$KV." + w.ItemBucket + ".>", "$KV." + w.ScheduleBucket + ".>", "$O." + w.UploadBucket + ".>"}, readKV(w.ConfigBucket)...)
 	caller = append(caller, readKV(w.ItemBucket)...)
+	caller = append(caller, readKV(w.ScheduleBucket)...)
 	caller = append(caller, readObj(w.UploadBucket)...)
 	observer := append([]string{"$JS.API.INFO", "_INBOX.>"}, readKV(w.MaterialBucket)...)
 	observer = append(observer, readObj(w.ArtifactBucket)...)
@@ -644,6 +837,22 @@ func servicePerms(w Wiring) core.Permissions {
 	pub = append(pub, readKV(w.ScriptBucket)...)
 	pub = append(pub, readKV(w.MaterialBucket)...)
 	pub = append(pub, readObj(w.ArtifactBucket)...)
+	return core.Permissions{
+		Publish:   core.PermList{Allow: pub},
+		Subscribe: core.PermList{Allow: []string{"_INBOX.>"}},
+	}
+}
+
+func schedulePerms(w Wiring) core.Permissions {
+	pub := []string{
+		"$JS.API.INFO", "_INBOX.>",
+		"$JS.API.STREAM.CREATE.KV_" + w.ScheduleBucket,
+		"$KV." + w.ScheduleBucket + ".>",
+		"$JS.API.STREAM.INFO.KV_" + w.ItemBucket,
+		"$JS.API.DIRECT.GET.KV_" + w.ItemBucket + ".>",
+		"$KV." + w.ItemBucket + ".>",
+	}
+	pub = append(pub, readKV(w.ScheduleBucket)...)
 	return core.Permissions{
 		Publish:   core.PermList{Allow: pub},
 		Subscribe: core.PermList{Allow: []string{"_INBOX.>"}},

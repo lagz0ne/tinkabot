@@ -49,9 +49,17 @@ TINKALET_DATA_DIR=/tmp/tinkalet-data \
 # -> profile local accepted bundle.clock.tick
 ```
 
-The page picks up the new renderedAt/unix within 2s. Control the schedule
-through NATS settings for now, using plain caller authority on the config
-bucket:
+The page picks up the new renderedAt/unix within 2s. Product item schedules use
+Tinkalet:
+
+```bash
+TINKALET_CONFIG_DIR=/tmp/tinkalet-config \
+TINKALET_DATA_DIR=/tmp/tinkalet-data \
+  ./tinkalet schedule set clockitem --every 1s --write examples/clock/tick --value '{"kind":"clock"}'
+```
+
+The bundle's manifest cadence can still be overridden through NATS config
+settings, using plain caller authority on the config bucket:
 
 ```bash
 NATS=./libexec/tinkabot/nats # release package root

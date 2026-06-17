@@ -101,10 +101,11 @@ func TestTinkaletItemRecords(t *testing.T) {
 }
 
 type itemView struct {
-	Key      string          `json:"key"`
-	Status   string          `json:"status"`
-	Value    json.RawMessage `json:"value"`
-	Revision uint64          `json:"revision"`
+	Key        string          `json:"key"`
+	Status     string          `json:"status"`
+	Value      json.RawMessage `json:"value"`
+	Revision   uint64          `json:"revision"`
+	Provenance itemProv        `json:"provenance"`
 }
 
 func decodeItem(t *testing.T, out string) itemView {

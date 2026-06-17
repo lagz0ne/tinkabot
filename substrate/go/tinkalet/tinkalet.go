@@ -110,6 +110,8 @@ func (c cli) run(args []string) int {
 		return c.trigger(args[1:])
 	case "item":
 		return c.item(args[1:])
+	case "schedule":
+		return c.schedule(args[1:])
 	case "reaction":
 		return c.reaction(args[1:])
 	case "watch":
@@ -139,6 +141,8 @@ commands:
   item get <key> [--json]
   item resolve <key> [--value <json>] [--revision <n>] [--json]
   item wait <key> --for resolved [--timeout <duration>] [--json]
+  schedule set <name> --every <duration> --write <item-key> [--value <json>] [--json]
+  schedule off <name> [--json]
   watch item <key> [--cursor <name>] [--limit <n>] [--timeout <duration>] [--json]
   watch prefix <prefix> [--cursor <name>] [--limit <n>] [--timeout <duration>] [--json]
   daemon watch item <key> --cursor <name> [--limit <n>] [--timeout <duration>] [--json]
@@ -427,7 +431,14 @@ func (c cli) triggerLive(prof Profile, intent, reqID string, jsonOut bool, creds
 	}
 }
 
-const itemBucket = "tb_items"
+const (
+	itemBucket        = "tb_items"
+	scheduleBucket    = "tb_schedules"
+	minScheduleEvery  = 100 * time.Millisecond
+	scheduleRecordV1  = "tinkabot.schedule.v1"
+	scheduleStatusOn  = "active"
+	scheduleStatusOff = "off"
+)
 
 type itemStored struct {
 	Kind       string          `json:"kind"`
@@ -456,6 +467,27 @@ type itemView struct {
 	CreatedAt  string          `json:"createdAt"`
 	UpdatedAt  string          `json:"updatedAt"`
 	Provenance itemProvenance  `json:"provenance"`
+}
+
+type scheduleRecord struct {
+	Kind       string          `json:"kind"`
+	Name       string          `json:"name"`
+	Status     string          `json:"status"`
+	EveryMs    int64           `json:"everyMs"`
+	WriteItem  string          `json:"writeItem"`
+	Value      json.RawMessage `json:"value"`
+	Sequence   int             `json:"sequence"`
+	LastTickAt string          `json:"lastTickAt,omitempty"`
+	UpdatedAt  string          `json:"updatedAt"`
+	Provenance itemProvenance  `json:"provenance"`
+}
+
+type scheduleSetReq struct {
+	Name      string
+	EveryRaw  string
+	WriteItem string
+	ValueRaw  string
+	JSON      bool
 }
 
 type watchReq struct {
@@ -527,6 +559,221 @@ type reactionRunDoc struct {
 	Status   string `json:"status"`
 	Item     string `json:"item"`
 	ExitCode int    `json:"exitCode"`
+}
+
+func (c cli) schedule(args []string) int {
+	if len(args) == 0 {
+		return c.usage()
+	}
+	switch args[0] {
+	case "set":
+		req, ok := parseScheduleSet(args[1:])
+		if !ok || !validName(req.Name) || !validItemKey(req.WriteItem) {
+			return c.usage()
+		}
+		every, err := time.ParseDuration(req.EveryRaw)
+		if err != nil || every < minScheduleEvery {
+			return c.denySchedule(req.Name, "set", "malformed-duration")
+		}
+		val, valid := jsonValue(req.ValueRaw)
+		if !valid {
+			return c.denySchedule(req.Name, "set", "malformed-value")
+		}
+		return c.scheduleSet(req, every, val)
+	case "off":
+		name, jsonOut, ok := parseScheduleOff(args[1:])
+		if !ok || !validName(name) {
+			return c.usage()
+		}
+		return c.scheduleOff(name, jsonOut)
+	default:
+		return c.usage()
+	}
+}
+
+func parseScheduleSet(args []string) (scheduleSetReq, bool) {
+	var req scheduleSetReq
+	if len(args) == 0 {
+		return req, false
+	}
+	req.Name = args[0]
+	for i := 1; i < len(args); i++ {
+		arg := args[i]
+		switch {
+		case arg == "--json":
+			req.JSON = true
+		case arg == "--every" && i+1 < len(args):
+			i++
+			req.EveryRaw = args[i]
+		case strings.HasPrefix(arg, "--every="):
+			req.EveryRaw = strings.TrimPrefix(arg, "--every=")
+		case arg == "--write" && i+1 < len(args):
+			i++
+			req.WriteItem = args[i]
+		case strings.HasPrefix(arg, "--write="):
+			req.WriteItem = strings.TrimPrefix(arg, "--write=")
+		case arg == "--value" && i+1 < len(args):
+			i++
+			req.ValueRaw = args[i]
+		case strings.HasPrefix(arg, "--value="):
+			req.ValueRaw = strings.TrimPrefix(arg, "--value=")
+		default:
+			return req, false
+		}
+	}
+	return req, req.Name != "" && req.EveryRaw != "" && req.WriteItem != ""
+}
+
+func parseScheduleOff(args []string) (string, bool, bool) {
+	var name string
+	var jsonOut bool
+	for _, arg := range args {
+		switch {
+		case arg == "--json":
+			jsonOut = true
+		case strings.HasPrefix(arg, "-"):
+			return "", false, false
+		case name == "":
+			name = arg
+		default:
+			return "", false, false
+		}
+	}
+	return name, jsonOut, name != ""
+}
+
+func (c cli) scheduleSet(req scheduleSetReq, every time.Duration, value json.RawMessage) int {
+	prof, kv, nc, reason := c.scheduleKV()
+	if reason != "" {
+		return c.denySchedule(req.Name, "set", reason)
+	}
+	defer nc.Close()
+	now := time.Now().UTC().Format(time.RFC3339)
+	rec := scheduleRecord{
+		Kind:      scheduleRecordV1,
+		Name:      req.Name,
+		Status:    scheduleStatusOn,
+		EveryMs:   every.Milliseconds(),
+		WriteItem: req.WriteItem,
+		Value:     value,
+		UpdatedAt: now,
+		Provenance: itemProvenance{
+			Profile: prof.Name,
+			Source:  prof.Source,
+			Writer:  "tinkalet",
+		},
+	}
+	if entry, err := kv.Get(req.Name); err == nil {
+		var prev scheduleRecord
+		if json.Unmarshal(entry.Value(), &prev) == nil && prev.Kind == scheduleRecordV1 && prev.Name == req.Name {
+			rec.Sequence = prev.Sequence
+			rec.LastTickAt = prev.LastTickAt
+		}
+	}
+	body, err := json.Marshal(rec)
+	if err != nil {
+		return c.denySchedule(req.Name, "set", "malformed-value")
+	}
+	if _, err := kv.Put(req.Name, body); err != nil {
+		return c.denySchedule(req.Name, "set", scheduleReason(err, *prof))
+	}
+	return c.okSchedule(rec, every, req.JSON)
+}
+
+func (c cli) scheduleOff(name string, jsonOut bool) int {
+	prof, kv, nc, reason := c.scheduleKV()
+	if reason != "" {
+		return c.denySchedule(name, "off", reason)
+	}
+	defer nc.Close()
+	entry, err := kv.Get(name)
+	if err != nil {
+		return c.denySchedule(name, "off", scheduleReason(err, *prof))
+	}
+	var rec scheduleRecord
+	if err := json.Unmarshal(entry.Value(), &rec); err != nil || rec.Kind != scheduleRecordV1 || rec.Name != name {
+		return c.denySchedule(name, "off", "schedule-invalid")
+	}
+	rec.Status = scheduleStatusOff
+	rec.UpdatedAt = time.Now().UTC().Format(time.RFC3339)
+	rec.Provenance = itemProvenance{Profile: prof.Name, Source: prof.Source, Writer: "tinkalet"}
+	body, err := json.Marshal(rec)
+	if err != nil {
+		return c.denySchedule(name, "off", "schedule-invalid")
+	}
+	if _, err := kv.Update(name, body, entry.Revision()); err != nil {
+		return c.denySchedule(name, "off", scheduleReason(err, *prof))
+	}
+	return c.okSchedule(rec, time.Duration(rec.EveryMs)*time.Millisecond, jsonOut)
+}
+
+func (c cli) scheduleKV() (*Profile, nats.KeyValue, *nats.Conn, string) {
+	name := c.defaultProfile()
+	if name == "" {
+		return nil, nil, nil, "profile-not-found"
+	}
+	profiles, _ := c.loadProfiles()
+	prof := find(profiles, name)
+	if prof == nil {
+		return nil, nil, nil, "profile-not-found"
+	}
+	creds := filepath.Join(c.dataDir(), filepath.FromSlash(prof.CredentialRef))
+	if _, err := os.Stat(creds); err != nil {
+		return prof, nil, nil, "stale-credentials"
+	}
+	if c.deniedNeighbor(*prof) {
+		return prof, nil, nil, "denied-neighbor"
+	}
+	nc, err := nats.Connect(prof.Server, nats.UserCredentials(creds), nats.NoReconnect(), nats.Timeout(2*time.Second), nats.ErrorHandler(func(*nats.Conn, *nats.Subscription, error) {}))
+	if err != nil {
+		return prof, nil, nil, authReason(err, *prof)
+	}
+	js, err := nc.JetStream()
+	if err != nil {
+		nc.Close()
+		return prof, nil, nil, "connection-failed"
+	}
+	kv, err := js.KeyValue(scheduleBucket)
+	if err != nil {
+		nc.Close()
+		return prof, nil, nil, scheduleReason(err, *prof)
+	}
+	return prof, kv, nc, ""
+}
+
+func scheduleReason(err error, prof Profile) string {
+	if err == nil {
+		return ""
+	}
+	msg := strings.ToLower(err.Error())
+	switch {
+	case strings.Contains(msg, "wrong last sequence"):
+		return "stale-revision"
+	case strings.Contains(msg, "not found"):
+		return "schedule-not-found"
+	case strings.Contains(msg, "authorization") || strings.Contains(msg, "authentication") || strings.Contains(msg, "permission"):
+		return authReason(err, prof)
+	default:
+		return "connection-failed"
+	}
+}
+
+func (c cli) okSchedule(rec scheduleRecord, every time.Duration, jsonOut bool) int {
+	if jsonOut {
+		_ = json.NewEncoder(c.out).Encode(rec)
+		return 0
+	}
+	if rec.Status == scheduleStatusOff {
+		fmt.Fprintf(c.out, "schedule %s off\n", rec.Name)
+		return 0
+	}
+	fmt.Fprintf(c.out, "schedule %s active every %s -> %s\n", rec.Name, every, rec.WriteItem)
+	return 0
+}
+
+func (c cli) denySchedule(name, action, reason string) int {
+	fmt.Fprintf(c.errOut, "schedule %s denied %s: %s\n", name, action, reason)
+	return 1
 }
 
 func (c cli) item(args []string) int {
