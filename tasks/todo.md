@@ -2,7 +2,7 @@
 
 ## Current State
 
-- Repo: `lagz0ne/tinkabot`, private, branch `main`.
+- Repo: `lagz0ne/tinkabot`, public, branch `main`.
 - Remote: `origin git@github.com:lagz0ne/tinkabot.git`.
 - Last completed commit: `3d7a663 chore: track matched-abstraction agent skill`.
 - Worktree status at resume: bundled-bwrap sidecar implementation in progress.
@@ -18,6 +18,8 @@
 Close the bundled-bwrap packaging gap for the product-success sandbox bar: package builds should carry a Bubblewrap sidecar at `libexec/tinkabot/bwrap`, runtime lookup should prefer `TB_BWRAP`, then the bundled sidecar, then `PATH`, and the existing fail-closed sandbox preflight must remain the authority before any bundle runs.
 
 ## Active Session
+
+Public MIT transition — DONE (2026-06-17). User asked to turn the project public and put it under MIT. Added root `LICENSE` with MIT terms, set package metadata license fields to `MIT` for the workspace, SDK, and frontend package manifests, changed README install docs from private/authenticated `gh release download` to public GitHub Release `curl` downloads, added a README License section, and updated the release package script so future archives include `LICENSE`. Verification: `git diff --check`; `bun run release:package /tmp/tinkabot-license-package` builds and the archive contains `tinkabot-v0.1.0-linux-amd64/LICENSE`; project docs no longer say the repo is private outside dependency docs under ignored `node_modules`.
 
 Package-first release distribution — DONE (2026-06-17). User decided to deliver the package first and defer the npm wrapper. Task-layer scope: keep `pack:tinkabot` as the local unpacked package, add a GitHub-Release-shaped archive, keep npm out of the critical path, and make the package self-contained enough for the README tour. RED: `bun run release:package` failed because no script existed; `go test ./cmd/tinkabot -run TestRunPrintsVersion -count=1` failed because `--version` was undefined; first archive build leaked builder `node_modules` and the release script called a non-executable packer directly. GREEN: `cmd/tinkabot` has ldflags-backed `--version`; `scripts/package-tinkabot.sh` builds `tinkabot`, bundled `bwrap`, and the pinned NATS CLI sidecar at `libexec/tinkabot/nats`; `scripts/release-package.sh` creates `tinkabot-v0.1.0-linux-amd64.tar.gz` plus `.sha256`, release metadata, README, examples, manual, and release evidence; dirty worktree builds identify as `<commit>-dirty`; README/examples prefer packaged sidecars and keep source-checkout fallback commands. Verified: archive contents exclude `node_modules`, checksum validates, `release.json` names bundled sidecars, `./libexec/tinkabot/nats --version` reports `v0.3.0`, unpacked release package serves the clock bundle and bundled NATS request returns `accepted`; direct `bun run pack:tinkabot /tmp/tb-package-direct` includes working `tinkabot`, `nats`, and `bwrap`; `bun run validate:layers`, `bun run release:evidence`, `bun run gate:manual`, `bun test tests/gate-checkers.test.ts`, `bun run typecheck:orchestrator`, `go test ./... -count=1` from `substrate/go`, and `git diff --check` pass.
 

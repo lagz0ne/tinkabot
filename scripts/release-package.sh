@@ -32,6 +32,7 @@ TB_VERSION="${tag#v}" TB_COMMIT="$commit" TB_BUILT_AT="$built_at" bash "$root/sc
 
 mkdir -p "$pkg/examples" "$pkg/docs/manual" "$pkg/release"
 cp "$root/README.md" "$pkg/README.md"
+cp "$root/LICENSE" "$pkg/LICENSE"
 cp "$root/examples/README.md" "$pkg/examples/README.md"
 cp -R "$root/examples/clock" "$pkg/examples/clock"
 cp -R "$root/examples/builder" "$pkg/examples/builder"

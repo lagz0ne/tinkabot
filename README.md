@@ -11,13 +11,11 @@ Bubblewrap. Generated code never receives NATS credentials or store handles.
 
 ## Quick Start
 
-Current release channel: GitHub Release archive. The repo is private today, so
-use `gh` with an authenticated GitHub session:
+Current release channel: GitHub Release archive:
 
 ```bash
-gh release download v0.1.0 \
-  -R lagz0ne/tinkabot \
-  -p 'tinkabot-v0.1.0-linux-amd64.tar.gz*'
+curl -LO https://github.com/lagz0ne/tinkabot/releases/download/v0.1.0/tinkabot-v0.1.0-linux-amd64.tar.gz
+curl -LO https://github.com/lagz0ne/tinkabot/releases/download/v0.1.0/tinkabot-v0.1.0-linux-amd64.tar.gz.sha256
 
 sha256sum -c tinkabot-v0.1.0-linux-amd64.tar.gz.sha256
 tar -xzf tinkabot-v0.1.0-linux-amd64.tar.gz
@@ -164,6 +162,10 @@ manifest and gate results.
 - `packages/sdk`, `schemas/base/v1`: shared contract surface
 - `apps/frontend`: trusted browser shell
 - `docs/matched-abstraction`: design, plan, and task evidence
+
+## License
+
+MIT. See [LICENSE](LICENSE).
 
 ## Current Limits
 

@@ -1,5 +1,6 @@
 {
   "name": "@tinkabot/frontend",
+  "license": "MIT",
   "type": "module",
   "private": true,
   "scripts": {
