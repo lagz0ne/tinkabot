@@ -108,6 +108,13 @@ func (c cli) run(args []string) int {
 		return c.trigger(args[1:])
 	case "item":
 		return c.item(args[1:])
+	case "watch":
+		return c.watch(args[1:], false)
+	case "daemon":
+		if len(args) > 1 && args[1] == "watch" {
+			return c.watch(args[2:], true)
+		}
+		return c.usage()
 	default:
 		return c.usage()
 	}
@@ -125,6 +132,10 @@ commands:
   item get <key> [--json]
   item resolve <key> [--value <json>] [--revision <n>] [--json]
   item wait <key> --for resolved [--timeout <duration>] [--json]
+  watch item <key> [--cursor <name>] [--limit <n>] [--timeout <duration>] [--json]
+  watch prefix <prefix> [--cursor <name>] [--limit <n>] [--timeout <duration>] [--json]
+  daemon watch item <key> --cursor <name> [--limit <n>] [--timeout <duration>] [--json]
+  daemon watch prefix <prefix> --cursor <name> [--limit <n>] [--timeout <duration>] [--json]
 `)
 }
 
@@ -438,6 +449,38 @@ type itemView struct {
 	Provenance itemProvenance  `json:"provenance"`
 }
 
+type watchReq struct {
+	Scope   string
+	Target  string
+	Cursor  string
+	Limit   int
+	Timeout time.Duration
+	JSON    bool
+}
+
+type watchCursor struct {
+	Kind      string `json:"kind"`
+	Name      string `json:"name"`
+	Profile   string `json:"profile"`
+	Source    string `json:"source"`
+	Scope     string `json:"scope"`
+	Target    string `json:"target"`
+	Revision  uint64 `json:"revision"`
+	UpdatedAt string `json:"updatedAt"`
+}
+
+type watchEvent struct {
+	Kind       string          `json:"kind"`
+	Cursor     string          `json:"cursor,omitempty"`
+	Scope      string          `json:"scope"`
+	Key        string          `json:"key"`
+	Status     string          `json:"status"`
+	Value      json.RawMessage `json:"value"`
+	Revision   uint64          `json:"revision"`
+	Source     string          `json:"source"`
+	ObservedAt string          `json:"observedAt"`
+}
+
 func (c cli) item(args []string) int {
 	if len(args) == 0 {
 		return c.usage()
@@ -478,6 +521,259 @@ func (c cli) item(args []string) int {
 	default:
 		return c.usage()
 	}
+}
+
+func (c cli) watch(args []string, daemon bool) int {
+	req, ok := parseWatch(args, daemon)
+	if !ok {
+		return c.usage()
+	}
+	if req.Scope == "item" && !validItemKey(req.Target) {
+		return c.usage()
+	}
+	if req.Scope == "prefix" && !validItemPrefix(req.Target) {
+		return c.usage()
+	}
+	if req.Cursor != "" && !validName(req.Cursor) {
+		return c.usage()
+	}
+	if daemon && req.Cursor == "" {
+		return c.usage()
+	}
+	return c.itemWatch(req)
+}
+
+func parseWatch(args []string, daemon bool) (watchReq, bool) {
+	req := watchReq{Limit: 1, Timeout: 30 * time.Second}
+	if len(args) < 2 {
+		return watchReq{}, false
+	}
+	req.Scope, req.Target = args[0], args[1]
+	if req.Scope != "item" && req.Scope != "prefix" {
+		return watchReq{}, false
+	}
+	for i := 2; i < len(args); i++ {
+		arg := args[i]
+		switch {
+		case arg == "--json":
+			req.JSON = true
+		case arg == "--cursor" && i+1 < len(args):
+			i++
+			req.Cursor = args[i]
+		case strings.HasPrefix(arg, "--cursor="):
+			req.Cursor = strings.TrimPrefix(arg, "--cursor=")
+		case arg == "--limit" && i+1 < len(args):
+			i++
+			limit, err := strconv.Atoi(args[i])
+			if err != nil || limit <= 0 {
+				return watchReq{}, false
+			}
+			req.Limit = limit
+		case strings.HasPrefix(arg, "--limit="):
+			limit, err := strconv.Atoi(strings.TrimPrefix(arg, "--limit="))
+			if err != nil || limit <= 0 {
+				return watchReq{}, false
+			}
+			req.Limit = limit
+		case arg == "--timeout" && i+1 < len(args):
+			i++
+			timeout, err := time.ParseDuration(args[i])
+			if err != nil || timeout <= 0 {
+				return watchReq{}, false
+			}
+			req.Timeout = timeout
+		case strings.HasPrefix(arg, "--timeout="):
+			timeout, err := time.ParseDuration(strings.TrimPrefix(arg, "--timeout="))
+			if err != nil || timeout <= 0 {
+				return watchReq{}, false
+			}
+			req.Timeout = timeout
+		default:
+			return watchReq{}, false
+		}
+	}
+	return req, true
+}
+
+func (c cli) itemWatch(req watchReq) int {
+	prof, kv, nc, reason := c.itemKV()
+	if reason != "" {
+		return c.denyWatch(req, reason)
+	}
+	defer nc.Close()
+	cur, reason := c.loadCursor(req, *prof)
+	if reason != "" {
+		return c.denyWatch(req, reason)
+	}
+	if reason := validateCursor(kv, cur); reason != "" {
+		return c.denyWatch(req, reason)
+	}
+	w, err := kv.WatchAll(nats.IncludeHistory(), nats.IgnoreDeletes())
+	if err != nil {
+		return c.denyWatch(req, itemReason(err, *prof))
+	}
+	defer w.Stop()
+
+	timer := time.NewTimer(req.Timeout)
+	defer timer.Stop()
+	seen := 0
+	replay := true
+	for {
+		select {
+		case err, ok := <-w.Error():
+			if ok && err != nil {
+				return c.denyWatch(req, "connection-lost")
+			}
+		case entry, ok := <-w.Updates():
+			if !ok {
+				return c.denyWatch(req, "connection-lost")
+			}
+			if entry == nil {
+				replay = false
+				continue
+			}
+			ev, match, reason := c.watchEvent(req, entry, cur, replay)
+			if reason != "" {
+				return c.denyWatch(req, reason)
+			}
+			if !match {
+				continue
+			}
+			if err := c.saveCursor(req, *prof, ev.Revision); err != nil {
+				return c.denyWatch(req, "stale-cursor")
+			}
+			cur.Revision = ev.Revision
+			c.okWatch(ev, req.JSON)
+			seen++
+			if seen >= req.Limit {
+				return 0
+			}
+		case <-timer.C:
+			return c.denyWatch(req, "watch-timeout")
+		}
+	}
+}
+
+func (c cli) loadCursor(req watchReq, prof Profile) (watchCursor, string) {
+	cur := watchCursor{
+		Kind:    "tinkalet.cursor.item.v1",
+		Name:    req.Cursor,
+		Profile: prof.Name,
+		Source:  prof.Source,
+		Scope:   req.Scope,
+		Target:  req.Target,
+	}
+	if req.Cursor == "" {
+		return cur, ""
+	}
+	body, err := os.ReadFile(c.cursorPath(req.Cursor))
+	if os.IsNotExist(err) {
+		return cur, ""
+	}
+	if err != nil {
+		return cur, "stale-cursor"
+	}
+	if err := json.Unmarshal(body, &cur); err != nil {
+		return cur, "stale-cursor"
+	}
+	if cur.Kind != "tinkalet.cursor.item.v1" || cur.Name != req.Cursor || cur.Profile != prof.Name || cur.Source != prof.Source || cur.Scope != req.Scope || cur.Target != req.Target {
+		return cur, "stale-cursor"
+	}
+	return cur, ""
+}
+
+func validateCursor(kv nats.KeyValue, cur watchCursor) string {
+	if cur.Revision == 0 {
+		return ""
+	}
+	status, err := kv.Status()
+	if err != nil {
+		return itemReason(err, Profile{})
+	}
+	type streamStatus interface {
+		StreamInfo() *nats.StreamInfo
+	}
+	if st, ok := status.(streamStatus); ok && st.StreamInfo() != nil && cur.Revision > st.StreamInfo().State.LastSeq {
+		return "stale-cursor"
+	}
+	return ""
+}
+
+func (c cli) saveCursor(req watchReq, prof Profile, rev uint64) error {
+	if req.Cursor == "" {
+		return nil
+	}
+	cur := watchCursor{
+		Kind:      "tinkalet.cursor.item.v1",
+		Name:      req.Cursor,
+		Profile:   prof.Name,
+		Source:    prof.Source,
+		Scope:     req.Scope,
+		Target:    req.Target,
+		Revision:  rev,
+		UpdatedAt: time.Now().UTC().Format(time.RFC3339),
+	}
+	body, err := json.MarshalIndent(cur, "", "  ")
+	if err != nil {
+		return err
+	}
+	return write0600(c.cursorPath(req.Cursor), append(body, '\n'))
+}
+
+func (c cli) cursorPath(name string) string {
+	return filepath.Join(c.dataDir(), "cursors", name+".json")
+}
+
+func (c cli) watchEvent(req watchReq, entry nats.KeyValueEntry, cur watchCursor, replay bool) (watchEvent, bool, string) {
+	if !watchMatches(req, entry.Key()) {
+		return watchEvent{}, false, ""
+	}
+	if entry.Revision() <= cur.Revision {
+		return watchEvent{}, false, ""
+	}
+	var rec itemStored
+	if err := json.Unmarshal(entry.Value(), &rec); err != nil || rec.Kind != "tinkabot.item.v1" || rec.Key != entry.Key() {
+		return watchEvent{}, false, "malformed-event"
+	}
+	src := "watch"
+	if replay {
+		src = "replay"
+	}
+	return watchEvent{
+		Kind:       "tinkalet.itemEvent.v1",
+		Cursor:     req.Cursor,
+		Scope:      req.Scope,
+		Key:        rec.Key,
+		Status:     rec.Status,
+		Value:      rec.Value,
+		Revision:   entry.Revision(),
+		Source:     src,
+		ObservedAt: time.Now().UTC().Format(time.RFC3339),
+	}, true, ""
+}
+
+func watchMatches(req watchReq, key string) bool {
+	switch req.Scope {
+	case "item":
+		return key == req.Target
+	case "prefix":
+		return strings.HasPrefix(key, req.Target)
+	default:
+		return false
+	}
+}
+
+func (c cli) okWatch(ev watchEvent, jsonOut bool) {
+	if jsonOut {
+		_ = json.NewEncoder(c.out).Encode(ev)
+		return
+	}
+	fmt.Fprintf(c.out, "item %s %s rev %d\n", ev.Key, ev.Status, ev.Revision)
+}
+
+func (c cli) denyWatch(req watchReq, reason string) int {
+	fmt.Fprintf(c.errOut, "watch %s denied %s: %s\n", req.Target, req.Scope, reason)
+	return 1
 }
 
 func parseItemCreate(args []string) (string, string, string, bool, bool) {
@@ -831,7 +1127,18 @@ func validItemKey(key string) bool {
 	if key == "" || strings.HasPrefix(key, "/") || strings.HasSuffix(key, "/") || strings.Contains(key, "//") {
 		return false
 	}
-	for _, r := range key {
+	return validItemPath(key)
+}
+
+func validItemPrefix(prefix string) bool {
+	if prefix == "" || strings.HasPrefix(prefix, "/") || strings.Contains(prefix, "//") {
+		return false
+	}
+	return validItemPath(prefix)
+}
+
+func validItemPath(path string) bool {
+	for _, r := range path {
 		switch {
 		case r >= 'a' && r <= 'z', r >= 'A' && r <= 'Z', r >= '0' && r <= '9':
 		case r == '.', r == '_', r == '-', r == '/':
@@ -839,7 +1146,7 @@ func validItemKey(key string) bool {
 			return false
 		}
 	}
-	return !strings.Contains(key, "..")
+	return !strings.Contains(path, "..")
 }
 
 func (c cli) deniedNeighbor(prof Profile) bool {

@@ -498,7 +498,7 @@ func materialize(ctx context.Context, rt *embednats.Runtime, svc embednats.UserC
 	if _, err := js.CreateKeyValue(&nats.KeyValueConfig{Bucket: w.ConfigBucket, Storage: nats.FileStorage}); err != nil {
 		return fail(StartupMaterializationFailed, "Start", "config bucket could not be materialized", map[string]string{"bucket": w.ConfigBucket}, err)
 	}
-	if _, err := js.CreateKeyValue(&nats.KeyValueConfig{Bucket: w.ItemBucket, Storage: nats.FileStorage}); err != nil {
+	if _, err := js.CreateKeyValue(&nats.KeyValueConfig{Bucket: w.ItemBucket, Storage: nats.FileStorage, History: nats.KeyValueMaxHistory}); err != nil {
 		return fail(StartupMaterializationFailed, "Start", "item bucket could not be materialized", map[string]string{"bucket": w.ItemBucket}, err)
 	}
 	if _, err := js.ObjectStore(w.UploadBucket); err != nil {

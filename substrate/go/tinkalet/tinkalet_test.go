@@ -153,6 +153,17 @@ func TestItemCommandDenials(t *testing.T) {
 	assertCmd(t, code, out, errOut, 1, "", "item deploy/1 denied create: profile-not-found\n")
 }
 
+func TestWatchCommandDenials(t *testing.T) {
+	t.Parallel()
+	env := newEnv(t)
+
+	code, out, errOut := runCmd(t, env.vars, "watch", "item", "deploy/1", "--cursor", "bad/name")
+	assertCmd(t, code, out, errOut, 2, "", "usage: tinkalet <command> [options]\n")
+
+	code, out, errOut = runCmd(t, env.vars, "watch", "item", "deploy/1", "--cursor", "deploy1")
+	assertCmd(t, code, out, errOut, 1, "", "watch deploy/1 denied item: profile-not-found\n")
+}
+
 func TestTriggerProfileOverrideDoesNotChangeDefault(t *testing.T) {
 	t.Parallel()
 	env := newEnv(t)
