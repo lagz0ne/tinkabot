@@ -135,6 +135,11 @@ GREEN on 2026-06-17:
 - `go test ./... -count=1` from `substrate/go` -> pass.
 - `bun run gate:scenarios` -> `gate:scenarios passed`.
 - `bun run gate:manual` -> `gate:manual passed`.
+- `bun run gate:tinkalet-package` -> packaged `tinkabot` started, packaged
+  `tinkalet` imported/selected the local profile, packaged NATS sidecar was
+  removed, trigger advanced the clock projection, `schedule set` wrote a
+  scheduled item tick, `schedule off` cancelled it, and
+  `gate:tinkalet-package passed`.
 - `bun run release:evidence` -> `release evidence check passed: 17 milestones over 12 spine steps, 6 gate results`.
 
 A focused subagent review tightened the proof before implementation: the

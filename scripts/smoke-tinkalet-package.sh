@@ -105,9 +105,28 @@ got="$(run_tinkalet trigger bundle.clock.tick --request-id smoke-tinkalet-packag
 
 for _ in {1..150}; do
   if curl -fsS "$shell_url/projections/bundle.clock.state" >"$after" && ! cmp -s "$before" "$after"; then
+    got="$(run_tinkalet schedule set packagetick --every 200ms --write package/schedule/tick --value '{"kind":"package-schedule"}')"
+    [[ "$got" == "schedule packagetick active every 200ms -> package/schedule/tick" ]]
+    item="$dist/scheduled-item.json"
+    for _ in {1..100}; do
+      if run_tinkalet item get package/schedule/tick --json >"$item" 2>/dev/null &&
+        grep -q '"key":"package/schedule/tick"' "$item" &&
+        grep -q '"status":"resolved"' "$item" &&
+        grep -q '"schedule":"packagetick"' "$item"; then
+        break
+      fi
+      sleep 0.1
+    done
+    if ! grep -q '"schedule":"packagetick"' "$item" 2>/dev/null; then
+      echo "smoke-tinkalet-package: scheduled item missing" >&2
+      exit 1
+    fi
+    got="$(run_tinkalet schedule off packagetick)"
+    [[ "$got" == "schedule packagetick off" ]]
     echo "package root $pkg"
     echo "shell $shell_url"
     echo "tinkalet trigger accepted and projection changed"
+    echo "tinkalet schedule wrote an item tick"
     echo "packaged nats sidecar was removed before the Tinkalet commands"
     echo "gate:tinkalet-package passed"
     exit 0

@@ -116,6 +116,11 @@ TINKALET_CONFIG_DIR=/tmp/tinkalet-config \
 TINKALET_DATA_DIR=/tmp/tinkalet-data \
   ./tinkalet trigger bundle.clock.tick --request-id req-clock-1
 # -> profile local accepted bundle.clock.tick
+
+TINKALET_CONFIG_DIR=/tmp/tinkalet-config \
+TINKALET_DATA_DIR=/tmp/tinkalet-data \
+  ./tinkalet schedule set heartbeat --every 1s --write demo/heartbeat --value '{"kind":"heartbeat"}'
+# -> schedule heartbeat active every 1s -> demo/heartbeat
 ```
 
 The clock also ticks itself every five seconds. The page polls the derived
