@@ -58,21 +58,21 @@ func TestScriptMaterializerLoopFromNATSCLI(t *testing.T) {
 	t.Cleanup(stop)
 	flush(t, h.nc)
 
-	reply, err := natsCLI(h.rt, h.caller, "request", "--raw", "-H", HeaderRequestID+":req-script-001", act.Source.Subject, "run")
+	reply, err := natsCLI(t, h.rt, h.caller, "request", "--raw", "-H", HeaderRequestID+":req-script-001", act.Source.Subject, "run")
 	if err != nil {
 		t.Fatalf("CLI request failed: %v\n%s", err, reply)
 	}
 	if strings.TrimSpace(reply) != string(core.Accepted) {
 		t.Fatalf("activation reply drift: %q", reply)
 	}
-	denyOut, denyErr := natsCLI(h.rt, h.caller, "kv", "put", h.ledger, "escape", "bad")
+	denyOut, denyErr := natsCLI(t, h.rt, h.caller, "kv", "put", h.ledger, "escape", "bad")
 	wantDenied(t, denyOut, denyErr, "caller wrote ledger KV")
 	run := waitScriptRun(t, runs)
 	if run.Err != nil || run.Run.Status != "applied" {
 		t.Fatalf("script run drift: %#v", run)
 	}
 
-	got, err := natsCLI(h.rt, h.observer, "kv", "get", h.material.Bucket(), "p.main", "--raw")
+	got, err := natsCLI(t, h.rt, h.observer, "kv", "get", h.material.Bucket(), "p.main", "--raw")
 	if err != nil {
 		t.Fatalf("CLI material read failed: %v\n%s", err, got)
 	}
@@ -83,7 +83,7 @@ func TestScriptMaterializerLoopFromNATSCLI(t *testing.T) {
 	if proj.Kind != "material.projection" || proj.ProjectionID != "main" || proj.ObservedAt == "" || proj.Provenance.Producer != "script-materializer" || string(proj.Value) != `{"title":"from-script"}` {
 		t.Fatalf("material projection drift: %#v", proj)
 	}
-	ev, err := natsCLI(h.rt, h.observer, "kv", "get", h.material.Bucket(), "e.script_run_"+runID(run.Activation, script), "--raw")
+	ev, err := natsCLI(t, h.rt, h.observer, "kv", "get", h.material.Bucket(), "e.script_run_"+runID(run.Activation, script), "--raw")
 	if err != nil {
 		t.Fatalf("CLI event read failed: %v\n%s", err, ev)
 	}
@@ -95,7 +95,7 @@ func TestScriptMaterializerLoopFromNATSCLI(t *testing.T) {
 		t.Fatalf("event drift: %#v", event)
 	}
 	path := t.TempDir() + "/artifact-main.js"
-	got, err = natsCLI(h.rt, h.observer, "object", "get", h.material.ArtifactBucket(), "artifact/main.js", "--output", path, "--force", "--no-progress")
+	got, err = natsCLI(t, h.rt, h.observer, "object", "get", h.material.ArtifactBucket(), "artifact/main.js", "--output", path, "--force", "--no-progress")
 	if err != nil {
 		t.Fatalf("CLI object read failed: %v\n%s", err, got)
 	}
@@ -106,7 +106,7 @@ func TestScriptMaterializerLoopFromNATSCLI(t *testing.T) {
 	if string(body) != "export default 1" {
 		t.Fatalf("artifact body drift: %q", body)
 	}
-	manifestDoc, err := natsCLI(h.rt, h.observer, "kv", "get", h.material.Bucket(), "a."+keyEnc("artifact/main.js"), "--raw")
+	manifestDoc, err := natsCLI(t, h.rt, h.observer, "kv", "get", h.material.Bucket(), "a."+keyEnc("artifact/main.js"), "--raw")
 	if err != nil {
 		t.Fatalf("CLI artifact manifest read failed: %v\n%s", err, manifestDoc)
 	}
@@ -117,12 +117,12 @@ func TestScriptMaterializerLoopFromNATSCLI(t *testing.T) {
 	if manifest.Kind != "artifact.manifest" || manifest.ArtifactRevision != "artifact.rev.7" || manifest.Digest == "" {
 		t.Fatalf("artifact manifest drift: %#v", manifest)
 	}
-	denyOut, denyErr = natsCLI(h.rt, h.observer, "kv", "put", h.material.Bucket(), "p.main", "{}")
+	denyOut, denyErr = natsCLI(t, h.rt, h.observer, "kv", "put", h.material.Bucket(), "p.main", "{}")
 	wantDenied(t, denyOut, denyErr, "observer wrote material KV")
-	denyOut, denyErr = natsCLI(h.rt, h.observer, "publish", "$O."+h.material.ArtifactBucket()+".C.deny", "bad")
+	denyOut, denyErr = natsCLI(t, h.rt, h.observer, "publish", "$O."+h.material.ArtifactBucket()+".C.deny", "bad")
 	wantDenied(t, denyOut, denyErr, "observer wrote object chunk")
 
-	reply, err = natsCLI(h.rt, h.caller, "request", "--raw", "-H", HeaderRequestID+":req-script-001", act.Source.Subject, "run")
+	reply, err = natsCLI(t, h.rt, h.caller, "request", "--raw", "-H", HeaderRequestID+":req-script-001", act.Source.Subject, "run")
 	if err != nil {
 		t.Fatalf("duplicate CLI request failed: %v\n%s", err, reply)
 	}

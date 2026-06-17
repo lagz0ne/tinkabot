@@ -1,5 +1,6 @@
 {
   "name": "tinkabot-workspace",
+  "version": "0.1.0",
   "type": "module",
   "private": true,
   "workspaces": [
@@ -23,6 +24,8 @@
     "typecheck:frontend": "bun run --cwd apps/frontend typecheck",
     "typecheck:orchestrator": "bunx @typescript/native-preview --noEmit -p tsconfig.orchestrator.json",
     "pack:dry": "cd packages/sdk && bun pm pack --dry-run",
+    "pack:tinkabot": "bash scripts/package-tinkabot.sh",
+    "release:package": "bash scripts/release-package.sh",
     "release:evidence": "bun scripts/release-evidence.ts",
     "gate:parallel": "bun scripts/gate-parallel.ts",
     "gate:fakes": "bun scripts/gate-fakes.ts",

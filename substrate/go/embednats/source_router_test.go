@@ -150,7 +150,7 @@ func TestSourceRouterRequestReplyFromNATSCLI(t *testing.T) {
 			LeaseID: act.SourceLease.LeaseID,
 		},
 	}
-	reply, err := natsCLI(rt, auth, "request", "--raw", "-H", HeaderRequestID+":req-cli-001", act.Source.Subject, "ping")
+	reply, err := natsCLI(t, rt, auth, "request", "--raw", "-H", HeaderRequestID+":req-cli-001", act.Source.Subject, "ping")
 	if err != nil {
 		t.Fatalf("CLI request failed: %v\n%s", err, reply)
 	}

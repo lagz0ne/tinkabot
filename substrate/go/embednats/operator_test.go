@@ -560,9 +560,10 @@ func TestOperatorCLIRequestWithCreds(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	bin := natsCLIBin(t)
 	cli := func(args ...string) string {
 		base := []string{"--no-context", "--server", rt.Posture().ClientURL, "--creds", creds, "--timeout", "2s"}
-		out, _ := exec.Command("nats", append(base, args...)...).CombinedOutput()
+		out, _ := exec.Command(bin, append(base, args...)...).CombinedOutput()
 		return string(out)
 	}
 

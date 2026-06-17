@@ -76,6 +76,9 @@ const ARTIFACT_BUCKET = "tb_artifacts";
 const SCRIPT_BUCKET = "tb_scripts";
 const SCRIPT_KEY = "scripts.app.main";
 const SCRIPT_REVISION = 1;
+const goDir = join(root, "substrate/go");
+const toolDir = join(root, "tools/natscli");
+const sh = (s: string) => `'${s.replaceAll("'", "'\\''")}'`;
 
 const frame = (body: string) => `Content-Length: ${body.length}\r\n\r\n${body}`;
 
@@ -115,7 +118,8 @@ if (import.meta.main) {
     // verbatim `go build ./cmd/tinkabot` output name collides with the
     // package directory, so the gate builds with -o.
     const bin = join(tmp, "tinkabot-bin");
-    execFileSync("go", ["build", "-o", bin, "./cmd/tinkabot"], { cwd: join(root, "substrate/go") });
+    execFileSync("go", ["build", "-o", bin, "./cmd/tinkabot"], { cwd: goDir });
+    const nats = execFileSync("go", ["tool", "-n", "nats"], { cwd: toolDir, encoding: "utf8" }).trim();
 
     proc = Bun.spawn([bin, "--store", join(tmp, "store"), "--shell", "127.0.0.1:0"], {
       stdout: "pipe",
@@ -156,7 +160,7 @@ if (import.meta.main) {
       },
     };
     const kvKey = "s." + Buffer.from(SCRIPT_KEY).toString("base64url");
-    execFileSync("nats", [
+    execFileSync(nats, [
       "--no-context",
       "--server",
       clientURL,
@@ -180,7 +184,7 @@ if (import.meta.main) {
     const run = (cmd: string, expected = "") => {
       const observes = /\$MATERIAL_BUCKET|\$ARTIFACT_BUCKET/.test(cmd);
       const authors = /\$SCRIPT_BUCKET/.test(cmd);
-      const sh = cmd.replace(/^nats /, `nats --no-context --server "$CLIENT_URL" --creds "$CREDS" --timeout 2s `);
+      const line = cmd.replace(/^nats /, `${sh(nats)} --no-context --server "$CLIENT_URL" --creds "$CREDS" --timeout 2s `);
       const env = {
         ...process.env,
         CLIENT_URL: clientURL,
@@ -192,7 +196,7 @@ if (import.meta.main) {
       const want = anchors(expected);
       const until = Date.now() + 5000;
       while (true) {
-        const p = Bun.spawnSync(["sh", "-c", sh], { env, cwd: root });
+        const p = Bun.spawnSync(["sh", "-c", line], { env, cwd: root });
         const out = p.stdout.toString() + p.stderr.toString();
         if (want.every((a) => strip(out).includes(a)) || Date.now() > until) return out;
         Bun.sleepSync(100);

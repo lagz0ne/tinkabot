@@ -32,3 +32,14 @@ func TestRunRequiresStore(t *testing.T) {
 		t.Fatalf("missing store dir not denied: %v", err)
 	}
 }
+
+func TestRunPrintsVersion(t *testing.T) {
+	t.Parallel()
+	var out bytes.Buffer
+	if err := run([]string{"--version"}, &out, nil); err != nil {
+		t.Fatal(err)
+	}
+	if got := strings.TrimSpace(out.String()); got != "tinkabot dev" {
+		t.Fatalf("version = %q", got)
+	}
+}

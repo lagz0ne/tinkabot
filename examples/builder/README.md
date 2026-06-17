@@ -1,65 +1,69 @@
-# builder — a tinkabot bundle example
+# builder - a Tinkabot Bundle Example
 
-One folder, one app, built by a chain reaction. A source script emits the app
-as a projection; a long-lived Vite filter watches that projection and rebuilds
-the app whenever it changes; the built files land as artifacts. Nothing is
-installed into the platform — the bundle is served ephemerally for the lifetime
-of the run; restart without `--bundle` and it is gone.
+One folder, one app, built by a chain reaction. A source script emits a tiny
+Vite app as a projection; a long-lived Bun/Vite filter watches that projection
+and rebuilds artifacts whenever it changes.
 
 ## Setup
 
-Vite must resolve before the build filter can run. Install it first — this is
-required:
+Vite must resolve before the build filter can run:
 
 ```bash
 cd examples/builder
 bun install
 ```
 
-## Run
+## Run From Source
+
+Then return to the repo root and start the bundle:
 
 ```bash
 cd substrate/go
 go run ./cmd/tinkabot --store /tmp/tb-builder --shell 127.0.0.1:8419 --bundle ../../examples/builder
 ```
 
-Open http://127.0.0.1:8419/artifacts/bundle/builder/index.html — the boot run
-of `scripts/source.sh` emits the source projection, the build filter does a cold
-Vite build, and the page is served from the produced artifacts. The page shows
-the timestamp it was built from on a colored background derived from that time.
+Open:
 
-## Poke the source
+```text
+http://127.0.0.1:8419/artifacts/bundle/builder/index.html
+```
+
+The boot run of `scripts/source.sh` emits the source projection, the build
+filter does a cold Vite build, and the page is served from produced artifacts.
+
+## Poke The Source
 
 Re-emit the source projection with a fresh timestamp; the filter does a warm
-rebuild (~35ms) and overwrites the artifacts in place:
+rebuild and overwrites the artifacts in place. From the release package root or
+source checkout root in another terminal:
 
 ```bash
-nats request --creds /tmp/tb-builder/caller.creds -H Tinkabot-Request-Id:req-1 tb.bundle.builder.source go
+NATS=./libexec/tinkabot/nats # release package root
+# NATS=$(cd tools/natscli && go tool -n nats) # source checkout
+CLIENT_URL=nats://127.0.0.1:4222 # replace with the printed "nats" URL
+
+"$NATS" --no-context --server "$CLIENT_URL" \
+  --creds /tmp/tb-builder/caller.creds \
+  --timeout 2s \
+  request --raw -H Tinkabot-Request-Id:req-builder-1 \
+  tb.bundle.builder.source go
 # -> accepted; the artifacts are rebuilt
 ```
 
-Then RELOAD THE TAB — the built app does not poll, so the new time and hue only
-appear on a fresh load. Build status (files emitted, build ms) shows at
-http://127.0.0.1:8419/projections/bundle.builder.built.
+Reload the tab. The built app does not poll, so the new time and color appear
+on a fresh load. Build status is visible at:
+
+```text
+http://127.0.0.1:8419/projections/bundle.builder.built
+```
 
 ## Anatomy
 
-- `bundle.json` — strictly decoded manifest. Authority is derived, never
-  declared: entry `source` in bundle `builder` gets trigger
-  `tb.bundle.builder.source`, projection ids under `bundle.builder.`, and
-  artifacts under `bundle/builder/`. `boot: true` fires `source` once at
-  startup so the app exists immediately. The bundle uses LOCAL refs only:
-  scripts emit short projection ids (`src`, `built`) and relative artifact
-  names (Vite builds with `base: "./"`, so asset URLs need no bundle name);
-  the substrate resolves each to the derived global name (`bundle.builder.src`,
-  `bundle/builder/<relpath>`).
-- `scripts/source.sh` — a plain process emitting a length-framed JSON effect on
-  stdout; it never sees NATS, credentials, or store handles. Writes the app
-  source map to the short id `src` (resolved to `bundle.builder.src`).
-- `scripts/build.ts` — a long-lived filter run with `bun`: the platform pipes
-  one JSON line per `src` change into its stdin, it runs a programmatic Vite
-  build, emits one artifact frame per output file (stable names, so each
-  rebuild overwrites in place), then a `bundle.builder.built` projection frame.
-  Chain-reaction: source projection -> watch -> warm Vite rebuild -> artifacts
-  -> `/artifacts/bundle/builder/index.html`. The first build is cold; later
-  rebuilds run warm at roughly 35ms.
+- `bundle.json`: strictly decoded manifest. Entry `source` in bundle `builder`
+  gets trigger `tb.bundle.builder.source`, projection ids under
+  `bundle.builder.`, and artifacts under `bundle/builder/`.
+- `scripts/source.sh`: emits a length-framed JSON effect containing an app
+  source map under the short projection id `src`.
+- `scripts/build.ts`: long-lived filter run with `bun`. The platform pipes one
+  JSON line per `src` change into stdin; the filter runs programmatic Vite,
+  emits artifact frames for output files, then emits `bundle.builder.built`.

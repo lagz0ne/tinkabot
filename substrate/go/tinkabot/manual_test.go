@@ -1,11 +1,11 @@
 package tinkabot
 
 import (
+	"context"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -13,39 +13,52 @@ import (
 
 	"github.com/lagz0ne/tinkabot/substrate/go/core"
 	"github.com/lagz0ne/tinkabot/substrate/go/embednats"
+	"github.com/nats-io/nats.go"
 )
 
-// cli runs the real nats CLI against the running binary with a materialized
-// role creds file — the manual's connection preamble in creds mode.
-func cli(t *testing.T, app *App, role string, args ...string) string {
+func conn(t *testing.T, app *App, role string) *nats.Conn {
 	t.Helper()
-	base := []string{
-		"--no-context",
-		"--server", app.Posture().NATS.ClientURL,
-		"--creds", app.CredsFile(role),
-		"--timeout", "2s",
+	nc, err := nats.Connect(app.Posture().NATS.ClientURL, nats.UserCredentials(app.CredsFile(role)))
+	if err != nil {
+		t.Fatal(err)
 	}
-	out, _ := exec.Command("nats", append(base, args...)...).CombinedOutput()
-	return string(out)
+	t.Cleanup(nc.Close)
+	return nc
 }
 
-// wantDenied is the output-parsed denial oracle: nats CLI v0.3.0 exits 0 on
-// permission errors, so denial evidence must come from output text
-// (docs/matched-abstraction/plan/endgame-app.md:177).
-func wantDenied(t *testing.T, out, msg string) {
+func wantDenied(t *testing.T, nc *nats.Conn, err error, msg string) {
 	t.Helper()
-	low := strings.ToLower(out)
-	if !strings.Contains(low, "permission") && !strings.Contains(low, "authorization") {
-		t.Fatalf("%s: no denial evidence in output: %s", msg, out)
+	var text string
+	if err != nil {
+		text = err.Error()
 	}
+	if nc != nil {
+		if nc.IsClosed() {
+			text += " closed"
+		}
+		if err := nc.LastError(); err != nil {
+			text += " " + err.Error()
+		}
+	}
+	low := strings.ToLower(text)
+	for _, s := range []string{"permission", "authorization", "revoked", "closed"} {
+		if strings.Contains(low, s) {
+			return
+		}
+	}
+	t.Fatalf("%s: no denial evidence in error: %s", msg, text)
 }
 
-func wantAllowed(t *testing.T, out, msg string) {
+func request(t *testing.T, nc *nats.Conn, subject, id, body string) string {
 	t.Helper()
-	low := strings.ToLower(out)
-	if strings.Contains(low, "permission") || strings.Contains(low, "authorization") || strings.Contains(low, "error") {
-		t.Fatalf("%s: unexpected denial or error: %s", msg, out)
+	msg := nats.NewMsg(subject)
+	msg.Header.Set(embednats.HeaderRequestID, id)
+	msg.Data = []byte(body)
+	reply, err := nc.RequestMsg(msg, 2*time.Second)
+	if err != nil {
+		t.Fatal(err)
 	}
+	return string(reply.Data)
 }
 
 func await(t *testing.T, what string, probe func() (string, bool)) string {
@@ -71,12 +84,13 @@ func frames() string {
 		frame(`{"kind":"script.effect","effectType":"artifact","artifactName":"artifact/main.js","artifactRevision":"artifact.rev.7","mediaType":"application/javascript","body":"export default 1"}`)
 }
 
-// TestBinaryManual runs the manual's flows through the real nats CLI against
-// the running binary in creds mode: script define, trigger, observation, the
-// KV/Object/publish behavior-commands creds-mode sweep carried from
+// TestBinaryManual runs the manual's flows through nats.go against the running
+// binary in creds mode: script define, trigger, observation, the
+// KV/Object/publish behavior sweep carried from
 // operator-jwt-authority (docs/matched-abstraction/task/operator-jwt-authority.md:130),
 // denied caller and observer writes, duplicate no-rerun, and revoked-lease
-// denial. All denial oracles are output-parsed, never exit-code.
+// denial. The manual-verbatim CLI proof lives in gate:manual; this package test
+// stays hermetic to the Go ecosystem.
 func TestBinaryManual(t *testing.T) {
 	t.Parallel()
 	app, err := boot(t, cfgFor(t.TempDir()))
@@ -84,9 +98,36 @@ func TestBinaryManual(t *testing.T) {
 		t.Fatal(err)
 	}
 	w := app.Posture().Wiring
+	author := conn(t, app, RoleAuthor)
+	caller := conn(t, app, RoleCaller)
+	observer := conn(t, app, RoleObserver)
+	authorJS, err := author.JetStream()
+	if err != nil {
+		t.Fatal(err)
+	}
+	callerJS, err := caller.JetStream()
+	if err != nil {
+		t.Fatal(err)
+	}
+	observerJS, err := observer.JetStream()
+	if err != nil {
+		t.Fatal(err)
+	}
+	scripts, err := authorJS.KeyValue(w.ScriptBucket)
+	if err != nil {
+		t.Fatal(err)
+	}
+	config, err := callerJS.KeyValue(w.ConfigBucket)
+	if err != nil {
+		t.Fatal(err)
+	}
+	material, err := observerJS.KeyValue(w.MaterialBucket)
+	if err != nil {
+		t.Fatal(err)
+	}
 
-	// Defining a script (manual "Defining a script"): the author role writes
-	// the strict script record into the script KV bucket over the CLI.
+	// Defining a script (manual "Defining a script"): the author role writes the
+	// strict script record into the script KV bucket with minted creds.
 	rec := core.ScriptRecord{
 		Kind:     "script.record",
 		Key:      w.ScriptKey,
@@ -109,20 +150,30 @@ func TestBinaryManual(t *testing.T) {
 		t.Fatal(err)
 	}
 	scriptKVKey := "s." + base64.RawURLEncoding.EncodeToString([]byte(w.ScriptKey))
-	wantAllowed(t, cli(t, app, RoleAuthor, "kv", "put", w.ScriptBucket, scriptKVKey, string(body)), "author defined script")
+	if _, err := scripts.Put(scriptKVKey, body); err != nil {
+		t.Fatalf("author defined script: %v", err)
+	}
 
 	// Triggering work (request/reply): the reply is the ledger status.
-	out := cli(t, app, RoleCaller, "request", "--raw", "-H", embednats.HeaderRequestID+":req-bin-001", w.TriggerSubject, "run")
+	out := request(t, caller, w.TriggerSubject, "req-bin-001", "run")
 	if strings.TrimSpace(out) != string(core.Accepted) {
 		t.Fatalf("trigger reply drift: %q", out)
 	}
 
 	// Denied caller write: a caller cannot write the ledger KV bucket.
-	wantDenied(t, cli(t, app, RoleCaller, "kv", "put", w.LedgerBucket, "escape", "bad"), "caller wrote ledger KV")
+	ledger, err := callerJS.KeyValue(w.LedgerBucket)
+	if err == nil {
+		_, err = ledger.Put("escape", []byte("bad"))
+	}
+	wantDenied(t, caller, err, "caller wrote ledger KV")
 
 	// Observing results: projection, artifact manifest, and artifact body.
 	projDoc := await(t, "material projection", func() (string, bool) {
-		out := cli(t, app, RoleObserver, "kv", "get", w.MaterialBucket, "p.main", "--raw")
+		entry, err := material.Get("p.main")
+		if err != nil {
+			return err.Error(), false
+		}
+		out := string(entry.Value())
 		return out, strings.Contains(out, "material.projection")
 	})
 	var proj core.MaterialProjection
@@ -132,7 +183,11 @@ func TestBinaryManual(t *testing.T) {
 	if proj.ProjectionID != "main" || proj.Provenance.Producer != "script-materializer" || string(proj.Value) != `{"title":"from-script"}` {
 		t.Fatalf("material projection drift: %#v", proj)
 	}
-	manifestDoc := cli(t, app, RoleObserver, "kv", "get", w.MaterialBucket, "a."+base64.RawURLEncoding.EncodeToString([]byte("artifact/main.js")), "--raw")
+	entry, err := material.Get("a." + base64.RawURLEncoding.EncodeToString([]byte("artifact/main.js")))
+	if err != nil {
+		t.Fatal(err)
+	}
+	manifestDoc := string(entry.Value())
 	var manifest core.MaterialArtifact
 	if err := json.Unmarshal([]byte(manifestDoc), &manifest); err != nil {
 		t.Fatalf("artifact manifest decode failed: %v\n%s", err, manifestDoc)
@@ -140,8 +195,14 @@ func TestBinaryManual(t *testing.T) {
 	if manifest.Kind != "artifact.manifest" || manifest.Digest == "" {
 		t.Fatalf("artifact manifest drift: %#v", manifest)
 	}
+	obj, err := observerJS.ObjectStore(w.ArtifactBucket)
+	if err != nil {
+		t.Fatal(err)
+	}
 	artifactPath := filepath.Join(t.TempDir(), "main.js")
-	cli(t, app, RoleObserver, "object", "get", w.ArtifactBucket, "artifact/main.js", "--output", artifactPath, "--force", "--no-progress")
+	if err := obj.GetFile("artifact/main.js", artifactPath); err != nil {
+		t.Fatal(err)
+	}
 	artifactBody, err := os.ReadFile(artifactPath)
 	if err != nil {
 		t.Fatal(err)
@@ -152,35 +213,75 @@ func TestBinaryManual(t *testing.T) {
 
 	// Denied observer writes: read-only roles cannot write material KV or
 	// Object Store chunks.
-	wantDenied(t, cli(t, app, RoleObserver, "kv", "put", w.MaterialBucket, "p.main", "{}"), "observer wrote material KV")
-	wantDenied(t, cli(t, app, RoleObserver, "publish", "$O."+w.ArtifactBucket+".C.deny", "bad"), "observer wrote object chunk")
+	_, err = material.Put("p.main", []byte("{}"))
+	wantDenied(t, observer, err, "observer wrote material KV")
+	err = observer.Publish("$O."+w.ArtifactBucket+".C.deny", []byte("bad"))
+	if flushErr := observer.FlushTimeout(2 * time.Second); err == nil {
+		err = flushErr
+	}
+	wantDenied(t, observer, err, "observer wrote object chunk")
 
 	// Duplicate no-rerun: the same request id returns Duplicate and the
 	// materialized projection stays byte-identical.
-	out = cli(t, app, RoleCaller, "request", "--raw", "-H", embednats.HeaderRequestID+":req-bin-001", w.TriggerSubject, "run")
+	out = request(t, caller, w.TriggerSubject, "req-bin-001", "run")
 	if strings.TrimSpace(out) != string(core.Duplicate) {
 		t.Fatalf("duplicate reply drift: %q", out)
 	}
-	if again := cli(t, app, RoleObserver, "kv", "get", w.MaterialBucket, "p.main", "--raw"); again != projDoc {
+	again, err := material.Get("p.main")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(again.Value()) != projDoc {
 		t.Fatalf("duplicate reran the script: %s != %s", again, projDoc)
 	}
 
-	// KV/Object/publish behavior-commands creds-mode sweep: the manual's
-	// remaining trigger commands run verbatim under minted creds.
-	// nats CLI v0.3.0 accepts -H/--header, not --hdr.
-	wantAllowed(t, cli(t, app, RoleCaller, "publish", "-H", embednats.HeaderMessageID+":msg-bin-001", w.TriggerSubject, ""), "subject-message trigger")
-	wantAllowed(t, cli(t, app, RoleCaller, "kv", "put", w.ConfigBucket, "app_config", `{"state":"new"}`), "KV change trigger")
+	// KV/Object/publish behavior sweep under minted creds.
+	msg := nats.NewMsg(w.TriggerSubject)
+	msg.Header.Set(embednats.HeaderMessageID, "msg-bin-001")
+	if err := caller.PublishMsg(msg); err != nil {
+		t.Fatalf("subject-message trigger: %v", err)
+	}
+	if _, err := config.Put("app_config", []byte(`{"state":"new"}`)); err != nil {
+		t.Fatalf("KV change trigger: %v", err)
+	}
 	bundle := filepath.Join(t.TempDir(), "app.bundle.js")
 	if err := os.WriteFile(bundle, []byte("bundle"), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	wantAllowed(t, cli(t, app, RoleCaller, "object", "put", w.UploadBucket, bundle, "--name", "app.bundle.js", "--no-progress"), "Object change trigger")
-	wantAllowed(t, cli(t, app, RoleCaller, "publish", w.EventsSubject, "event"), "stream trigger publish")
-	wantDenied(t, cli(t, app, RoleCaller, "publish", "tb.internal.escape", "bad"), "caller published internal subject")
+	uploads, err := callerJS.ObjectStore(w.UploadBucket)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := uploads.PutFile(bundle); err != nil {
+		t.Fatalf("Object change trigger: %v", err)
+	}
+	if err := caller.Publish(w.EventsSubject, []byte("event")); err != nil {
+		t.Fatalf("stream trigger publish: %v", err)
+	}
+	err = caller.Publish("tb.internal.escape", []byte("bad"))
+	if flushErr := caller.FlushTimeout(2 * time.Second); err == nil {
+		err = flushErr
+	}
+	wantDenied(t, caller, err, "caller published internal subject")
 
-	// Revoked-lease denial: revoking the caller principal denies the CLI.
+	// Revoked-lease denial: revoking the caller principal closes the live
+	// connection and denies reconnect with the same creds.
 	if err := app.Runtime().Revoke(embednats.AppAccount, app.Creds(RoleCaller).UserPub); err != nil {
 		t.Fatal(err)
 	}
-	wantDenied(t, cli(t, app, RoleCaller, "request", "--raw", "-H", embednats.HeaderRequestID+":req-bin-002", w.TriggerSubject, "run"), "revoked caller still served")
+	deadline := time.Now().Add(2 * time.Second)
+	for caller.IsConnected() {
+		if time.Now().After(deadline) {
+			t.Fatal("revoked caller connection stayed open")
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+	nc, err := app.Runtime().ConnectCreds(ctx, app.Creds(RoleCaller).File)
+	if err == nil {
+		nc.Close()
+		t.Fatal("revoked caller reconnected")
+	}
+	wantDenied(t, nil, err, "revoked caller reconnected")
 }

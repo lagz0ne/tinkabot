@@ -23,7 +23,7 @@ func TestActivationReleaseProofAcceptedSources(t *testing.T) {
 		flush(t, nc)
 
 		auth := core.Auth{User: act.SourcePrincipal.PrincipalID, Capability: core.Capability{LeaseID: act.SourceLease.LeaseID}}
-		reply, err := natsCLI(rt, auth, "request", "--raw", "-H", HeaderRequestID+":req-rel-001", act.Source.Subject, "ping")
+		reply, err := natsCLI(t, rt, auth, "request", "--raw", "-H", HeaderRequestID+":req-rel-001", act.Source.Subject, "ping")
 		if err != nil {
 			t.Fatalf("CLI request failed: %v\n%s", err, reply)
 		}
@@ -177,7 +177,7 @@ func TestActivationReleaseProofFailureAttribution(t *testing.T) {
 		t.Cleanup(func() { mustStop(t, route) })
 		flush(t, nc)
 
-		reply, err := natsCLI(rt, auth, "request", "--raw", "-H", HeaderRequestID+":req-rel-revoked", act.Source.Subject, "ping")
+		reply, err := natsCLI(t, rt, auth, "request", "--raw", "-H", HeaderRequestID+":req-rel-revoked", act.Source.Subject, "ping")
 		if err != nil {
 			t.Fatalf("CLI revoked request failed: %v\n%s", err, reply)
 		}

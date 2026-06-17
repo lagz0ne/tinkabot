@@ -275,14 +275,42 @@ type bundleDeps struct {
 // plane (memory storage, dead with the process), and the only crossing into
 // TB_APP is the service export/import per trigger. The account boundary —
 // not naming — is what keeps bundle and app state apart.
-// resolveBwrap resolves the bwrap binary (TB_BWRAP override, else PATH). The
-// actual jail smoke test lives in embednats.BwrapSandbox.Preflight; this only
-// finds the binary the default tier will preflight.
+var executable = os.Executable
+
+// resolveBwrap resolves the bwrap binary (TB_BWRAP override, bundled sidecar,
+// else PATH). The actual jail smoke test lives in
+// embednats.BwrapSandbox.Preflight; this only finds the binary the default
+// tier will preflight.
 func resolveBwrap() (string, error) {
 	if bin := os.Getenv("TB_BWRAP"); bin != "" {
 		return bin, nil
 	}
+	if bin, err := bundledBwrap(); err == nil {
+		return bin, nil
+	}
 	return exec.LookPath("bwrap")
+}
+
+func bundledBwrap() (string, error) {
+	exe, err := executable()
+	if err != nil {
+		return "", err
+	}
+	if bin, ok := bwrapUnder(filepath.Dir(exe)); ok {
+		return bin, nil
+	}
+	if real, err := filepath.EvalSymlinks(exe); err == nil && real != exe {
+		if bin, ok := bwrapUnder(filepath.Dir(real)); ok {
+			return bin, nil
+		}
+	}
+	return "", os.ErrNotExist
+}
+
+func bwrapUnder(dir string) (string, bool) {
+	bin := filepath.Join(dir, "libexec", "tinkabot", "bwrap")
+	st, err := os.Stat(bin)
+	return bin, err == nil && !st.IsDir() && st.Mode()&0o111 != 0
 }
 
 // buildSandbox selects the bundle sandbox tier. The trusted tier ("none") is

@@ -3,13 +3,23 @@ package embednats
 import (
 	"context"
 	"os/exec"
+	"path/filepath"
+	"runtime"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
 	"github.com/lagz0ne/tinkabot/substrate/go/core"
 	"github.com/nats-io/nats.go"
 )
+
+var natsTool struct {
+	once sync.Once
+	path string
+	err  error
+	out  string
+}
 
 func TestSourceAuthorityCLIAllowedAndDeniedSubject(t *testing.T) {
 	t.Parallel()
@@ -50,7 +60,7 @@ func TestSourceAuthorityCLIAllowedAndDeniedSubject(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	out, err := natsCLI(rt, cfg.Auth, "request", "--raw", "tb.proof.runtime.execute", "ping")
+	out, err := natsCLI(t, rt, cfg.Auth, "request", "--raw", "tb.proof.runtime.execute", "ping")
 	if err != nil {
 		t.Fatalf("allowed request failed: %v\n%s", err, out)
 	}
@@ -58,13 +68,39 @@ func TestSourceAuthorityCLIAllowedAndDeniedSubject(t *testing.T) {
 		t.Fatalf("reply drift: %q", out)
 	}
 
-	out, err = natsCLI(rt, cfg.Auth, "request", "--raw", "tb.proof.runtime.denied", "ping")
+	out, err = natsCLI(t, rt, cfg.Auth, "request", "--raw", "tb.proof.runtime.denied", "ping")
 	if !strings.Contains(strings.ToLower(out), "permissions") {
 		t.Fatalf("denied neighbor request did not surface permission evidence: err=%v out=%s", err, out)
 	}
 }
 
-func natsCLI(rt *Runtime, auth core.Auth, args ...string) (string, error) {
+func natsCLIBin(t *testing.T) string {
+	t.Helper()
+	natsTool.once.Do(func() {
+		cmd := exec.Command("go", "tool", "-n", "nats")
+		cmd.Dir = natsToolDir(t)
+		out, err := cmd.CombinedOutput()
+		natsTool.path = strings.TrimSpace(string(out))
+		natsTool.err = err
+		natsTool.out = string(out)
+	})
+	if natsTool.err != nil {
+		t.Fatalf("nats CLI Go tool unavailable: %v\n%s", natsTool.err, natsTool.out)
+	}
+	return natsTool.path
+}
+
+func natsToolDir(t *testing.T) string {
+	t.Helper()
+	_, file, _, ok := runtime.Caller(0)
+	if !ok {
+		t.Fatal("could not resolve nats CLI tool module")
+	}
+	return filepath.Clean(filepath.Join(filepath.Dir(file), "..", "..", "..", "tools", "natscli"))
+}
+
+func natsCLI(t *testing.T, rt *Runtime, auth core.Auth, args ...string) (string, error) {
+	t.Helper()
 	base := []string{
 		"--no-context",
 		"--server", rt.Posture().ClientURL,
@@ -72,7 +108,7 @@ func natsCLI(rt *Runtime, auth core.Auth, args ...string) (string, error) {
 		"--password", auth.Capability.LeaseID,
 		"--timeout", "2s",
 	}
-	cmd := exec.Command("nats", append(base, args...)...)
+	cmd := exec.Command(natsCLIBin(t), append(base, args...)...)
 	out, err := cmd.CombinedOutput()
 	return string(out), err
 }
