@@ -14,12 +14,12 @@ Bubblewrap. Generated code never receives NATS credentials or store handles.
 Current release channel: GitHub Release archive:
 
 ```bash
-curl -LO https://github.com/lagz0ne/tinkabot/releases/download/v0.1.0/tinkabot-v0.1.0-linux-amd64.tar.gz
-curl -LO https://github.com/lagz0ne/tinkabot/releases/download/v0.1.0/tinkabot-v0.1.0-linux-amd64.tar.gz.sha256
+curl -LO https://github.com/lagz0ne/tinkabot/releases/download/v0.1.1/tinkabot-v0.1.1-linux-amd64.tar.gz
+curl -LO https://github.com/lagz0ne/tinkabot/releases/download/v0.1.1/tinkabot-v0.1.1-linux-amd64.tar.gz.sha256
 
-sha256sum -c tinkabot-v0.1.0-linux-amd64.tar.gz.sha256
-tar -xzf tinkabot-v0.1.0-linux-amd64.tar.gz
-cd tinkabot-v0.1.0-linux-amd64
+sha256sum -c tinkabot-v0.1.1-linux-amd64.tar.gz.sha256
+tar -xzf tinkabot-v0.1.1-linux-amd64.tar.gz
+cd tinkabot-v0.1.1-linux-amd64
 ./tinkabot --version
 ./tinkalet --version
 ```
@@ -45,9 +45,9 @@ binary:
 
 ```bash
 mkdir -p ~/.local/opt ~/.local/bin
-mv tinkabot-v0.1.0-linux-amd64 ~/.local/opt/
-ln -sfn ~/.local/opt/tinkabot-v0.1.0-linux-amd64/tinkabot ~/.local/bin/tinkabot
-ln -sfn ~/.local/opt/tinkabot-v0.1.0-linux-amd64/tinkalet ~/.local/bin/tinkalet
+mv tinkabot-v0.1.1-linux-amd64 ~/.local/opt/
+ln -sfn ~/.local/opt/tinkabot-v0.1.1-linux-amd64/tinkabot ~/.local/bin/tinkabot
+ln -sfn ~/.local/opt/tinkabot-v0.1.1-linux-amd64/tinkalet ~/.local/bin/tinkalet
 tinkabot --version
 tinkalet --version
 ```
