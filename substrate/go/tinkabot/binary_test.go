@@ -105,6 +105,7 @@ func TestBinaryRestartReloadsWithoutRegeneration(t *testing.T) {
 		t.Fatal(err)
 	}
 	pub := first.Posture().NATS.Operator.PublicKey
+	oldCaller := first.Creds(RoleCaller).File
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	if err := first.Stop(ctx); err != nil {
@@ -124,6 +125,10 @@ func TestBinaryRestartReloadsWithoutRegeneration(t *testing.T) {
 	}
 	if got := again.Posture().NATS.Operator.PublicKey; got != pub {
 		t.Fatalf("operator identity drift across restart: %s != %s", got, pub)
+	}
+	if nc, err := again.Runtime().ConnectCreds(ctx, oldCaller); err == nil {
+		nc.Close()
+		t.Fatal("pre-stop caller creds reconnected after restart")
 	}
 	nc, err := again.Runtime().ConnectCreds(ctx, again.Creds(RoleCaller).File)
 	if err != nil {

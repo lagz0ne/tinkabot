@@ -142,6 +142,17 @@ func TestProfileUseAndTriggerDenials(t *testing.T) {
 	assertCmd(t, code, out, errOut, 1, "", "profile default denied bundle.clock.tick: profile-not-found\n")
 }
 
+func TestItemCommandDenials(t *testing.T) {
+	t.Parallel()
+	env := newEnv(t)
+
+	code, out, errOut := runCmd(t, env.vars, "item", "create", "deploy/1", "--value", "{")
+	assertCmd(t, code, out, errOut, 1, "", "item deploy/1 denied create: malformed-value\n")
+
+	code, out, errOut = runCmd(t, env.vars, "item", "create", "deploy/1")
+	assertCmd(t, code, out, errOut, 1, "", "item deploy/1 denied create: profile-not-found\n")
+}
+
 func TestTriggerProfileOverrideDoesNotChangeDefault(t *testing.T) {
 	t.Parallel()
 	env := newEnv(t)

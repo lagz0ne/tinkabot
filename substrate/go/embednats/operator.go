@@ -91,12 +91,14 @@ type opAccount struct {
 	scopeKP  nkeys.KeyPair
 	claims   *jwt.AccountClaims
 	minted   map[string]bool
+	revFile  string
 }
 
 // newOperator loads (or generates, on first start) the master operator key
 // from the store dir and compiles the control/app account split into the
-// in-memory account resolver. Account identities are ephemeral per process;
-// the operator identity is the persistent authority.
+// in-memory account resolver. Built-in account identities are durable because
+// app-plane JetStream state is stored under the account public key; dynamic
+// accounts minted later remain ephemeral unless their caller persists them.
 func newOperator(dir string) (*operator, error) {
 	kp, keyFile, err := operatorKey(dir)
 	if err != nil {
@@ -129,7 +131,7 @@ func newOperator(dir string) (*operator, error) {
 		return nil, err
 	}
 	for _, name := range []string{ControlAccount, AppAccount} {
-		acc, err := op.newAccount(name)
+		acc, err := op.persistentAccount(dir, name)
 		if err != nil {
 			return nil, err
 		}
@@ -178,6 +180,59 @@ func operatorKey(dir string) (nkeys.KeyPair, string, error) {
 	return kp, path, nil
 }
 
+func accountKey(dir, name, role string) (nkeys.KeyPair, error) {
+	path := filepath.Join(dir, strings.ToLower(name)+"."+role+".nk")
+	raw, err := os.ReadFile(path)
+	if errors.Is(err, fs.ErrNotExist) {
+		kp, err := nkeys.CreateAccount()
+		if err != nil {
+			return nil, fail(AccountCompileFailed, "Start", "account key could not be created", map[string]string{"account": name, "role": role}, err)
+		}
+		seed, err := kp.Seed()
+		if err != nil {
+			return nil, fail(AccountCompileFailed, "Start", "account seed could not be derived", map[string]string{"account": name, "role": role}, err)
+		}
+		if err := os.MkdirAll(dir, 0o700); err != nil {
+			return nil, fail(AccountCompileFailed, "Start", "store dir could not be created", map[string]string{"dir": dir}, err)
+		}
+		if err := os.WriteFile(path, seed, 0o600); err != nil {
+			return nil, fail(AccountCompileFailed, "Start", "account key could not be persisted", map[string]string{"file": path}, err)
+		}
+		return kp, nil
+	}
+	if err != nil {
+		return nil, fail(AccountCompileFailed, "Start", "account key material unreadable", map[string]string{"file": path}, err)
+	}
+	kp, err := nkeys.FromSeed([]byte(strings.TrimSpace(string(raw))))
+	if err != nil {
+		return nil, fail(AccountCompileFailed, "Start", "account key material is corrupt", map[string]string{"file": path}, err)
+	}
+	pub, err := kp.PublicKey()
+	if err != nil || !nkeys.IsValidPublicAccountKey(pub) {
+		return nil, fail(AccountCompileFailed, "Start", "account key material is not an account key", map[string]string{"file": path}, err)
+	}
+	return kp, nil
+}
+
+func accountRevocations(dir, name string) (jwt.RevocationList, string, error) {
+	path := filepath.Join(dir, strings.ToLower(name)+".revocations.json")
+	raw, err := os.ReadFile(path)
+	if errors.Is(err, fs.ErrNotExist) {
+		return jwt.RevocationList{}, path, nil
+	}
+	if err != nil {
+		return nil, path, fail(AccountCompileFailed, "Start", "account revocations unreadable", map[string]string{"file": path}, err)
+	}
+	var rev jwt.RevocationList
+	if err := json.Unmarshal(raw, &rev); err != nil {
+		return nil, path, fail(AccountCompileFailed, "Start", "account revocations are corrupt", map[string]string{"file": path}, err)
+	}
+	if rev == nil {
+		rev = jwt.RevocationList{}
+	}
+	return rev, path, nil
+}
+
 func (o *operator) systemAccount() (string, error) {
 	kp, err := nkeys.CreateAccount()
 	if err != nil {
@@ -199,6 +254,22 @@ func (o *operator) systemAccount() (string, error) {
 	return pub, nil
 }
 
+func (o *operator) persistentAccount(dir, name string) (*opAccount, error) {
+	kp, err := accountKey(dir, name, "account")
+	if err != nil {
+		return nil, err
+	}
+	scopeKP, err := accountKey(dir, name, "scope")
+	if err != nil {
+		return nil, err
+	}
+	rev, revFile, err := accountRevocations(dir, name)
+	if err != nil {
+		return nil, err
+	}
+	return o.compileAccount(name, kp, scopeKP, rev, revFile)
+}
+
 // newAccount compiles one account of the split: a root key that signs users
 // carrying their own permissions, and a scoped signing key whose template is
 // the account default for users minted without permissions. JetStream is
@@ -208,28 +279,32 @@ func (o *operator) newAccount(name string) (*opAccount, error) {
 	if err != nil {
 		return nil, fail(AccountCompileFailed, "Start", "account key could not be created", map[string]string{"account": name}, err)
 	}
-	pub, err := kp.PublicKey()
-	if err != nil {
-		return nil, fail(AccountCompileFailed, "Start", "account key could not be derived", map[string]string{"account": name}, err)
-	}
 	scopeKP, err := nkeys.CreateAccount()
 	if err != nil {
 		return nil, fail(AccountCompileFailed, "Start", "account signing key could not be created", map[string]string{"account": name}, err)
+	}
+	return o.compileAccount(name, kp, scopeKP, nil, "")
+}
+
+func (o *operator) compileAccount(name string, kp, scopeKP nkeys.KeyPair, rev jwt.RevocationList, revFile string) (*opAccount, error) {
+	pub, err := kp.PublicKey()
+	if err != nil {
+		return nil, fail(AccountCompileFailed, "Start", "account key could not be derived", map[string]string{"account": name}, err)
 	}
 	scopePub, err := scopeKP.PublicKey()
 	if err != nil {
 		return nil, fail(AccountCompileFailed, "Start", "account signing key could not be derived", map[string]string{"account": name}, err)
 	}
-
 	claims := jwt.NewAccountClaims(pub)
 	claims.Name = name
+	claims.Revocations = rev
 	claims.Limits.JetStreamLimits = jwt.JetStreamLimits{
 		MemoryStorage: jwt.NoLimit,
 		DiskStorage:   jwt.NoLimit,
 		Streams:       jwt.NoLimit,
 		Consumer:      jwt.NoLimit,
 	}
-	acc := &opAccount{pub: pub, kp: kp, scopePub: scopePub, scopeKP: scopeKP, claims: claims, minted: map[string]bool{}}
+	acc := &opAccount{pub: pub, kp: kp, scopePub: scopePub, scopeKP: scopeKP, claims: claims, minted: map[string]bool{}, revFile: revFile}
 	// Deny-by-default: a permissionless mint holds no authority until an
 	// explicit UpdateAccountPerms sets the account default.
 	acc.setScope(core.Permissions{
@@ -244,6 +319,20 @@ func (o *operator) newAccount(name string) (*opAccount, error) {
 		return nil, fail(AccountUpdateFailed, "Start", "account claims could not be stored", map[string]string{"account": name}, err)
 	}
 	return acc, nil
+}
+
+func (a *opAccount) saveRevocations() error {
+	if a.revFile == "" {
+		return nil
+	}
+	body, err := json.MarshalIndent(a.claims.Revocations, "", "  ")
+	if err != nil {
+		return err
+	}
+	if err := os.WriteFile(a.revFile, append(body, '\n'), 0o600); err != nil {
+		return err
+	}
+	return os.Chmod(a.revFile, 0o600)
 }
 
 // setScope replaces the account-default permission template carried by the
@@ -393,8 +482,7 @@ func (r *Runtime) MintUser(account string, auth core.Auth, ttl time.Duration) (U
 // MintAccount compiles a new account into the live resolver at runtime. An
 // account is a hard namespace: same-name subjects and buckets in other
 // accounts are unrelated, and only explicit service exports/imports cross
-// the boundary. Account identity is ephemeral per process, like the
-// control/app split.
+// the boundary. Runtime-minted account identity is ephemeral per process.
 func (r *Runtime) MintAccount(name string) error {
 	if r == nil || r.op == nil {
 		return fail(AccountCompileFailed, "MintAccount", "operator mode is not enabled", nil, nil)
@@ -560,6 +648,9 @@ func (r *Runtime) Revoke(account, userPub string) error {
 		return fail(RevocationFailed, "Revoke", "credential was not minted here", map[string]string{"account": account, "user": userPub}, nil)
 	}
 	acc.claims.Revoke(userPub)
+	if err := acc.saveRevocations(); err != nil {
+		return fail(RevocationFailed, "Revoke", "revocation could not be persisted", map[string]string{"account": account, "user": userPub}, err)
+	}
 	if _, _, err := r.pushAccount(acc); err != nil {
 		return fail(RevocationFailed, "Revoke", "revocation could not be enforced", map[string]string{"account": account, "user": userPub}, err)
 	}

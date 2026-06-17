@@ -1,7 +1,9 @@
 package tinkalet
 
 import (
+	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/url"
@@ -104,6 +106,8 @@ func (c cli) run(args []string) int {
 		return c.profile(args[1:])
 	case "trigger":
 		return c.trigger(args[1:])
+	case "item":
+		return c.item(args[1:])
 	default:
 		return c.usage()
 	}
@@ -117,6 +121,10 @@ commands:
   profile list [--json]
   profile use <name>
   trigger <intent> [--profile <name>] [--request-id <id>] [--json]
+  item create <key> [--status pending] [--value <json>] [--json]
+  item get <key> [--json]
+  item resolve <key> [--value <json>] [--revision <n>] [--json]
+  item wait <key> --for resolved [--timeout <duration>] [--json]
 `)
 }
 
@@ -397,6 +405,441 @@ func (c cli) triggerLive(prof Profile, intent, reqID string, jsonOut bool, creds
 	default:
 		return c.denyTrigger(prof.Name, intent, "malformed-response", reqID, jsonOut, &prof)
 	}
+}
+
+const itemBucket = "tb_items"
+
+type itemStored struct {
+	Kind       string          `json:"kind"`
+	Key        string          `json:"key"`
+	Status     string          `json:"status"`
+	Value      json.RawMessage `json:"value"`
+	Reason     string          `json:"reason,omitempty"`
+	CreatedAt  string          `json:"createdAt"`
+	UpdatedAt  string          `json:"updatedAt"`
+	Provenance itemProvenance  `json:"provenance"`
+}
+
+type itemProvenance struct {
+	Profile string `json:"profile"`
+	Source  string `json:"source"`
+	Writer  string `json:"writer"`
+}
+
+type itemView struct {
+	Kind       string          `json:"kind"`
+	Key        string          `json:"key"`
+	Status     string          `json:"status"`
+	Value      json.RawMessage `json:"value"`
+	Reason     string          `json:"reason,omitempty"`
+	Revision   uint64          `json:"revision"`
+	CreatedAt  string          `json:"createdAt"`
+	UpdatedAt  string          `json:"updatedAt"`
+	Provenance itemProvenance  `json:"provenance"`
+}
+
+func (c cli) item(args []string) int {
+	if len(args) == 0 {
+		return c.usage()
+	}
+	switch args[0] {
+	case "create":
+		key, status, value, jsonOut, ok := parseItemCreate(args[1:])
+		if !ok || !validItemKey(key) || status != "pending" {
+			return c.usage()
+		}
+		val, valid := jsonValue(value)
+		if !valid {
+			return c.denyItem(key, "create", "malformed-value")
+		}
+		return c.itemCreate(key, status, val, jsonOut)
+	case "get":
+		key, jsonOut, ok := parseItemGet(args[1:])
+		if !ok || !validItemKey(key) {
+			return c.usage()
+		}
+		return c.itemGet(key, jsonOut)
+	case "resolve":
+		key, value, rev, revSet, jsonOut, ok := parseItemResolve(args[1:])
+		if !ok || !validItemKey(key) {
+			return c.usage()
+		}
+		val, valid := jsonValue(value)
+		if !valid {
+			return c.denyItem(key, "resolve", "malformed-value")
+		}
+		return c.itemResolve(key, val, rev, revSet, jsonOut)
+	case "wait":
+		key, want, timeout, jsonOut, ok := parseItemWait(args[1:])
+		if !ok || !validItemKey(key) || want != "resolved" {
+			return c.usage()
+		}
+		return c.itemWait(key, want, timeout, jsonOut)
+	default:
+		return c.usage()
+	}
+}
+
+func parseItemCreate(args []string) (string, string, string, bool, bool) {
+	status := "pending"
+	var key, value string
+	var jsonOut bool
+	for i := 0; i < len(args); i++ {
+		arg := args[i]
+		switch {
+		case arg == "--json":
+			jsonOut = true
+		case arg == "--status" && i+1 < len(args):
+			i++
+			status = args[i]
+		case strings.HasPrefix(arg, "--status="):
+			status = strings.TrimPrefix(arg, "--status=")
+		case arg == "--value" && i+1 < len(args):
+			i++
+			value = args[i]
+		case strings.HasPrefix(arg, "--value="):
+			value = strings.TrimPrefix(arg, "--value=")
+		case strings.HasPrefix(arg, "-"):
+			return "", "", "", false, false
+		case key == "":
+			key = arg
+		default:
+			return "", "", "", false, false
+		}
+	}
+	return key, status, value, jsonOut, key != ""
+}
+
+func parseItemGet(args []string) (string, bool, bool) {
+	var key string
+	var jsonOut bool
+	for _, arg := range args {
+		switch {
+		case arg == "--json":
+			jsonOut = true
+		case strings.HasPrefix(arg, "-"):
+			return "", false, false
+		case key == "":
+			key = arg
+		default:
+			return "", false, false
+		}
+	}
+	return key, jsonOut, key != ""
+}
+
+func parseItemResolve(args []string) (string, string, uint64, bool, bool, bool) {
+	var key, value string
+	var rev uint64
+	var revSet bool
+	var jsonOut bool
+	for i := 0; i < len(args); i++ {
+		arg := args[i]
+		switch {
+		case arg == "--json":
+			jsonOut = true
+		case arg == "--value" && i+1 < len(args):
+			i++
+			value = args[i]
+		case strings.HasPrefix(arg, "--value="):
+			value = strings.TrimPrefix(arg, "--value=")
+		case arg == "--revision" && i+1 < len(args):
+			i++
+			parsed, err := strconv.ParseUint(args[i], 10, 64)
+			if err != nil {
+				return "", "", 0, false, false, false
+			}
+			rev = parsed
+			revSet = true
+		case strings.HasPrefix(arg, "--revision="):
+			parsed, err := strconv.ParseUint(strings.TrimPrefix(arg, "--revision="), 10, 64)
+			if err != nil {
+				return "", "", 0, false, false, false
+			}
+			rev = parsed
+			revSet = true
+		case strings.HasPrefix(arg, "-"):
+			return "", "", 0, false, false, false
+		case key == "":
+			key = arg
+		default:
+			return "", "", 0, false, false, false
+		}
+	}
+	return key, value, rev, revSet, jsonOut, key != ""
+}
+
+func parseItemWait(args []string) (string, string, time.Duration, bool, bool) {
+	timeout := 30 * time.Second
+	var key, want string
+	var jsonOut bool
+	for i := 0; i < len(args); i++ {
+		arg := args[i]
+		switch {
+		case arg == "--json":
+			jsonOut = true
+		case arg == "--for" && i+1 < len(args):
+			i++
+			want = args[i]
+		case strings.HasPrefix(arg, "--for="):
+			want = strings.TrimPrefix(arg, "--for=")
+		case arg == "--timeout" && i+1 < len(args):
+			i++
+			d, err := time.ParseDuration(args[i])
+			if err != nil {
+				return "", "", 0, false, false
+			}
+			timeout = d
+		case strings.HasPrefix(arg, "--timeout="):
+			d, err := time.ParseDuration(strings.TrimPrefix(arg, "--timeout="))
+			if err != nil {
+				return "", "", 0, false, false
+			}
+			timeout = d
+		case strings.HasPrefix(arg, "-"):
+			return "", "", 0, false, false
+		case key == "":
+			key = arg
+		default:
+			return "", "", 0, false, false
+		}
+	}
+	return key, want, timeout, jsonOut, key != "" && want != "" && timeout > 0
+}
+
+func (c cli) itemCreate(key, status string, value json.RawMessage, jsonOut bool) int {
+	prof, kv, nc, reason := c.itemKV()
+	if reason != "" {
+		return c.denyItem(key, "create", reason)
+	}
+	defer nc.Close()
+	now := time.Now().UTC().Format(time.RFC3339)
+	rec := itemStored{
+		Kind:      "tinkabot.item.v1",
+		Key:       key,
+		Status:    status,
+		Value:     value,
+		CreatedAt: now,
+		UpdatedAt: now,
+		Provenance: itemProvenance{
+			Profile: prof.Name,
+			Source:  prof.Source,
+			Writer:  "tinkalet",
+		},
+	}
+	body, err := json.Marshal(rec)
+	if err != nil {
+		return c.denyItem(key, "create", "malformed-value")
+	}
+	rev, err := kv.Create(key, body)
+	if err != nil {
+		if errors.Is(err, nats.ErrKeyExists) {
+			return c.denyItem(key, "create", "duplicate-item")
+		}
+		return c.denyItem(key, "create", itemReason(err, *prof))
+	}
+	return c.okItem(viewItem(rec, rev), jsonOut)
+}
+
+func (c cli) itemGet(key string, jsonOut bool) int {
+	_, kv, nc, reason := c.itemKV()
+	if reason != "" {
+		return c.denyItem(key, "get", reason)
+	}
+	defer nc.Close()
+	item, reason := readItem(kv, key)
+	if reason != "" {
+		return c.denyItem(key, "get", reason)
+	}
+	return c.okItem(item, jsonOut)
+}
+
+func (c cli) itemResolve(key string, value json.RawMessage, rev uint64, revSet, jsonOut bool) int {
+	prof, kv, nc, reason := c.itemKV()
+	if reason != "" {
+		return c.denyItem(key, "resolve", reason)
+	}
+	defer nc.Close()
+	current, reason := readItem(kv, key)
+	if reason != "" {
+		return c.denyItem(key, "resolve", reason)
+	}
+	if !revSet {
+		rev = current.Revision
+	}
+	rec := itemStored{
+		Kind:      "tinkabot.item.v1",
+		Key:       key,
+		Status:    "resolved",
+		Value:     value,
+		CreatedAt: current.CreatedAt,
+		UpdatedAt: time.Now().UTC().Format(time.RFC3339),
+		Provenance: itemProvenance{
+			Profile: prof.Name,
+			Source:  prof.Source,
+			Writer:  "tinkalet",
+		},
+	}
+	body, err := json.Marshal(rec)
+	if err != nil {
+		return c.denyItem(key, "resolve", "malformed-value")
+	}
+	next, err := kv.Update(key, body, rev)
+	if err != nil {
+		return c.denyItem(key, "resolve", itemReason(err, *prof))
+	}
+	return c.okItem(viewItem(rec, next), jsonOut)
+}
+
+func (c cli) itemWait(key, want string, timeout time.Duration, jsonOut bool) int {
+	_, kv, nc, reason := c.itemKV()
+	if reason != "" {
+		return c.denyItem(key, "wait", reason)
+	}
+	defer nc.Close()
+	deadline := time.Now().Add(timeout)
+	for {
+		item, reason := readItem(kv, key)
+		if reason != "" {
+			return c.denyItem(key, "wait", reason)
+		}
+		if item.Status == want {
+			return c.okItem(item, jsonOut)
+		}
+		if time.Now().After(deadline) {
+			return c.denyItem(key, "wait", "wait-timeout")
+		}
+		time.Sleep(100 * time.Millisecond)
+	}
+}
+
+func (c cli) itemKV() (*Profile, nats.KeyValue, *nats.Conn, string) {
+	profiles, _ := c.loadProfiles()
+	name := c.defaultProfile()
+	if name == "" {
+		return nil, nil, nil, "profile-not-found"
+	}
+	prof := find(profiles, name)
+	if prof == nil {
+		return nil, nil, nil, "profile-not-found"
+	}
+	creds := filepath.Join(c.dataDir(), filepath.FromSlash(prof.CredentialRef))
+	if _, err := os.Stat(creds); err != nil {
+		return prof, nil, nil, "stale-credentials"
+	}
+	if c.deniedNeighbor(*prof) {
+		return prof, nil, nil, "denied-neighbor"
+	}
+	nc, err := nats.Connect(prof.Server, nats.UserCredentials(creds), nats.NoReconnect(), nats.Timeout(2*time.Second), nats.ErrorHandler(func(*nats.Conn, *nats.Subscription, error) {}))
+	if err != nil {
+		return prof, nil, nil, authReason(err, *prof)
+	}
+	js, err := nc.JetStream()
+	if err != nil {
+		nc.Close()
+		return prof, nil, nil, "connection-failed"
+	}
+	kv, err := js.KeyValue(itemBucket)
+	if err != nil {
+		nc.Close()
+		return prof, nil, nil, itemReason(err, *prof)
+	}
+	return prof, kv, nc, ""
+}
+
+func readItem(kv nats.KeyValue, key string) (itemView, string) {
+	entry, err := kv.Get(key)
+	if err != nil {
+		if errors.Is(err, nats.ErrKeyNotFound) {
+			return itemView{}, "item-not-found"
+		}
+		return itemView{}, itemReason(err, Profile{})
+	}
+	var rec itemStored
+	if err := json.Unmarshal(entry.Value(), &rec); err != nil || rec.Kind != "tinkabot.item.v1" || rec.Key != key {
+		return itemView{}, "malformed-item"
+	}
+	return viewItem(rec, entry.Revision()), ""
+}
+
+func viewItem(rec itemStored, rev uint64) itemView {
+	return itemView{
+		Kind:       rec.Kind,
+		Key:        rec.Key,
+		Status:     rec.Status,
+		Value:      rec.Value,
+		Reason:     rec.Reason,
+		Revision:   rev,
+		CreatedAt:  rec.CreatedAt,
+		UpdatedAt:  rec.UpdatedAt,
+		Provenance: rec.Provenance,
+	}
+}
+
+func itemReason(err error, prof Profile) string {
+	if err == nil {
+		return ""
+	}
+	msg := strings.ToLower(err.Error())
+	switch {
+	case strings.Contains(msg, "wrong last sequence"):
+		return "stale-revision"
+	case strings.Contains(msg, "key exists"):
+		return "duplicate-item"
+	case strings.Contains(msg, "not found"):
+		return "item-not-found"
+	case strings.Contains(msg, "authorization") || strings.Contains(msg, "authentication") || strings.Contains(msg, "permission"):
+		return authReason(err, prof)
+	default:
+		return "connection-failed"
+	}
+}
+
+func (c cli) okItem(item itemView, jsonOut bool) int {
+	if jsonOut {
+		_ = json.NewEncoder(c.out).Encode(item)
+		return 0
+	}
+	if string(item.Value) != "null" && len(item.Value) > 0 {
+		fmt.Fprintf(c.out, "item %s %s rev %d value %s\n", item.Key, item.Status, item.Revision, item.Value)
+		return 0
+	}
+	fmt.Fprintf(c.out, "item %s %s rev %d\n", item.Key, item.Status, item.Revision)
+	return 0
+}
+
+func (c cli) denyItem(key, action, reason string) int {
+	fmt.Fprintf(c.errOut, "item %s denied %s: %s\n", key, action, reason)
+	return 1
+}
+
+func jsonValue(raw string) (json.RawMessage, bool) {
+	if raw == "" {
+		return json.RawMessage("null"), true
+	}
+	if !json.Valid([]byte(raw)) {
+		return nil, false
+	}
+	var buf bytes.Buffer
+	if err := json.Compact(&buf, []byte(raw)); err != nil {
+		return nil, false
+	}
+	return json.RawMessage(buf.Bytes()), true
+}
+
+func validItemKey(key string) bool {
+	if key == "" || strings.HasPrefix(key, "/") || strings.HasSuffix(key, "/") || strings.Contains(key, "//") {
+		return false
+	}
+	for _, r := range key {
+		switch {
+		case r >= 'a' && r <= 'z', r >= 'A' && r <= 'Z', r >= '0' && r <= '9':
+		case r == '.', r == '_', r == '-', r == '/':
+		default:
+			return false
+		}
+	}
+	return !strings.Contains(key, "..")
 }
 
 func (c cli) deniedNeighbor(prof Profile) bool {

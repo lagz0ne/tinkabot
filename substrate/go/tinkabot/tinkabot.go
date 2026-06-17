@@ -97,6 +97,7 @@ type Wiring struct {
 	LedgerBucket   string
 	MaterialBucket string
 	ArtifactBucket string
+	ItemBucket     string
 	ScriptKey      string
 	ScriptRevision int
 }
@@ -145,6 +146,7 @@ func wiring() Wiring {
 		LedgerBucket:   "tb_ledger",
 		MaterialBucket: "tb_material",
 		ArtifactBucket: "tb_artifacts",
+		ItemBucket:     "tb_items",
 		ScriptKey:      "scripts.app.main",
 		ScriptRevision: 1,
 	}
@@ -481,8 +483,8 @@ func (a *App) serveShell(addr string) (ShellPosture, error) {
 
 // materialize creates the manual's caller-facing stores at first start and
 // reopens them on restart (JetStream create is idempotent for an unchanged
-// config; account identity is ephemeral, so a restart starts a fresh plane
-// over the same operator authority).
+// config; the built-in app account is durable, so app-plane KV state survives
+// restart under the same operator authority).
 func materialize(ctx context.Context, rt *embednats.Runtime, svc embednats.UserCreds, w Wiring) error {
 	nc, err := rt.ConnectCreds(ctx, svc.File)
 	if err != nil {
@@ -495,6 +497,9 @@ func materialize(ctx context.Context, rt *embednats.Runtime, svc embednats.UserC
 	}
 	if _, err := js.CreateKeyValue(&nats.KeyValueConfig{Bucket: w.ConfigBucket, Storage: nats.FileStorage}); err != nil {
 		return fail(StartupMaterializationFailed, "Start", "config bucket could not be materialized", map[string]string{"bucket": w.ConfigBucket}, err)
+	}
+	if _, err := js.CreateKeyValue(&nats.KeyValueConfig{Bucket: w.ItemBucket, Storage: nats.FileStorage}); err != nil {
+		return fail(StartupMaterializationFailed, "Start", "item bucket could not be materialized", map[string]string{"bucket": w.ItemBucket}, err)
 	}
 	if _, err := js.ObjectStore(w.UploadBucket); err != nil {
 		if !errors.Is(err, nats.ErrStreamNotFound) && !errors.Is(err, nats.ErrBucketNotFound) {
@@ -590,7 +595,8 @@ func principal(user, lease string, perms core.Permissions) core.Auth {
 // writes script records. Deny wins; tb.internal.> stays out of caller reach.
 func rolePerms(w Wiring) map[string]core.Permissions {
 	inbox := core.PermList{Allow: []string{"_INBOX.>"}}
-	caller := append([]string{"$JS.API.INFO", w.TriggerSubject, w.EventsSubject, "$KV." + w.ConfigBucket + ".>", "$O." + w.UploadBucket + ".>"}, readKV(w.ConfigBucket)...)
+	caller := append([]string{"$JS.API.INFO", w.TriggerSubject, w.EventsSubject, "$KV." + w.ConfigBucket + ".>", "$KV." + w.ItemBucket + ".>", "$O." + w.UploadBucket + ".>"}, readKV(w.ConfigBucket)...)
+	caller = append(caller, readKV(w.ItemBucket)...)
 	caller = append(caller, readObj(w.UploadBucket)...)
 	observer := append([]string{"$JS.API.INFO", "_INBOX.>"}, readKV(w.MaterialBucket)...)
 	observer = append(observer, readObj(w.ArtifactBucket)...)
@@ -625,6 +631,7 @@ func servicePerms(w Wiring) core.Permissions {
 		"$JS.API.INFO", "_INBOX.>",
 		"$JS.API.STREAM.CREATE." + eventsStream,
 		"$JS.API.STREAM.CREATE.KV_" + w.ConfigBucket,
+		"$JS.API.STREAM.CREATE.KV_" + w.ItemBucket,
 		"$JS.API.STREAM.CREATE.OBJ_" + w.UploadBucket,
 		"$JS.API.STREAM.INFO.OBJ_" + w.UploadBucket,
 		"$JS.API.STREAM.CREATE.KV_" + w.ScriptBucket,
