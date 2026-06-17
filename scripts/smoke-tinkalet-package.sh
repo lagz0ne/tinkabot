@@ -109,6 +109,7 @@ for _ in {1..150}; do
     echo "shell $shell_url"
     echo "tinkalet trigger accepted and projection changed"
     echo "packaged nats sidecar was removed before the Tinkalet commands"
+    echo "gate:tinkalet-package passed"
     exit 0
   fi
   sleep 0.1

@@ -760,6 +760,13 @@
         "docs/matched-abstraction/approach/code-structure.md",
         "docs/matched-abstraction/plan/code-structure.md"
       ]
+    },
+    {
+      "domain": "tinkalet-edge",
+      "docs": [
+        "docs/matched-abstraction/approach/tinkalet-edge.md",
+        "docs/matched-abstraction/plan/tinkalet-edge.md"
+      ]
     }
   ],
   "gateResults": [
@@ -797,6 +804,18 @@
         "nats request --raw -H Tinkabot-Request-Id:req-rel-001 tb.proof.runtime.execute ping",
         "nats kv get \"$MATERIAL_BUCKET\" p.main --raw",
         "nats kv get \"$MATERIAL_BUCKET\" a.YXJ0aWZhY3QvbWFpbi5qcw --raw"
+      ]
+    },
+    {
+      "gate": "gate:tinkalet-package",
+      "command": "bun run gate:tinkalet-package",
+      "result": "gate:tinkalet-package passed",
+      "doc": "docs/matched-abstraction/task/tinkalet-release-docs-and-proof.md",
+      "manual": "docs/manual/v1.md",
+      "verbatim": [
+        "./tinkalet profile import local --store \"$STORE\" --name local",
+        "./tinkalet profile use local",
+        "./tinkalet trigger bundle.clock.tick --request-id req-clock-1"
       ]
     }
   ]

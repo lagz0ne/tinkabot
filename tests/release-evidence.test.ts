@@ -226,8 +226,9 @@ describe("evidence-stale", () => {
 });
 
 // quality-release extension (plan/quality-v1.md:79,93-94): the checker must
-// validate the four standing gate results plus the manual-verbatim result as
-// part of the one centralized release gate. The required gate list is
+// validate the four standing gate results, the manual-verbatim result, and the
+// Tinkalet package gate as part of the one centralized release gate. The
+// required gate list is
 // hardcoded like MILESTONES so the manifest cannot weaken its own gates
 // (tasks/todo.md:244); in these synthetic corpora it rides the gates fixture.
 
@@ -248,6 +249,7 @@ const gateLines = `Gates:
 - \`bun run gate:coverage\` -> \`gate:coverage passed\`.
 - \`bun run gate:scenarios\` -> \`gate:scenarios passed\`.
 - \`bun run gate:manual\` -> \`gate:manual passed\`.
+- \`bun run gate:tinkalet-package\` -> \`gate:tinkalet-package passed\`.
 `;
 
 // goodDoc plus per-gate executed result lines inside Verification Evidence.
@@ -266,11 +268,26 @@ const gateResults = [
     manual: MANUAL,
     verbatim: ["nats request tb.m1.execute ping"],
   },
+  {
+    gate: "gate:tinkalet-package",
+    command: "bun run gate:tinkalet-package",
+    result: "gate:tinkalet-package passed",
+    doc: TASK,
+    manual: MANUAL,
+    verbatim: ["tinkalet trigger bundle.clock.tick"],
+  },
 ];
 
 const qGates = {
   ...gates,
-  requiredGates: ["gate:fakes", "gate:parallel", "gate:coverage", "gate:scenarios", "gate:manual"],
+  requiredGates: [
+    "gate:fakes",
+    "gate:parallel",
+    "gate:coverage",
+    "gate:scenarios",
+    "gate:manual",
+    "gate:tinkalet-package",
+  ],
 };
 
 const qRepo = (extra: Record<string, string> = {}) => repo({ [TASK]: gateDoc, [MANUAL]: manualDoc, ...extra });
@@ -340,6 +357,16 @@ describe("manual-divergence", () => {
       ...manifest,
       gateResults: gateResults.map((g) =>
         g.gate === "gate:manual" ? { ...g, verbatim: ["nats request tb.m1.execute pong"] } : g,
+      ),
+    };
+    expect(qFamilies(m)).toContain("manual-divergence");
+  });
+
+  test("package gate manual evidence cites a command the manual does not contain", () => {
+    const m = {
+      ...manifest,
+      gateResults: gateResults.map((g) =>
+        g.gate === "gate:tinkalet-package" ? { ...g, verbatim: ["tinkalet trigger missing.intent"] } : g,
       ),
     };
     expect(qFamilies(m)).toContain("manual-divergence");

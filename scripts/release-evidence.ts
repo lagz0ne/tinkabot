@@ -38,8 +38,8 @@ export type Entry = {
 export type Authority = { domain: string; docs: string[]; superseded?: string[] };
 
 // A standing gate's landed result (quality-v1.md:79,94): the cited doc must
-// carry the result line; gate:manual additionally cites the manual and the
-// verbatim commands it held against the running binary.
+// carry the result line; gates may additionally cite the manual and verbatim
+// commands they held through their own executable proof.
 export type GateResult = {
   gate: string;
   command: string;
@@ -147,15 +147,17 @@ export const REQUIRED_CASES = [
   "attributed_failure",
 ];
 
-// quality-v1.md:93-94 — the four standing gates plus the manual-verbatim
-// gate, hardcoded like MILESTONES so the manifest cannot weaken its own
-// gates (tasks/todo.md:244).
+// quality-v1.md:93-94 plus tinkalet-edge.md release-docs-and-proof — the four
+// standing gates, the manual-verbatim gate, and the Tinkalet package tour gate,
+// hardcoded like MILESTONES so the manifest cannot weaken its own gates
+// (tasks/todo.md:244).
 export const REQUIRED_GATES = [
   "gate:fakes",
   "gate:parallel",
   "gate:coverage",
   "gate:scenarios",
   "gate:manual",
+  "gate:tinkalet-package",
 ];
 
 export const PLAN_GATES: Gates = {
@@ -355,9 +357,9 @@ export function check(manifest: Manifest, repo: Repo, gates: Gates = PLAN_GATES)
 
   // quality-v1.md:79,94 — every required standing gate needs a landed result:
   // the cited doc must exist and carry the recorded result line, the result
-  // must be a pass (quality-v1.md:61 — no gate presented as passing before
-  // the owning slice landed its proof), and gate:manual's verbatim commands
-  // must appear in the cited manual.
+  // must be a pass (quality-v1.md:61 — no gate presented as passing before the
+  // owning slice landed its proof), and any gate with manual/verbatim evidence
+  // must cite commands that appear in the cited manual.
   const gateResults = new Map((manifest.gateResults ?? []).map((g) => [g.gate, g]));
   for (const name of gates.requiredGates ?? []) {
     const g = gateResults.get(name);
@@ -381,19 +383,23 @@ export function check(manifest: Manifest, repo: Repo, gates: Gates = PLAN_GATES)
         add("evidence-stale", `gate ${name} result line sits outside executed verification evidence in ${g.doc}`);
       }
     }
-    if (name !== "gate:manual") continue;
-    if (!g.manual || !g.verbatim?.length) {
+    if (name === "gate:manual" && (!g.manual || !g.verbatim?.length)) {
       add("gate-result-missing", "gate:manual result names no manual doc or verbatim commands");
+      continue;
+    }
+    if (!g.manual && !g.verbatim?.length) continue;
+    if (!g.manual || !g.verbatim?.length) {
+      add("gate-result-missing", `gate ${name} result has incomplete manual/verbatim command evidence`);
       continue;
     }
     const man = repo.read(g.manual);
     if (man === null) {
-      add("citation-unresolved", `gate:manual cites missing manual doc ${g.manual}`);
+      add("citation-unresolved", `gate ${name} cites missing manual doc ${g.manual}`);
       continue;
     }
     for (const cmd of g.verbatim) {
       if (!man.includes(cmd)) {
-        add("manual-divergence", `manual-verbatim command not found in ${g.manual}: ${cmd}`);
+        add("manual-divergence", `gate ${name} manual-verbatim command not found in ${g.manual}: ${cmd}`);
       }
     }
   }
