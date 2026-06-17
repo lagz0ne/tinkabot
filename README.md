@@ -21,6 +21,7 @@ sha256sum -c tinkabot-v0.1.0-linux-amd64.tar.gz.sha256
 tar -xzf tinkabot-v0.1.0-linux-amd64.tar.gz
 cd tinkabot-v0.1.0-linux-amd64
 ./tinkabot --version
+./tinkalet --version
 ```
 
 Run directly from the unpacked package:
@@ -35,8 +36,9 @@ Open:
 http://127.0.0.1:8419/artifacts/bundle/clock/index.html
 ```
 
-The package includes `libexec/tinkabot/bwrap` for sandboxing and
-`libexec/tinkabot/nats` for operator commands.
+The package includes `tinkalet` for profile-aware product commands,
+`libexec/tinkabot/bwrap` for sandboxing, and `libexec/tinkabot/nats` for
+operator diagnostics.
 
 To put `tinkabot` on `PATH`, keep the package directory intact and symlink the
 binary:
@@ -45,7 +47,9 @@ binary:
 mkdir -p ~/.local/opt ~/.local/bin
 mv tinkabot-v0.1.0-linux-amd64 ~/.local/opt/
 ln -sfn ~/.local/opt/tinkabot-v0.1.0-linux-amd64/tinkabot ~/.local/bin/tinkabot
+ln -sfn ~/.local/opt/tinkabot-v0.1.0-linux-amd64/tinkalet ~/.local/bin/tinkalet
 tinkabot --version
+tinkalet --version
 ```
 
 This layout matters: the binary discovers bundled sidecars relative to itself
@@ -95,23 +99,31 @@ bun run release:package dist/release
 
 ## Drive It
 
-The binary prints its NATS client URL and role creds on startup. Use the bundled
-NATS CLI sidecar instead of installing a global CLI:
+The binary writes a local profile descriptor into the store on startup.
+Tinkalet imports that descriptor, copies the caller credential into its managed
+data dir, and then speaks product intent instead of raw NATS subjects:
 
 ```bash
-NATS=./libexec/tinkabot/nats # release package root
-# NATS=/tmp/tinkabot/libexec/tinkabot/nats # local package from source
-CLIENT_URL=nats://127.0.0.1:4222 # replace with the printed "nats" URL
+TINKALET_CONFIG_DIR=/tmp/tinkalet-config \
+TINKALET_DATA_DIR=/tmp/tinkalet-data \
+  ./tinkalet profile import local --store /tmp/tb-clock --name local
 
-"$NATS" --no-context --server "$CLIENT_URL" \
-  --creds /tmp/tb-clock/caller.creds \
-  --timeout 2s \
-  request --raw -H Tinkabot-Request-Id:req-clock-1 \
-  tb.bundle.clock.tick go
+TINKALET_CONFIG_DIR=/tmp/tinkalet-config \
+TINKALET_DATA_DIR=/tmp/tinkalet-data \
+  ./tinkalet profile use local
+
+TINKALET_CONFIG_DIR=/tmp/tinkalet-config \
+TINKALET_DATA_DIR=/tmp/tinkalet-data \
+  ./tinkalet trigger bundle.clock.tick --request-id req-clock-1
+# -> profile local accepted bundle.clock.tick
 ```
 
 The clock also ticks itself every five seconds. The page polls the derived
 projection and updates without receiving credentials.
+
+The bundled NATS CLI sidecar remains useful for diagnostics and advanced
+operator checks, but the clock trigger tour does not require a global `nats`
+install or raw subject names.
 
 ## What Is Proven
 
@@ -135,13 +147,16 @@ projection and updates without receiving credentials.
 bun run gate:manual
 bun run release:evidence
 bun run release:package dist/release
+bun run smoke:tinkalet-package
 bun run validate:layers
 cd substrate/go && go test ./... -count=1
 ```
 
 `gate:manual` runs the manual's documented command/outcome pairs against a real
-binary using the pinned NATS CLI tool. `release:evidence` validates the release
-manifest and gate results.
+binary using the pinned NATS CLI tool. `smoke:tinkalet-package` builds the
+release archive, runs the packaged `tinkabot`, imports its local profile with
+the packaged `tinkalet`, removes the packaged NATS sidecar, and still triggers
+the clock. `release:evidence` validates the release manifest and gate results.
 
 ## Examples
 
@@ -170,7 +185,7 @@ MIT. See [LICENSE](LICENSE).
 ## Current Limits
 
 - No npm wrapper yet; `bun run release:package` creates the GitHub Release
-  archive locally.
+  archive locally. Symlink `tinkabot` and `tinkalet` from that archive for now.
 - Default bundle sandboxing depends on host support for Bubblewrap namespaces.
 - The browser shell is functional proof infrastructure, not a polished product
   UI.

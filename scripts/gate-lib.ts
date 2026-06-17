@@ -1,6 +1,6 @@
 // Shared corpus scanning for the four standing quality gates
 // (docs/matched-abstraction/plan/quality-v1.md:87-92). Each gate reads the
-// committed Go test corpus under substrate/go and reports findings in the
+// current Go test corpus under substrate/go and reports findings in the
 // slice's owned failure families (quality-v1.md:71).
 
 import { execSync } from "node:child_process";
@@ -18,7 +18,10 @@ export function setGoDir(dir: string) {
 export type Finding = { family: string; detail: string };
 
 export function goFiles(): string[] {
-  return execSync("git ls-files '*.go'", { cwd: goDir, encoding: "utf8" })
+  return execSync("git ls-files --cached --others --exclude-standard -- '*.go'", {
+    cwd: goDir,
+    encoding: "utf8",
+  })
     .split("\n")
     .filter(Boolean);
 }
@@ -38,7 +41,7 @@ export const lineOf = (src: string, index: number) =>
 
 export type TestFn = { file: string; name: string; line: number; body: string };
 
-// Top-level Test funcs per committed _test.go file. Body runs to the next
+// Top-level Test funcs per current _test.go file. Body runs to the next
 // top-level func, so subtest t.Parallel() calls count for their parent.
 export function testFns(): TestFn[] {
   const out: TestFn[] = [];
@@ -58,8 +61,8 @@ export function testFns(): TestFn[] {
   return out;
 }
 
-// A citation resolves when its first slash segment exactly names a committed
-// Test func (stricter than release-evidence.ts's startsWith rule).
+// A citation resolves when its first slash segment exactly names a current Test
+// func (stricter than release-evidence.ts's startsWith rule).
 export function resolves(citation: string, names: Set<string>): boolean {
   return names.has(citation.split("/")[0]);
 }

@@ -8,6 +8,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net"
@@ -363,6 +364,9 @@ func Start(cfg Config) (*App, error) {
 		}
 	}
 	app.posture = Posture{NATS: rt.Posture(), Shell: shell, Wiring: w}
+	if err := writeLocalProfile(cfg.StoreDir, app.posture); err != nil {
+		return nil, fail(StartupMaterializationFailed, "Start", "local profile descriptor could not be persisted", nil, err)
+	}
 	ok = true
 	return app, nil
 }
@@ -504,6 +508,39 @@ func materialize(ctx context.Context, rt *embednats.Runtime, svc embednats.UserC
 		return fail(StartupMaterializationFailed, "Start", "events stream could not be materialized", map[string]string{"stream": eventsStream}, err)
 	}
 	return nil
+}
+
+func writeLocalProfile(store string, p Posture) error {
+	abs, err := filepath.Abs(store)
+	if err != nil {
+		return err
+	}
+	doc := struct {
+		Kind       string `json:"kind"`
+		Server     string `json:"server"`
+		Shell      string `json:"shell"`
+		Credential string `json:"credential"`
+		Role       string `json:"role"`
+		Trust      string `json:"trust"`
+		Source     string `json:"source"`
+	}{
+		Kind:       "tinkabot.localProfile.v1",
+		Server:     p.NATS.ClientURL,
+		Shell:      p.Shell.URL,
+		Credential: "caller.creds",
+		Role:       RoleCaller,
+		Trust:      "local-owner",
+		Source:     "local-store:" + abs,
+	}
+	body, err := json.MarshalIndent(doc, "", "  ")
+	if err != nil {
+		return err
+	}
+	path := filepath.Join(store, "local-profile.json")
+	if err := os.WriteFile(path, append(body, '\n'), 0o600); err != nil {
+		return err
+	}
+	return os.Chmod(path, 0o600)
 }
 
 // CheckManual verifies docs/manual/v1.md names the served binary surface: the

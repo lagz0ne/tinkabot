@@ -48,6 +48,10 @@ cat > "$pkg/release.json" <<JSON
   "gitCommit": "$commit",
   "builtAt": "$built_at",
   "binary": "tinkabot",
+  "commands": [
+    "tinkabot",
+    "tinkalet"
+  ],
   "bundledBwrap": "libexec/tinkabot/bwrap",
   "bundledNats": "libexec/tinkabot/nats",
   "examples": [

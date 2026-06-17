@@ -27,6 +27,7 @@
     "pack:dry": "cd packages/sdk && bun pm pack --dry-run",
     "pack:tinkabot": "bash scripts/package-tinkabot.sh",
     "release:package": "bash scripts/release-package.sh",
+    "smoke:tinkalet-package": "bash scripts/smoke-tinkalet-package.sh",
     "release:evidence": "bun scripts/release-evidence.ts",
     "gate:parallel": "bun scripts/gate-parallel.ts",
     "gate:fakes": "bun scripts/gate-fakes.ts",

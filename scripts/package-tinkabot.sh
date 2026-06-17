@@ -31,11 +31,13 @@ rm -rf "$out"
 mkdir -p "$out/libexec/tinkabot"
 
 (cd "$root/substrate/go" && go build -ldflags "$ldflags" -o "$out/tinkabot" ./cmd/tinkabot)
+(cd "$root/substrate/go" && go build -ldflags "$ldflags" -o "$out/tinkalet" ./cmd/tinkalet)
 (cd "$root/tools/natscli" && go build -o "$out/libexec/tinkabot/nats" github.com/nats-io/natscli/nats)
 cp "$bwrap" "$out/libexec/tinkabot/bwrap"
-chmod 0755 "$out/tinkabot" "$out/libexec/tinkabot/bwrap" "$out/libexec/tinkabot/nats"
+chmod 0755 "$out/tinkabot" "$out/tinkalet" "$out/libexec/tinkabot/bwrap" "$out/libexec/tinkabot/nats"
 
 echo "packaged $out"
 echo "version $version"
+echo "binary $out/tinkalet"
 echo "bundled bwrap $out/libexec/tinkabot/bwrap"
 echo "bundled nats $out/libexec/tinkabot/nats"

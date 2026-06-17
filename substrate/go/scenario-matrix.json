@@ -140,5 +140,28 @@
     "attributed-failure": [
       "TestSteeringAcceptance/DeniedNeighbor"
     ]
+  },
+  "tinkalet-trigger": {
+    "allowed": [
+      "TestTinkaletTriggerClock"
+    ],
+    "denied-neighbor": [
+      "TestTinkaletAuthorityDenials/denied_neighbor"
+    ],
+    "malformed": [
+      "TestTriggerMalformedResponse"
+    ],
+    "duplicate": [
+      "TestTinkaletTriggerClock"
+    ],
+    "stale": [
+      "TestTinkaletAuthorityDenials/stale_credentials_no_stronger_fallback"
+    ],
+    "revoked": [
+      "TestTinkaletAuthorityDenials/revoked_credentials"
+    ],
+    "attributed-failure": [
+      "TestTinkaletAuthorityDenials/denied_neighbor"
+    ]
   }
 }

@@ -18,6 +18,8 @@ const FAMILIES = [
   "attributed-failure",
 ] as const;
 
+const REQUIRED_SURFACES = ["tinkalet-trigger"] as const;
+
 export function check(): Finding[] {
   const findings: Finding[] = [];
   const raw = readJSON(MATRIX);
@@ -39,6 +41,14 @@ export function check(): Finding[] {
       detail: "matrix declares no outside-in surfaces",
     });
   }
+  for (const surface of REQUIRED_SURFACES) {
+    if (!(surface in matrix)) {
+      findings.push({
+        family: "scenario-matrix-hole",
+        detail: `required outside-in surface ${surface} is absent`,
+      });
+    }
+  }
 
   const testNames = new Set(testFns().map((t) => t.name));
   for (const surface of surfaces) {
@@ -55,7 +65,7 @@ export function check(): Finding[] {
         if (!resolves(citation, testNames)) {
           findings.push({
             family: "measurement-stale",
-            detail: `surface ${surface}, family ${family}: "${citation}" does not resolve to a committed Go test`,
+            detail: `surface ${surface}, family ${family}: "${citation}" does not resolve to a current Go test`,
           });
         }
       }

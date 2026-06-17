@@ -10,11 +10,22 @@ Use [builder](builder/README.md) when you want to see a warmer chain reaction:
 a source projection feeds a long-lived Bun/Vite filter, which rebuilds frontend
 artifacts in place.
 
-Use the packaged NATS CLI sidecar for operator commands:
+Use Tinkalet for product commands:
+
+```bash
+TINKALET_CONFIG_DIR=/tmp/tinkalet-config \
+TINKALET_DATA_DIR=/tmp/tinkalet-data \
+  ./tinkalet profile import local --store /tmp/tb-clock --name local
+
+TINKALET_CONFIG_DIR=/tmp/tinkalet-config \
+TINKALET_DATA_DIR=/tmp/tinkalet-data \
+  ./tinkalet trigger bundle.clock.tick
+```
+
+The packaged NATS CLI sidecar is still available for diagnostics and schedule
+settings:
 
 ```bash
 NATS=./libexec/tinkabot/nats # release package root
 # NATS=$(cd tools/natscli && go tool -n nats) # source checkout
 ```
-
-Copy the `nats` URL printed by the running binary into `CLIENT_URL`.

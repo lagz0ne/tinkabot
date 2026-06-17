@@ -31,26 +31,33 @@ view every two seconds.
 ## Poke The Backend
 
 The bundle ticks itself every five seconds (`"every": "5s"` in the manifest).
-From the release package root or source checkout root in another terminal, fire
-a tick manually any time:
+From the release package root in another terminal, import the local profile and
+fire a tick manually:
+
+```bash
+TINKALET_CONFIG_DIR=/tmp/tinkalet-config \
+TINKALET_DATA_DIR=/tmp/tinkalet-data \
+  ./tinkalet profile import local --store /tmp/tb-clock --name local
+
+TINKALET_CONFIG_DIR=/tmp/tinkalet-config \
+TINKALET_DATA_DIR=/tmp/tinkalet-data \
+  ./tinkalet profile use local
+
+TINKALET_CONFIG_DIR=/tmp/tinkalet-config \
+TINKALET_DATA_DIR=/tmp/tinkalet-data \
+  ./tinkalet trigger bundle.clock.tick --request-id req-clock-1
+# -> profile local accepted bundle.clock.tick
+```
+
+The page picks up the new renderedAt/unix within 2s. Control the schedule
+through NATS settings for now, using plain caller authority on the config
+bucket:
 
 ```bash
 NATS=./libexec/tinkabot/nats # release package root
-# NATS=$(cd tools/natscli && go tool -n nats) # source checkout
+# NATS=/tmp/tinkabot/libexec/tinkabot/nats # local package from source
 CLIENT_URL=nats://127.0.0.1:4222 # replace with the printed "nats" URL
 
-"$NATS" --no-context --server "$CLIENT_URL" \
-  --creds /tmp/tb-clock/caller.creds \
-  --timeout 2s \
-  request --raw -H Tinkabot-Request-Id:req-clock-1 \
-  tb.bundle.clock.tick go
-# -> accepted; the page picks up the new renderedAt/unix within 2s
-```
-
-Control the schedule through NATS settings, using plain caller authority on the
-config bucket:
-
-```bash
 "$NATS" --no-context --server "$CLIENT_URL" \
   --creds /tmp/tb-clock/caller.creds \
   --timeout 2s \

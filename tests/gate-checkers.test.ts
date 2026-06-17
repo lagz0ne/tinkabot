@@ -129,6 +129,29 @@ func TestCovered(t *testing.T) {
 });
 
 describe("gate:scenarios", () => {
+  test("scenario-matrix-hole: required Tinkalet trigger surface missing", () => {
+    corpus({
+      "svc/svc_test.go": `package svc
+
+import "testing"
+
+func TestAllowed(t *testing.T) { t.Parallel() }
+`,
+      "scenario-matrix.json": JSON.stringify({
+        api: {
+          allowed: ["TestAllowed"],
+          "denied-neighbor": ["TestAllowed"],
+          malformed: ["TestAllowed"],
+          duplicate: ["TestAllowed"],
+          stale: ["TestAllowed"],
+          revoked: ["TestAllowed"],
+          "attributed-failure": ["TestAllowed"],
+        },
+      }),
+    });
+    expect(has(scenarios(), "scenario-matrix-hole", "required outside-in surface tinkalet-trigger is absent")).toBe(true);
+  });
+
   test("scenario-matrix-hole: pinned family missing from present matrix", () => {
     corpus({
       "svc/svc_test.go": `package svc
