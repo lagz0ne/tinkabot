@@ -164,6 +164,17 @@ func TestWatchCommandDenials(t *testing.T) {
 	assertCmd(t, code, out, errOut, 1, "", "watch deploy/1 denied item: profile-not-found\n")
 }
 
+func TestReactionCommandDenials(t *testing.T) {
+	t.Parallel()
+	env := newEnv(t)
+
+	code, out, errOut := runCmd(t, env.vars, "reaction", "add", "bad/name", "--watch", "item", "deploy/1", "--for", "resolved", "--cmd", "/bin/echo", "--write", "deploy/1/out")
+	assertCmd(t, code, out, errOut, 2, "", "usage: tinkalet <command> [options]\n")
+
+	code, out, errOut = runCmd(t, env.vars, "reaction", "add", "approve", "--watch", "item", "deploy/1", "--for", "resolved", "--cmd", "/bin/echo", "--write", "deploy/1/out")
+	assertCmd(t, code, out, errOut, 1, "", "reaction approve denied add: profile-not-found\n")
+}
+
 func TestTriggerProfileOverrideDoesNotChangeDefault(t *testing.T) {
 	t.Parallel()
 	env := newEnv(t)

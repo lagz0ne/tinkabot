@@ -2,12 +2,14 @@ package tinkalet
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"net/url"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"sort"
 	"strconv"
@@ -108,11 +110,16 @@ func (c cli) run(args []string) int {
 		return c.trigger(args[1:])
 	case "item":
 		return c.item(args[1:])
+	case "reaction":
+		return c.reaction(args[1:])
 	case "watch":
 		return c.watch(args[1:], false)
 	case "daemon":
 		if len(args) > 1 && args[1] == "watch" {
 			return c.watch(args[2:], true)
+		}
+		if len(args) > 1 && args[1] == "react" {
+			return c.react(args[2:])
 		}
 		return c.usage()
 	default:
@@ -136,6 +143,8 @@ commands:
   watch prefix <prefix> [--cursor <name>] [--limit <n>] [--timeout <duration>] [--json]
   daemon watch item <key> --cursor <name> [--limit <n>] [--timeout <duration>] [--json]
   daemon watch prefix <prefix> --cursor <name> [--limit <n>] [--timeout <duration>] [--json]
+  reaction add <name> --watch item <key> --for resolved --cmd <path> [--arg <arg>] --write <item-key>
+  daemon react <name> --once [--timeout <duration>] [--json]
 `)
 }
 
@@ -481,6 +490,45 @@ type watchEvent struct {
 	ObservedAt string          `json:"observedAt"`
 }
 
+type reactionRecord struct {
+	Kind      string          `json:"kind"`
+	Name      string          `json:"name"`
+	Profile   string          `json:"profile"`
+	Source    string          `json:"source"`
+	Watch     reactionWatch   `json:"watch"`
+	Command   reactionCommand `json:"command"`
+	Write     reactionWrite   `json:"write"`
+	CreatedAt string          `json:"createdAt"`
+}
+
+type reactionWatch struct {
+	Scope  string `json:"scope"`
+	Target string `json:"target"`
+	Status string `json:"status"`
+}
+
+type reactionCommand struct {
+	Cmd  string   `json:"cmd"`
+	Args []string `json:"args"`
+}
+
+type reactionWrite struct {
+	Item string `json:"item"`
+}
+
+type reactionOutput struct {
+	Stdout   string `json:"stdout"`
+	Stderr   string `json:"stderr"`
+	ExitCode int    `json:"exitCode"`
+}
+
+type reactionRunDoc struct {
+	Reaction string `json:"reaction"`
+	Status   string `json:"status"`
+	Item     string `json:"item"`
+	ExitCode int    `json:"exitCode"`
+}
+
 func (c cli) item(args []string) int {
 	if len(args) == 0 {
 		return c.usage()
@@ -521,6 +569,278 @@ func (c cli) item(args []string) int {
 	default:
 		return c.usage()
 	}
+}
+
+func (c cli) reaction(args []string) int {
+	if len(args) == 0 {
+		return c.usage()
+	}
+	switch args[0] {
+	case "add":
+		rec, ok := parseReactionAdd(args[1:])
+		if !ok || !validName(rec.Name) || rec.Watch.Scope != "item" || rec.Watch.Status != "resolved" || !validItemKey(rec.Watch.Target) || !validItemKey(rec.Write.Item) {
+			return c.usage()
+		}
+		return c.reactionAdd(rec)
+	default:
+		return c.usage()
+	}
+}
+
+func parseReactionAdd(args []string) (reactionRecord, bool) {
+	var rec reactionRecord
+	if len(args) == 0 {
+		return rec, false
+	}
+	rec.Name = args[0]
+	for i := 1; i < len(args); i++ {
+		arg := args[i]
+		switch {
+		case arg == "--watch" && i+2 < len(args):
+			i++
+			rec.Watch.Scope = args[i]
+			i++
+			rec.Watch.Target = args[i]
+		case arg == "--for" && i+1 < len(args):
+			i++
+			rec.Watch.Status = args[i]
+		case arg == "--cmd" && i+1 < len(args):
+			i++
+			rec.Command.Cmd = args[i]
+		case arg == "--arg" && i+1 < len(args):
+			i++
+			rec.Command.Args = append(rec.Command.Args, args[i])
+		case arg == "--write" && i+1 < len(args):
+			i++
+			rec.Write.Item = args[i]
+		default:
+			return rec, false
+		}
+	}
+	return rec, rec.Name != "" && rec.Watch.Scope != "" && rec.Watch.Target != "" && rec.Watch.Status != "" && rec.Command.Cmd != "" && rec.Write.Item != ""
+}
+
+func (c cli) reactionAdd(rec reactionRecord) int {
+	profiles, _ := c.loadProfiles()
+	name := c.defaultProfile()
+	if name == "" {
+		return c.denyReaction(rec.Name, "add", "profile-not-found")
+	}
+	prof := find(profiles, name)
+	if prof == nil {
+		return c.denyReaction(rec.Name, "add", "profile-not-found")
+	}
+	rec.Kind = "tinkalet.reaction.v1"
+	rec.Profile = prof.Name
+	rec.Source = prof.Source
+	rec.CreatedAt = time.Now().UTC().Format(time.RFC3339)
+	body, err := json.MarshalIndent(rec, "", "  ")
+	if err != nil {
+		return c.denyReaction(rec.Name, "add", "reaction-invalid")
+	}
+	if err := write0600(c.reactionPath(rec.Name), append(body, '\n')); err != nil {
+		return c.denyReaction(rec.Name, "add", "reaction-invalid")
+	}
+	fmt.Fprintf(c.out, "reaction %s added\n", rec.Name)
+	return 0
+}
+
+func (c cli) react(args []string) int {
+	name, timeout, jsonOut, ok := parseReact(args)
+	if !ok || !validName(name) {
+		return c.usage()
+	}
+	rec, reason := c.loadReaction(name)
+	if reason != "" {
+		return c.denyReaction(name, "run", reason)
+	}
+	return c.runReaction(rec, timeout, jsonOut)
+}
+
+func parseReact(args []string) (string, time.Duration, bool, bool) {
+	timeout := 30 * time.Second
+	var name string
+	var once, jsonOut bool
+	for i := 0; i < len(args); i++ {
+		arg := args[i]
+		switch {
+		case arg == "--once":
+			once = true
+		case arg == "--json":
+			jsonOut = true
+		case arg == "--timeout" && i+1 < len(args):
+			i++
+			parsed, err := time.ParseDuration(args[i])
+			if err != nil || parsed <= 0 {
+				return "", 0, false, false
+			}
+			timeout = parsed
+		case strings.HasPrefix(arg, "--timeout="):
+			parsed, err := time.ParseDuration(strings.TrimPrefix(arg, "--timeout="))
+			if err != nil || parsed <= 0 {
+				return "", 0, false, false
+			}
+			timeout = parsed
+		case strings.HasPrefix(arg, "-"):
+			return "", 0, false, false
+		case name == "":
+			name = arg
+		default:
+			return "", 0, false, false
+		}
+	}
+	return name, timeout, jsonOut, name != "" && once
+}
+
+func (c cli) runReaction(rec reactionRecord, timeout time.Duration, jsonOut bool) int {
+	prof, kv, nc, reason := c.itemKVFor(rec.Profile)
+	if reason != "" {
+		return c.denyReaction(rec.Name, "run", reason)
+	}
+	defer nc.Close()
+	req := watchReq{Scope: rec.Watch.Scope, Target: rec.Watch.Target, Cursor: "reaction-" + rec.Name, Limit: 1, Timeout: timeout}
+	cur, reason := c.loadCursor(req, *prof)
+	if reason != "" {
+		return c.denyReaction(rec.Name, "run", reason)
+	}
+	if reason := validateCursor(kv, cur); reason != "" {
+		return c.denyReaction(rec.Name, "run", reason)
+	}
+	w, err := kv.WatchAll(nats.IncludeHistory(), nats.IgnoreDeletes())
+	if err != nil {
+		return c.denyReaction(rec.Name, "run", itemReason(err, *prof))
+	}
+	defer w.Stop()
+
+	timer := time.NewTimer(timeout)
+	defer timer.Stop()
+	replay := true
+	for {
+		select {
+		case err, ok := <-w.Error():
+			if ok && err != nil {
+				return c.denyReaction(rec.Name, "run", "connection-lost")
+			}
+		case entry, ok := <-w.Updates():
+			if !ok {
+				return c.denyReaction(rec.Name, "run", "connection-lost")
+			}
+			if entry == nil {
+				replay = false
+				continue
+			}
+			ev, match, reason := c.watchEvent(req, entry, cur, replay)
+			if reason != "" {
+				return c.denyReaction(rec.Name, "run", reason)
+			}
+			if !match {
+				continue
+			}
+			if ev.Status != rec.Watch.Status {
+				if err := c.saveCursor(req, *prof, ev.Revision); err != nil {
+					return c.denyReaction(rec.Name, "run", "stale-cursor")
+				}
+				cur.Revision = ev.Revision
+				continue
+			}
+			out, reason := runLocalCommand(rec, timeout)
+			if reason != "" {
+				return c.denyReaction(rec.Name, "run", reason)
+			}
+			if reason := c.writeReactionResult(kv, *prof, rec, out); reason != "" {
+				return c.denyReaction(rec.Name, "run", reason)
+			}
+			if err := c.saveCursor(req, *prof, ev.Revision); err != nil {
+				return c.denyReaction(rec.Name, "run", "stale-cursor")
+			}
+			return c.okReaction(rec, out.ExitCode, jsonOut)
+		case <-timer.C:
+			return c.denyReaction(rec.Name, "run", "watch-timeout")
+		}
+	}
+}
+
+func runLocalCommand(rec reactionRecord, timeout time.Duration) (reactionOutput, string) {
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+	cmd := exec.CommandContext(ctx, rec.Command.Cmd, rec.Command.Args...)
+	cmd.Env = []string{}
+	var stdout, stderr bytes.Buffer
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
+	err := cmd.Run()
+	code := 0
+	if err != nil {
+		code = 1
+		var exit *exec.ExitError
+		if errors.As(err, &exit) {
+			code = exit.ExitCode()
+		}
+		return reactionOutput{Stdout: stdout.String(), Stderr: stderr.String(), ExitCode: code}, "command-failed"
+	}
+	return reactionOutput{Stdout: stdout.String(), Stderr: stderr.String(), ExitCode: code}, ""
+}
+
+func (c cli) writeReactionResult(kv nats.KeyValue, prof Profile, rec reactionRecord, out reactionOutput) string {
+	value, err := json.Marshal(out)
+	if err != nil {
+		return "denied-writeback"
+	}
+	now := time.Now().UTC().Format(time.RFC3339)
+	stored := itemStored{
+		Kind:      "tinkabot.item.v1",
+		Key:       rec.Write.Item,
+		Status:    "resolved",
+		Value:     value,
+		CreatedAt: now,
+		UpdatedAt: now,
+		Provenance: itemProvenance{
+			Profile: prof.Name,
+			Source:  prof.Source,
+			Writer:  "tinkalet-reaction:" + rec.Name,
+		},
+	}
+	body, err := json.Marshal(stored)
+	if err != nil {
+		return "denied-writeback"
+	}
+	if _, err := kv.Create(rec.Write.Item, body); err != nil {
+		return "denied-writeback"
+	}
+	return ""
+}
+
+func (c cli) loadReaction(name string) (reactionRecord, string) {
+	body, err := os.ReadFile(c.reactionPath(name))
+	if os.IsNotExist(err) {
+		return reactionRecord{}, "reaction-not-found"
+	}
+	if err != nil {
+		return reactionRecord{}, "reaction-invalid"
+	}
+	var rec reactionRecord
+	if err := json.Unmarshal(body, &rec); err != nil || rec.Kind != "tinkalet.reaction.v1" || rec.Name != name {
+		return reactionRecord{}, "reaction-invalid"
+	}
+	return rec, ""
+}
+
+func (c cli) reactionPath(name string) string {
+	return filepath.Join(c.dataDir(), "reactions", name+".json")
+}
+
+func (c cli) okReaction(rec reactionRecord, code int, jsonOut bool) int {
+	if jsonOut {
+		_ = json.NewEncoder(c.out).Encode(reactionRunDoc{Reaction: rec.Name, Status: "ran", Item: rec.Write.Item, ExitCode: code})
+		return 0
+	}
+	fmt.Fprintf(c.out, "reaction %s ran %s\n", rec.Name, rec.Write.Item)
+	return 0
+}
+
+func (c cli) denyReaction(name, action, reason string) int {
+	fmt.Fprintf(c.errOut, "reaction %s denied %s: %s\n", name, action, reason)
+	return 1
 }
 
 func (c cli) watch(args []string, daemon bool) int {
@@ -1010,11 +1330,15 @@ func (c cli) itemWait(key, want string, timeout time.Duration, jsonOut bool) int
 }
 
 func (c cli) itemKV() (*Profile, nats.KeyValue, *nats.Conn, string) {
-	profiles, _ := c.loadProfiles()
 	name := c.defaultProfile()
 	if name == "" {
 		return nil, nil, nil, "profile-not-found"
 	}
+	return c.itemKVFor(name)
+}
+
+func (c cli) itemKVFor(name string) (*Profile, nats.KeyValue, *nats.Conn, string) {
+	profiles, _ := c.loadProfiles()
 	prof := find(profiles, name)
 	if prof == nil {
 		return nil, nil, nil, "profile-not-found"
