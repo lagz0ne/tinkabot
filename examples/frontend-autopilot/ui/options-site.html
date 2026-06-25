@@ -1,0 +1,409 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Site Planner</title>
+<style>
+  :root {
+    --bg: #0f1220;
+    --panel: #171b2e;
+    --line: #2a3052;
+    --ink: #e7ebff;
+    --muted: #9aa3c7;
+    --accent: #6c8cff;
+    --ok: #4ad295;
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0;
+    padding: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font: 14px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+  }
+  .wrap {
+    max-width: 720px;
+    margin: 0 auto;
+    padding: 16px;
+  }
+  .head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 6px 10px;
+    margin-bottom: 4px;
+  }
+  .head h1 {
+    font-size: 18px;
+    margin: 0;
+    letter-spacing: 0.2px;
+  }
+  .tag {
+    font-size: 11px;
+    color: var(--muted);
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    padding: 2px 8px;
+  }
+  .lede {
+    color: var(--muted);
+    margin: 6px 0 14px;
+    font-size: 12.5px;
+  }
+  .card {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    padding: 14px;
+    margin-bottom: 12px;
+  }
+  .card h2 {
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
+    color: var(--muted);
+    margin: 0 0 10px;
+  }
+  .grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+  }
+  .field { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+  .field.span { grid-column: 1 / -1; }
+  label { font-size: 12px; color: var(--muted); }
+  input[type="text"], select {
+    width: 100%;
+    background: #11142440;
+    border: 1px solid var(--line);
+    color: var(--ink);
+    border-radius: 8px;
+    padding: 9px 10px;
+    font-size: 13px;
+  }
+  input[type="text"]:focus, select:focus {
+    outline: none;
+    border-color: var(--accent);
+  }
+  .color-row { display: flex; align-items: center; gap: 8px; }
+  .color-row input[type="color"] {
+    width: 38px;
+    height: 34px;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: transparent;
+    padding: 2px;
+  }
+  .color-row .hex { font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
+  .checks { display: flex; flex-direction: column; gap: 8px; }
+  .check {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 8px 10px;
+  }
+  .check input { margin-top: 2px; }
+  .check .txt { display: flex; flex-direction: column; gap: 2px; }
+  .check .txt b { font-size: 12.5px; font-weight: 600; }
+  .check .txt span { font-size: 11px; color: var(--muted); }
+  .actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 10px;
+    justify-content: flex-end;
+  }
+  .hint { font-size: 11px; color: var(--muted); margin-right: auto; }
+  button.submit {
+    background: var(--accent);
+    color: #0c1024;
+    border: none;
+    border-radius: 9px;
+    padding: 10px 18px;
+    font-size: 13px;
+    font-weight: 700;
+    cursor: pointer;
+  }
+  button.submit:disabled { opacity: 0.55; cursor: default; }
+  .status {
+    font-size: 11.5px;
+    color: var(--muted);
+    margin-top: 8px;
+    min-height: 14px;
+  }
+  .done {
+    border-color: var(--ok);
+  }
+  .done h2 { color: var(--ok); }
+  .proof {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 4px 12px;
+    font-size: 12.5px;
+    margin-top: 8px;
+  }
+  .proof dt { color: var(--muted); }
+  .proof dd { margin: 0; word-break: break-word; }
+  .hidden { display: none; }
+  @media (max-width: 420px) {
+    .grid { grid-template-columns: 1fr; }
+    .actions { justify-content: stretch; }
+    button.submit { width: 100%; }
+    .hint { margin-right: 0; width: 100%; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="head">
+    <h1>Site Planner</h1>
+    <span class="tag" id="leaseTag">offline draft</span>
+  </div>
+  <p class="lede">Collect the build options for one website request. Nothing is sent until you confirm.</p>
+
+  <form id="planner">
+    <div class="card">
+      <h2>Basics</h2>
+      <div class="grid">
+        <div class="field span">
+          <label for="siteTitle">Site title</label>
+          <input type="text" id="siteTitle" name="siteTitle" value="Northwind Studio" autocomplete="off" />
+        </div>
+        <div class="field span">
+          <label for="audience">Audience</label>
+          <input type="text" id="audience" name="audience" value="Small design teams" autocomplete="off" />
+        </div>
+        <div class="field">
+          <label for="tone">Tone</label>
+          <select id="tone" name="tone">
+            <option value="calm">Calm</option>
+            <option value="bold">Bold</option>
+            <option value="playful">Playful</option>
+            <option value="editorial">Editorial</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="layout">Layout</label>
+          <select id="layout" name="layout">
+            <option value="single-column">Single column</option>
+            <option value="split-hero">Split hero</option>
+            <option value="grid-cards">Grid cards</option>
+            <option value="sidebar">Sidebar</option>
+          </select>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Palette</h2>
+      <div class="grid">
+        <div class="field">
+          <label for="primaryColor">Primary color</label>
+          <div class="color-row">
+            <input type="color" id="primaryColor" name="primaryColor" value="#6c8cff" />
+            <span class="hex" id="primaryHex">#6c8cff</span>
+          </div>
+        </div>
+        <div class="field">
+          <label for="secondaryColor">Secondary color</label>
+          <div class="color-row">
+            <input type="color" id="secondaryColor" name="secondaryColor" value="#4ad295" />
+            <span class="hex" id="secondaryHex">#4ad295</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Features</h2>
+      <div class="checks">
+        <label class="check">
+          <input type="checkbox" id="featContact" name="features" value="contact-form" checked />
+          <span class="txt"><b>Contact form</b><span>Let visitors reach the team.</span></span>
+        </label>
+        <label class="check">
+          <input type="checkbox" name="features" value="newsletter" />
+          <span class="txt"><b>Newsletter signup</b><span>Grow an audience list.</span></span>
+        </label>
+        <label class="check">
+          <input type="checkbox" name="features" value="gallery" />
+          <span class="txt"><b>Work gallery</b><span>Show off recent projects.</span></span>
+        </label>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="actions">
+        <span class="hint">Review the options, then confirm.</span>
+        <button type="button" class="submit" id="submitBtn">Confirm site plan</button>
+      </div>
+      <div class="status" id="status"></div>
+    </div>
+  </form>
+
+  <div class="card done hidden" id="generated" data-complete="false">
+    <h2>Plan accepted</h2>
+    <p class="lede" style="margin:0 0 4px;">The site request was recorded.</p>
+    <dl class="proof">
+      <dt>Tone</dt>
+      <dd data-proof="tone" id="proofTone"></dd>
+      <dt>Item key</dt>
+      <dd data-proof="itemKey" id="proofKey"></dd>
+    </dl>
+  </div>
+</div>
+
+<script>
+(function () {
+  "use strict";
+
+  var lease = null;
+  var demo = null;
+  var pendingCommandId = null;
+  var submitted = false;
+  var counter = 0;
+
+  var els = {
+    siteTitle: document.getElementById("siteTitle"),
+    audience: document.getElementById("audience"),
+    tone: document.getElementById("tone"),
+    layout: document.getElementById("layout"),
+    primaryColor: document.getElementById("primaryColor"),
+    secondaryColor: document.getElementById("secondaryColor"),
+    primaryHex: document.getElementById("primaryHex"),
+    secondaryHex: document.getElementById("secondaryHex"),
+    form: document.getElementById("planner"),
+    submitBtn: document.getElementById("submitBtn"),
+    status: document.getElementById("status"),
+    leaseTag: document.getElementById("leaseTag"),
+    generated: document.getElementById("generated"),
+    proofTone: document.getElementById("proofTone"),
+    proofKey: document.getElementById("proofKey")
+  };
+
+  function makeId() {
+    counter += 1;
+    return "cmd-" + counter + "-" + Math.floor(performance.now()) + "-" + counter;
+  }
+
+  function selectedFeatures() {
+    var boxes = els.form.querySelectorAll('input[name="features"]:checked');
+    var out = [];
+    for (var i = 0; i < boxes.length; i++) {
+      out.push(boxes[i].value);
+    }
+    return out;
+  }
+
+  function collectValue() {
+    return {
+      siteTitle: els.siteTitle.value.trim(),
+      audience: els.audience.value.trim(),
+      tone: els.tone.value,
+      layout: els.layout.value,
+      primaryColor: els.primaryColor.value,
+      secondaryColor: els.secondaryColor.value,
+      features: selectedFeatures(),
+      pickedAt: new Date().toISOString(),
+      author: "bootstrap-placeholder"
+    };
+  }
+
+  function snapshot() {
+    return {
+      hasLease: !!lease,
+      submitted: submitted,
+      complete: els.generated.dataset.complete === "true",
+      pendingCommandId: pendingCommandId,
+      value: collectValue()
+    };
+  }
+
+  function submit() {
+    if (submitted || !lease || !demo) {
+      els.status.textContent = lease ? "Already confirmed." : "Waiting for the workspace to connect.";
+      return false;
+    }
+    var commandId = makeId();
+    pendingCommandId = commandId;
+    var value = collectValue();
+    var intent = {
+      type: "content.intent",
+      command: "item_submit",
+      commandId: commandId,
+      expectedRevision: lease.artifactRevision,
+      nonce: lease.nonce,
+      frameId: lease.frameId,
+      artifactRevision: lease.artifactRevision,
+      schemaRevision: lease.schemaRevision,
+      payload: {
+        key: demo.visualKey,
+        status: "resolved",
+        expectedRevision: 0,
+        value: value
+      }
+    };
+    submitted = true;
+    els.submitBtn.disabled = true;
+    els.submitBtn.textContent = "Confirming...";
+    els.status.textContent = "Sent for confirmation.";
+    parent.postMessage(intent, "*");
+    return true;
+  }
+
+  function complete(value) {
+    els.generated.classList.remove("hidden");
+    els.generated.dataset.complete = "true";
+    els.proofTone.textContent = value && value.tone ? value.tone : els.tone.value;
+    els.proofKey.textContent = demo && demo.visualKey ? demo.visualKey : "";
+    els.submitBtn.textContent = "Confirmed";
+    els.status.textContent = "Plan accepted.";
+  }
+
+  els.form.addEventListener("submit", function (ev) {
+    ev.preventDefault();
+    submit();
+  });
+
+  els.submitBtn.addEventListener("click", function (ev) {
+    ev.preventDefault();
+    submit();
+  });
+
+  els.primaryColor.addEventListener("input", function () {
+    els.primaryHex.textContent = els.primaryColor.value;
+  });
+  els.secondaryColor.addEventListener("input", function () {
+    els.secondaryHex.textContent = els.secondaryColor.value;
+  });
+
+  window.addEventListener("message", function (ev) {
+    var data = ev.data;
+    if (!data || typeof data !== "object") { return; }
+    if (data.type === "tinkabot.lease") {
+      lease = data.lease || null;
+      demo = data.demo || null;
+      els.leaseTag.textContent = "linked";
+      els.status.textContent = "Workspace connected.";
+      return;
+    }
+    if (data.type === "tinkabot.command.result") {
+      if (pendingCommandId && data.commandId === pendingCommandId) {
+        complete(collectValue());
+      }
+    }
+  });
+
+  window.__frontendAutopilot = {
+    submit: submit,
+    snapshot: snapshot
+  };
+
+  parent.postMessage({ type: "content.ready" }, "*");
+})();
+</script>
+</body>
+</html>

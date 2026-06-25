@@ -36,7 +36,9 @@ cp "$root/LICENSE" "$pkg/LICENSE"
 cp "$root/examples/README.md" "$pkg/examples/README.md"
 cp -R "$root/examples/clock" "$pkg/examples/clock"
 cp -R "$root/examples/builder" "$pkg/examples/builder"
+cp -R "$root/examples/frontend-autopilot" "$pkg/examples/frontend-autopilot"
 rm -rf "$pkg/examples/builder/node_modules"
+rm -rf "$pkg/examples/frontend-autopilot/node_modules"
 cp "$root/docs/manual/v1.md" "$pkg/docs/manual/v1.md"
 cp "$root/release/v1.json" "$pkg/release/v1.json"
 
@@ -56,7 +58,8 @@ cat > "$pkg/release.json" <<JSON
   "bundledNats": "libexec/tinkabot/nats",
   "examples": [
     "examples/clock",
-    "examples/builder"
+    "examples/builder",
+    "examples/frontend-autopilot"
   ]
 }
 JSON

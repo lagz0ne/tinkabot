@@ -125,6 +125,8 @@ func (c cli) run(args []string) int {
 		return c.item(args[1:])
 	case "action":
 		return c.action(args[1:])
+	case "app":
+		return c.app(args[1:])
 	case "schedule":
 		return c.schedule(args[1:])
 	case "reaction":
@@ -148,7 +150,7 @@ func (c cli) help() {
 	fmt.Fprint(c.out, `usage: tinkalet <command> [options]
 
 commands:
-  profile import local --store <dir> --name <name>
+  profile import local --store <dir> --name <name> [--use]
   profile list [--json]
   profile use <name>
   trigger <intent> [--profile <name>] [--request-id <id>] [--json]
@@ -159,6 +161,8 @@ commands:
   action submit <action-id> --state <item-key> --base-revision <n> [--value <json>] [--json]
   action apply <action-key> --value <json> [--json]
   action reject <action-key> --reason <reason-token> [--json]
+  app handler register vite --from <bundle-dir> [--json]
+  app create frontend <name> --handler <handler-name> [--json]
   schedule set <name> --every <duration> --write <item-key> [--value <json>] [--json]
   schedule off <name> [--json]
   watch item <key> [--cursor <name>] [--limit <n>] [--timeout <duration>] [--json]
@@ -184,11 +188,11 @@ func (c cli) profile(args []string) int {
 		if len(args) < 2 || args[1] != "local" {
 			return c.usage()
 		}
-		store, name, ok := parseImport(args[2:])
+		store, name, use, ok := parseImport(args[2:])
 		if !ok || !validName(name) {
 			return c.usage()
 		}
-		return c.importLocal(store, name)
+		return c.importLocal(store, name, use)
 	case "list":
 		jsonOut, ok := parseList(args[1:])
 		if !ok {
@@ -205,11 +209,14 @@ func (c cli) profile(args []string) int {
 	}
 }
 
-func parseImport(args []string) (string, string, bool) {
+func parseImport(args []string) (string, string, bool, bool) {
 	var store, name string
+	var use bool
 	for i := 0; i < len(args); i++ {
 		arg := args[i]
 		switch {
+		case arg == "--use":
+			use = true
 		case arg == "--store" && i+1 < len(args):
 			i++
 			store = args[i]
@@ -221,10 +228,10 @@ func parseImport(args []string) (string, string, bool) {
 		case strings.HasPrefix(arg, "--name="):
 			name = strings.TrimPrefix(arg, "--name=")
 		default:
-			return "", "", false
+			return "", "", false, false
 		}
 	}
-	return store, name, store != "" && name != ""
+	return store, name, use, store != "" && name != ""
 }
 
 func parseList(args []string) (bool, bool) {
@@ -237,7 +244,7 @@ func parseList(args []string) (bool, bool) {
 	return false, false
 }
 
-func (c cli) importLocal(store, name string) int {
+func (c cli) importLocal(store, name string, use bool) int {
 	prof, cred, reason := c.profileFromStore(store, name)
 	if reason != "" {
 		return c.denyProfile(name, "profile import", reason)
@@ -264,6 +271,13 @@ func (c cli) importLocal(store, name string) int {
 	upsert(&profiles, prof)
 	if err := c.saveProfiles(profiles); err != nil {
 		return c.denyProfile(name, "profile import", "import-source-invalid")
+	}
+	if use {
+		if err := write0600(filepath.Join(c.configDir(), "default-profile"), []byte(name+"\n")); err != nil {
+			return c.denyProfile(name, "profile import", "profile-not-found")
+		}
+		fmt.Fprintf(c.out, "profile %s imported and selected\n", name)
+		return 0
 	}
 	fmt.Fprintf(c.out, "profile %s imported\n", name)
 	return 0
@@ -613,15 +627,16 @@ type watchCursor struct {
 }
 
 type watchEvent struct {
-	Kind       string          `json:"kind"`
-	Cursor     string          `json:"cursor,omitempty"`
-	Scope      string          `json:"scope"`
-	Key        string          `json:"key"`
-	Status     string          `json:"status"`
-	Value      json.RawMessage `json:"value"`
-	Revision   uint64          `json:"revision"`
-	Source     string          `json:"source"`
-	ObservedAt string          `json:"observedAt"`
+	Kind             string          `json:"kind"`
+	Cursor           string          `json:"cursor,omitempty"`
+	Scope            string          `json:"scope"`
+	Key              string          `json:"key"`
+	Status           string          `json:"status"`
+	Value            json.RawMessage `json:"value"`
+	Revision         uint64          `json:"revision"`
+	Source           string          `json:"source"`
+	ObservedAt       string          `json:"observedAt"`
+	ObservedAtUnixMs int64           `json:"observedAtUnixMs"`
 }
 
 type reactionRecord struct {
@@ -661,6 +676,281 @@ type reactionRunDoc struct {
 	Status   string `json:"status"`
 	Item     string `json:"item"`
 	ExitCode int    `json:"exitCode"`
+}
+
+type appHandlerRegisterReq struct {
+	Name string
+	From string
+	JSON bool
+}
+
+type appHandlerRecord struct {
+	Kind      string `json:"kind"`
+	Name      string `json:"name"`
+	Type      string `json:"type"`
+	From      string `json:"from"`
+	Profile   string `json:"profile"`
+	Source    string `json:"source"`
+	CreatedAt string `json:"createdAt"`
+}
+
+type appCreateReq struct {
+	Kind    string
+	Name    string
+	Handler string
+	JSON    bool
+}
+
+type frontendAppValue struct {
+	Kind          string `json:"kind"`
+	Name          string `json:"name"`
+	Handler       string `json:"handler"`
+	HandlerType   string `json:"handlerType"`
+	HandlerFrom   string `json:"handlerFrom"`
+	StateKey      string `json:"stateKey"`
+	ResultKey     string `json:"resultKey"`
+	GeneratedPath string `json:"generatedPath"`
+	CreatedAt     string `json:"createdAt"`
+}
+
+func (c cli) app(args []string) int {
+	if len(args) == 0 {
+		return c.usage()
+	}
+	switch args[0] {
+	case "create":
+		req, ok := parseAppCreate(args[1:])
+		if !ok || req.Kind != "frontend" || !validSubjectToken(req.Name) || !validName(req.Handler) {
+			return c.usage()
+		}
+		return c.appCreateFrontend(req)
+	case "handler":
+		if len(args) < 2 || args[1] != "register" {
+			return c.usage()
+		}
+		req, ok := parseAppHandlerRegister(args[2:])
+		if !ok || req.Name != "vite" {
+			return c.usage()
+		}
+		return c.appHandlerRegister(req)
+	default:
+		return c.usage()
+	}
+}
+
+func parseAppCreate(args []string) (appCreateReq, bool) {
+	var req appCreateReq
+	if len(args) < 2 {
+		return req, false
+	}
+	req.Kind = args[0]
+	req.Name = args[1]
+	for i := 2; i < len(args); i++ {
+		arg := args[i]
+		switch {
+		case arg == "--json":
+			req.JSON = true
+		case arg == "--handler" && i+1 < len(args):
+			i++
+			req.Handler = args[i]
+		case strings.HasPrefix(arg, "--handler="):
+			req.Handler = strings.TrimPrefix(arg, "--handler=")
+		default:
+			return req, false
+		}
+	}
+	return req, req.Kind != "" && req.Name != "" && req.Handler != ""
+}
+
+func parseAppHandlerRegister(args []string) (appHandlerRegisterReq, bool) {
+	var req appHandlerRegisterReq
+	if len(args) == 0 {
+		return req, false
+	}
+	req.Name = args[0]
+	for i := 1; i < len(args); i++ {
+		arg := args[i]
+		switch {
+		case arg == "--json":
+			req.JSON = true
+		case arg == "--from" && i+1 < len(args):
+			i++
+			req.From = args[i]
+		case strings.HasPrefix(arg, "--from="):
+			req.From = strings.TrimPrefix(arg, "--from=")
+		default:
+			return req, false
+		}
+	}
+	return req, req.Name != "" && req.From != ""
+}
+
+func (c cli) appCreateFrontend(req appCreateReq) int {
+	if prof, reason := c.profilePolicy(); reason != "" {
+		return c.denyApp(req.Name, "create", reason)
+	} else if restrictedProfile(*prof) {
+		return c.denyApp(req.Name, "create", "denied-scope")
+	}
+	handler, reason := c.loadAppHandler(req.Handler)
+	if reason != "" {
+		return c.denyApp(req.Name, "create", reason)
+	}
+	generatedPath, reason := frontendGeneratedPath(handler.From)
+	if reason != "" {
+		return c.denyApp(req.Name, "create", reason)
+	}
+	prof, kv, nc, reason := c.itemKV()
+	if reason != "" {
+		return c.denyApp(req.Name, "create", reason)
+	}
+	defer nc.Close()
+	key := "apps." + req.Name + ".state.frontend"
+	resultKey := "artifacts." + req.Name + ".results.plan"
+	now := time.Now().UTC().Format(time.RFC3339)
+	value, err := json.Marshal(frontendAppValue{
+		Kind:          "tinkabot.frontendApp.v1",
+		Name:          req.Name,
+		Handler:       handler.Name,
+		HandlerType:   handler.Type,
+		HandlerFrom:   handler.From,
+		StateKey:      key,
+		ResultKey:     resultKey,
+		GeneratedPath: generatedPath,
+		CreatedAt:     now,
+	})
+	if err != nil {
+		return c.denyApp(req.Name, "create", "malformed-value")
+	}
+	rec := itemStored{
+		Kind:      "tinkabot.item.v1",
+		Key:       key,
+		Status:    "resolved",
+		Value:     value,
+		CreatedAt: now,
+		UpdatedAt: now,
+		Provenance: itemProvenance{
+			Profile: prof.Name,
+			Source:  prof.Source,
+			Writer:  "tinkalet-app-create",
+		},
+	}
+	body, err := json.Marshal(rec)
+	if err != nil {
+		return c.denyApp(req.Name, "create", "malformed-value")
+	}
+	rev, err := kv.Create(key, body)
+	if err != nil {
+		if errors.Is(err, nats.ErrKeyExists) {
+			return c.denyApp(req.Name, "create", "duplicate-app")
+		}
+		return c.denyApp(req.Name, "create", itemReason(err, *prof))
+	}
+	return c.okApp(req.Name, viewItem(rec, rev), req.JSON)
+}
+
+func (c cli) appHandlerRegister(req appHandlerRegisterReq) int {
+	profiles, _ := c.loadProfiles()
+	name := c.defaultProfile()
+	if name == "" {
+		return c.denyAppHandler(req.Name, "register", "profile-not-found")
+	}
+	prof := find(profiles, name)
+	if prof == nil {
+		return c.denyAppHandler(req.Name, "register", "profile-not-found")
+	}
+	if c.deniedNeighbor(*prof) {
+		return c.denyAppHandler(req.Name, "register", "denied-neighbor")
+	}
+	if c.revokedProfile(*prof) {
+		return c.denyAppHandler(req.Name, "register", "revoked-credentials")
+	}
+	if restrictedProfile(*prof) {
+		return c.denyAppHandler(req.Name, "register", "denied-scope")
+	}
+	from, err := filepath.Abs(req.From)
+	if err != nil || !validHandlerSource(from) {
+		return c.denyAppHandler(req.Name, "register", "handler-source-invalid")
+	}
+	rec := appHandlerRecord{
+		Kind:      "tinkalet.frontendHandler.v1",
+		Name:      req.Name,
+		Type:      "vite",
+		From:      from,
+		Profile:   prof.Name,
+		Source:    prof.Source,
+		CreatedAt: time.Now().UTC().Format(time.RFC3339),
+	}
+	body, err := json.MarshalIndent(rec, "", "  ")
+	if err != nil {
+		return c.denyAppHandler(req.Name, "register", "handler-invalid")
+	}
+	if err := write0600(c.appHandlerPath(req.Name), append(body, '\n')); err != nil {
+		return c.denyAppHandler(req.Name, "register", "handler-invalid")
+	}
+	if req.JSON {
+		_ = json.NewEncoder(c.out).Encode(rec)
+		return 0
+	}
+	fmt.Fprintf(c.out, "app handler %s registered\n", req.Name)
+	return 0
+}
+
+func validHandlerSource(path string) bool {
+	info, err := os.Stat(path)
+	if err != nil || !info.IsDir() {
+		return false
+	}
+	_, err = os.Stat(filepath.Join(path, "bundle.json"))
+	return err == nil
+}
+
+func frontendGeneratedPath(from string) (string, string) {
+	body, err := os.ReadFile(filepath.Join(from, "bundle.json"))
+	if err != nil {
+		return "", "handler-invalid"
+	}
+	var manifest struct {
+		Name string `json:"name"`
+	}
+	if err := json.Unmarshal(body, &manifest); err != nil || !validSubjectToken(manifest.Name) {
+		return "", "handler-invalid"
+	}
+	return "/artifacts/bundle/" + manifest.Name + "/index.html", ""
+}
+
+func (c cli) loadAppHandler(name string) (appHandlerRecord, string) {
+	body, err := os.ReadFile(c.appHandlerPath(name))
+	if err != nil {
+		return appHandlerRecord{}, "handler-not-found"
+	}
+	var rec appHandlerRecord
+	if err := json.Unmarshal(body, &rec); err != nil || rec.Kind != "tinkalet.frontendHandler.v1" || rec.Name != name || rec.Type != "vite" || !validHandlerSource(rec.From) {
+		return appHandlerRecord{}, "handler-invalid"
+	}
+	return rec, ""
+}
+
+func (c cli) appHandlerPath(name string) string {
+	return filepath.Join(c.dataDir(), "app-handlers", name+".json")
+}
+
+func (c cli) okApp(name string, item itemView, jsonOut bool) int {
+	if jsonOut {
+		_ = json.NewEncoder(c.out).Encode(item)
+		return 0
+	}
+	fmt.Fprintf(c.out, "app %s created %s rev %d\n", name, item.Key, item.Revision)
+	return 0
+}
+
+func (c cli) denyApp(name, action, reason string) int {
+	fmt.Fprintf(c.errOut, "app %s denied %s: %s\n", name, action, reason)
+	return 1
+}
+
+func (c cli) denyAppHandler(name, action, reason string) int {
+	fmt.Fprintf(c.errOut, "app handler %s denied %s: %s\n", name, action, reason)
+	return 1
 }
 
 func (c cli) schedule(args []string) int {
@@ -1482,16 +1772,18 @@ func (c cli) watchEvent(req watchReq, entry nats.KeyValueEntry, cur watchCursor,
 	if replay {
 		src = "replay"
 	}
+	now := time.Now().UTC()
 	return watchEvent{
-		Kind:       "tinkalet.itemEvent.v1",
-		Cursor:     req.Cursor,
-		Scope:      req.Scope,
-		Key:        rec.Key,
-		Status:     rec.Status,
-		Value:      rec.Value,
-		Revision:   entry.Revision(),
-		Source:     src,
-		ObservedAt: time.Now().UTC().Format(time.RFC3339),
+		Kind:             "tinkalet.itemEvent.v1",
+		Cursor:           req.Cursor,
+		Scope:            req.Scope,
+		Key:              rec.Key,
+		Status:           rec.Status,
+		Value:            rec.Value,
+		Revision:         entry.Revision(),
+		Source:           src,
+		ObservedAt:       now.Format(time.RFC3339Nano),
+		ObservedAtUnixMs: now.UnixMilli(),
 	}, true, ""
 }
 

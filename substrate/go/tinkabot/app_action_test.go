@@ -321,7 +321,7 @@ func TestBrowserItemSubmitBridge(t *testing.T) {
 	mustTinkalet(t, owner, "profile", "import", "local", "--store", store, "--name", "owner")
 	mustTinkalet(t, owner, "profile", "use", "owner")
 
-	browser := browserConn(t, app)
+	browser, grant := browserGrantConn(t, app)
 	defer browser.Close()
 
 	key := "artifacts.artifact-browser.results.choice"
@@ -342,6 +342,36 @@ func TestBrowserItemSubmitBridge(t *testing.T) {
 	item := decodeItem(t, out)
 	if item.Key != key || item.Revision != resp.Item.Revision || string(item.Value) != `{"choice":"diagram-a"}` {
 		t.Fatalf("stored item drift: %#v vs %#v", item, resp.Item)
+	}
+
+	watchKey := "artifacts.artifact-browser.results.live"
+	watchResp := decodeBrowserActionResp(t, requestBrowserCommand(t, browser, browserItemCommand("item_watch", "cmd-visual-watch", map[string]any{
+		"key":      watchKey,
+		"delivery": grant.StateSubject,
+	})))
+	if watchResp.Status != "accepted" || !strings.Contains(watchResp.DeliverySubject, ".artifact.artifact-browser.") {
+		t.Fatalf("visual item watch response drift: %#v", watchResp)
+	}
+	sub, err := browser.SubscribeSync(watchResp.DeliverySubject)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = sub.Unsubscribe() })
+
+	live := decodeBrowserActionResp(t, requestBrowserCommand(t, browser, browserItemCommand("item_submit", "cmd-visual-live", map[string]any{
+		"key":   watchKey,
+		"value": map[string]any{"choice": "diagram-live"},
+	})))
+	if live.Status != "accepted" || live.Item == nil || live.Item.Key != watchKey {
+		t.Fatalf("visual live submit drift: %#v", live)
+	}
+	msg, err := sub.NextMsg(2 * time.Second)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var ev browserStateEvent
+	if err := json.Unmarshal(msg.Data, &ev); err != nil || ev.Source != "trusted-shell.nats-watch.push" || ev.Key != watchKey || string(ev.Value) != `{"choice":"diagram-live"}` {
+		t.Fatalf("visual item watch event drift: %v %#v", err, ev)
 	}
 
 	dup := decodeBrowserActionResp(t, requestBrowserCommand(t, browser, browserItemCommand("item_submit", "cmd-visual-dup", map[string]any{

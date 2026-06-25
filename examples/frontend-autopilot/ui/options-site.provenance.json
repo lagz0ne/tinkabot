@@ -1,0 +1,8 @@
+{
+  "kind": "tinkabot.uiBootstrapPlaceholder.v1",
+  "model": "none",
+  "command": "checked-in package placeholder",
+  "artifacts": ["options-site.html"],
+  "authoredBy": "bootstrap-placeholder",
+  "createdFor": "Frontend-autopilot package shape. The proof replaces this file with Claude Opus generated provenance before Tinkabot starts."
+}

@@ -823,13 +823,14 @@ type browserItemSubmitPayload struct {
 }
 
 type browserStateEvent struct {
-	Kind       string          `json:"kind"`
-	Source     string          `json:"source"`
-	Key        string          `json:"key"`
-	Status     string          `json:"status"`
-	Value      json.RawMessage `json:"value"`
-	Revision   uint64          `json:"revision"`
-	ObservedAt string          `json:"observedAt"`
+	Kind             string          `json:"kind"`
+	Source           string          `json:"source"`
+	Key              string          `json:"key"`
+	Status           string          `json:"status"`
+	Value            json.RawMessage `json:"value"`
+	Revision         uint64          `json:"revision"`
+	ObservedAt       string          `json:"observedAt"`
+	ObservedAtUnixMs int64           `json:"observedAtUnixMs"`
 }
 
 func (a *App) startSchedules(nc *nats.Conn, w Wiring) error {
@@ -957,6 +958,8 @@ func (a *App) handleBrowserCommand(nc *nats.Conn, items nats.KeyValue, msg *nats
 		return a.handleBrowserParticipantWatch(nc, items, req)
 	case "item_submit":
 		return handleBrowserItemSubmit(items, req)
+	case "item_watch":
+		return a.handleBrowserItemWatch(nc, items, req)
 	default:
 		return denyAppAction("unknown-command")
 	}
@@ -1054,6 +1057,24 @@ func (a *App) handleBrowserParticipantWatch(nc *nats.Conn, items nats.KeyValue, 
 	return appActionResp{Status: "accepted", DeliverySubject: subject}
 }
 
+func (a *App) handleBrowserItemWatch(nc *nats.Conn, items nats.KeyValue, req browserCommandReq) appActionResp {
+	var payload browserParticipantWatchPayload
+	if err := json.Unmarshal(req.Payload, &payload); err != nil {
+		return denyAppAction("malformed-action")
+	}
+	if reason := browserItemWatchReason(req.Context, payload.Key); reason != "" {
+		return denyAppAction(reason)
+	}
+	subject, ok := browserStateSubject(payload.Delivery, req.Context, payload.Key)
+	if !ok {
+		return denyAppAction("malformed-action")
+	}
+	if err := a.startBrowserStateWatch(nc, items, payload.Key, subject); err != nil {
+		return denyAppAction(appActionReason(err))
+	}
+	return appActionResp{Status: "accepted", DeliverySubject: subject}
+}
+
 func handleBrowserItemSubmit(items nats.KeyValue, req browserCommandReq) appActionResp {
 	var payload browserItemSubmitPayload
 	if err := json.Unmarshal(req.Payload, &payload); err != nil {
@@ -1129,6 +1150,17 @@ func browserItemSubmitReason(ctx browserCommandContext, payload browserItemSubmi
 	return ""
 }
 
+func browserItemWatchReason(ctx browserCommandContext, key string) string {
+	if !validProductItemKey(key) {
+		return "malformed-action"
+	}
+	prefix := "artifacts." + ctx.ArtifactID + ".results."
+	if !strings.HasPrefix(key, prefix) {
+		return "denied-scope"
+	}
+	return ""
+}
+
 func itemSubmitReason(err error) string {
 	if err == nil {
 		return ""
@@ -1179,7 +1211,10 @@ func (a *App) startBrowserStateWatch(nc *nats.Conn, items nats.KeyValue, key, su
 	if _, exists := a.browserWatches[subject]; exists {
 		a.mu.Unlock()
 		stop()
-		return publishBrowserState(nc, items, key, subject)
+		if err := publishBrowserState(nc, items, key, subject); err != nil && appActionReason(err) != "item-not-found" {
+			return err
+		}
+		return nil
 	}
 	a.browserWatches[subject] = stop
 	a.stopLoops = append(a.stopLoops, stop)
@@ -1242,14 +1277,16 @@ func browserStateEventFromEntry(entry nats.KeyValueEntry) (browserStateEvent, bo
 	if err := json.Unmarshal(entry.Value(), &rec); err != nil || rec.Kind != itemKind || rec.Key != entry.Key() {
 		return browserStateEvent{}, false
 	}
+	now := time.Now().UTC()
 	return browserStateEvent{
-		Kind:       "tinkabot.browserState.v1",
-		Source:     "trusted-shell.nats-watch.push",
-		Key:        rec.Key,
-		Status:     rec.Status,
-		Value:      rec.Value,
-		Revision:   entry.Revision(),
-		ObservedAt: time.Now().UTC().Format(time.RFC3339),
+		Kind:             "tinkabot.browserState.v1",
+		Source:           "trusted-shell.nats-watch.push",
+		Key:              rec.Key,
+		Status:           rec.Status,
+		Value:            rec.Value,
+		Revision:         entry.Revision(),
+		ObservedAt:       now.Format(time.RFC3339Nano),
+		ObservedAtUnixMs: now.UnixMilli(),
 	}, true
 }
 
@@ -1257,8 +1294,12 @@ func browserStateSubject(prefix string, ctx browserCommandContext, key string) (
 	if !validBrowserStatePrefix(prefix) {
 		return "", false
 	}
-	sum := sha256.Sum256([]byte(ctx.AppID + "\x00" + ctx.ParticipantID + "\x00" + key))
-	return prefix + "." + ctx.AppID + "." + ctx.ParticipantID + "." + hex.EncodeToString(sum[:8]), true
+	if ctx.AppID != "" || ctx.ParticipantID != "" {
+		sum := sha256.Sum256([]byte(ctx.AppID + "\x00" + ctx.ParticipantID + "\x00" + key))
+		return prefix + "." + ctx.AppID + "." + ctx.ParticipantID + "." + hex.EncodeToString(sum[:8]), true
+	}
+	sum := sha256.Sum256([]byte(ctx.ArtifactID + "\x00" + key))
+	return prefix + ".artifact." + ctx.ArtifactID + "." + hex.EncodeToString(sum[:8]), true
 }
 
 func validBrowserStatePrefix(prefix string) bool {
@@ -2087,6 +2128,7 @@ func browserCommandPerms(w Wiring) core.Permissions {
 		"$JS.API.INFO",
 		"$JS.API.STREAM.INFO.KV_" + w.ItemBucket,
 		"$JS.API.CONSUMER.CREATE.KV_" + w.ItemBucket + ".*.$KV." + w.ItemBucket + ".apps.*.state.>",
+		"$JS.API.CONSUMER.CREATE.KV_" + w.ItemBucket + ".*.$KV." + w.ItemBucket + ".artifacts.*.results.>",
 		"$JS.API.CONSUMER.DELETE.KV_" + w.ItemBucket + ".>",
 		"$JS.API.DIRECT.GET.KV_" + w.ItemBucket + ".$KV." + w.ItemBucket + ".apps.*.state.>",
 		"$JS.API.DIRECT.GET.KV_" + w.ItemBucket + ".$KV." + w.ItemBucket + ".apps.*.participants.*.actions.>",

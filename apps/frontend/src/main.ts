@@ -3,6 +3,7 @@ import {
   denyRaw,
   frameAttrs,
   makeLease,
+  type Lease,
   type BrowserCommandIntent,
 } from "./isolation";
 import { generatedUrl } from "./fixture";
@@ -33,7 +34,10 @@ interface Proof {
   state: {
     delivery: string;
     events: number;
+    lastKey: string;
     lastRevision: number;
+    lastObservedAtUnixMs: number;
+    lastReceivedAtMs: number;
     errors: string[];
   };
   ready?: {
@@ -44,6 +48,7 @@ interface Proof {
     cookie: string;
     storage: string;
   };
+  lease?: Lease;
 }
 
 const root = document.querySelector("#app");
@@ -78,7 +83,9 @@ const stateKey =
               ? "board"
               : "browser"
       }`
-    : "");
+    : visualMode
+      ? visualKey
+      : "");
 const autoActions = Number.parseInt(param("tb_auto") || "0", 10);
 const intervalMs = Number.parseInt(param("tb_interval_ms") || "25", 10);
 const attrs = frameAttrs("generated artifact proof");
@@ -92,7 +99,10 @@ const proof: Proof = {
   state: {
     delivery: "",
     events: 0,
+    lastKey: "",
     lastRevision: 0,
+    lastObservedAtUnixMs: 0,
+    lastReceivedAtMs: 0,
     errors: [],
   },
 };
@@ -163,7 +173,7 @@ const lease = makeLease({
   commands: participantMode
     ? ["participant_read", "participant_action"]
     : visualMode
-      ? ["item_submit"]
+      ? ["item_submit", "item_watch"]
       : ["select_artifact"],
   sessions: participantMode || visualMode ? [sessionId] : [],
   chain: {
@@ -173,6 +183,7 @@ const lease = makeLease({
     maxHops: 5,
   },
 });
+proof.lease = lease;
 
 let client: Promise<CommandClient> | undefined;
 let observation: ReturnType<typeof observe> | undefined;
@@ -228,7 +239,10 @@ window.addEventListener("message", (event) => {
   render();
 });
 
-generatedFrame.src = generatedUrl();
+void setGeneratedSource().catch((error) => {
+  proof.denied.push(error instanceof Error ? error.message : String(error));
+  render();
+});
 
 const obsLog = app.querySelector<HTMLPreElement>('[data-obs="log"]');
 const obsSid = app.querySelector<HTMLInputElement>('[data-obs="sid"]');
@@ -294,7 +308,7 @@ function getClient() {
 }
 
 function startStateWatch() {
-  if (!participantMode || stateKey === "" || stateWatch) return;
+  if ((!participantMode && !visualMode) || stateKey === "" || stateWatch) return;
   stateWatch = getClient()
     .then((c) => c.watch(stateWatchIntent(), postState))
     .catch((error) => {
@@ -309,7 +323,7 @@ function stateWatchIntent(): BrowserCommandIntent {
   return {
     kind: "browser.command_intent",
     type: "content.intent",
-    command: "participant_watch",
+    command: visualMode ? "item_watch" : "participant_watch",
     commandId: `watch-${lease.frameId}-${Date.now()}`,
     expectedRevision: lease.artifactRevision,
     payload: { key: stateKey },
@@ -331,7 +345,10 @@ function postState(event: StateEvent) {
     denyRaw(event);
     proof.state.delivery = event.source;
     proof.state.events += 1;
+    proof.state.lastKey = event.key;
     proof.state.lastRevision = event.revision;
+    proof.state.lastObservedAtUnixMs = event.observedAtUnixMs;
+    proof.state.lastReceivedAtMs = Date.now();
     generatedFrame.contentWindow?.postMessage(
       {
         type: "tinkabot.state",
@@ -408,6 +425,22 @@ function render() {
 
 function param(name: string) {
   return params.get(name)?.trim() ?? "";
+}
+
+async function setGeneratedSource() {
+  const raw = param("tb_generated");
+  if (raw === "") {
+    generatedFrame.src = generatedUrl();
+    return;
+  }
+  const url = new URL(raw, location.href);
+  if (url.origin !== location.origin || !url.pathname.startsWith("/artifacts/")) {
+    throw new Error("generated artifact URL is outside the trusted shell");
+  }
+  const res = await fetch(url.href, { cache: "no-store" });
+  if (!res.ok) throw new Error(`generated artifact fetch failed: ${res.status}`);
+  const html = await res.text();
+  generatedFrame.src = URL.createObjectURL(new Blob([html], { type: "text/html" }));
 }
 
 function artifactFromVisualKey(key: string) {

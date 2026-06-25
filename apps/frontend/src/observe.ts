@@ -20,6 +20,7 @@ export interface StateEvent {
   value: unknown;
   revision: number;
   observedAt: string;
+  observedAtUnixMs: number;
 }
 
 export interface CommandClient {

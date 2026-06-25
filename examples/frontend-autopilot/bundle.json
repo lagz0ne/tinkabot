@@ -1,0 +1,22 @@
+{
+  "kind": "bundle.manifest",
+  "name": "frontend-autopilot",
+  "scripts": [
+    {
+      "name": "source",
+      "desc": "Emit the frontend app source file map.",
+      "file": "scripts/source.sh",
+      "command": "/bin/sh",
+      "projections": ["src"],
+      "boot": true
+    },
+    {
+      "name": "build",
+      "desc": "Rebuild the frontend app whenever the source changes.",
+      "file": "scripts/build.ts",
+      "command": "bun",
+      "watches": "src",
+      "projections": ["built"]
+    }
+  ]
+}

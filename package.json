@@ -37,6 +37,7 @@
     "demo:realtime-browser": "bash scripts/demo-realtime-browser.sh",
     "demo:iso-concurrency": "bash scripts/demo-iso-concurrency.sh",
     "demo:visual": "bash scripts/demo-visual-decision.sh",
+    "demo:frontend-autopilot": "bash scripts/demo-frontend-autopilot.sh",
     "smoke:tinkalet-package": "bash scripts/smoke-tinkalet-package.sh",
     "gate:tinkalet-package": "bash scripts/smoke-tinkalet-package.sh",
     "release:evidence": "bun scripts/release-evidence.ts",

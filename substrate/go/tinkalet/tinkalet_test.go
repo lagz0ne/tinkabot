@@ -69,6 +69,20 @@ func TestProfileImportListUse(t *testing.T) {
 	assertList(t, out, "local", []wantProfile{{Name: "local", Default: true}})
 }
 
+func TestProfileImportUse(t *testing.T) {
+	t.Parallel()
+	env := newEnv(t)
+	store := localStore(t, "nats://127.0.0.1:4229", "http://127.0.0.1:8429", "SECRET-CREDS")
+
+	code, out, errOut := runCmd(t, env.vars, "profile", "import", "local", "--store", store, "--name", "local", "--use")
+	assertCmd(t, code, out, errOut, 0, "profile local imported and selected\n", "")
+	assertMode(t, filepath.Join(env.config, "default-profile"), 0o600)
+
+	code, out, errOut = runCmd(t, env.vars, "profile", "list", "--json")
+	assertJSONCmd(t, code, errOut)
+	assertList(t, out, "local", []wantProfile{{Name: "local", Default: true}})
+}
+
 func TestProfileImportDenials(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
@@ -180,6 +194,135 @@ func TestActionCommandDenials(t *testing.T) {
 
 	code, out, errOut = runCmd(t, env.vars, "action", "reject", "apps.demo.participants.alice.actions.move-1", "--reason", "BadReason")
 	assertCmd(t, code, out, errOut, 2, "", "usage: tinkalet <command> [options]\n")
+}
+
+func TestAppHandlerRegister(t *testing.T) {
+	t.Parallel()
+	env := newEnv(t)
+	template := t.TempDir()
+	write(t, filepath.Join(template, "bundle.json"), `{"name":"template"}`, 0o600)
+
+	code, out, errOut := runCmd(t, env.vars, "app", "handler", "register", "vite", "--from", template)
+	assertCmd(t, code, out, errOut, 1, "", "app handler vite denied register: profile-not-found\n")
+
+	store := localStore(t, "nats://127.0.0.1:4229", "http://127.0.0.1:8429", "SECRET-CREDS")
+	mustRun(t, env.vars, "profile", "import", "local", "--store", store, "--name", "local")
+	mustRun(t, env.vars, "profile", "use", "local")
+
+	code, out, errOut = runCmd(t, env.vars, "app", "handler", "register", "vite", "--from", template, "--json")
+	assertJSONCmd(t, code, errOut)
+	var rec appHandlerRecord
+	if err := json.Unmarshal([]byte(out), &rec); err != nil {
+		t.Fatalf("handler json: %v\n%s", err, out)
+	}
+	if rec.Kind != "tinkalet.frontendHandler.v1" || rec.Name != "vite" || rec.Type != "vite" || rec.Profile != "local" {
+		t.Fatalf("handler record = %#v", rec)
+	}
+	if rec.From != mustAbs(t, template) {
+		t.Fatalf("handler from = %q, want %q", rec.From, mustAbs(t, template))
+	}
+	if strings.Contains(out, "SECRET-CREDS") {
+		t.Fatalf("handler json leaked credential: %q", out)
+	}
+	path := filepath.Join(env.data, "app-handlers", "vite.json")
+	assertMode(t, path, 0o600)
+	var stored appHandlerRecord
+	if err := json.Unmarshal(mustRead(t, path), &stored); err != nil {
+		t.Fatalf("stored handler: %v", err)
+	}
+	if stored.Name != rec.Name || stored.From != rec.From || stored.Profile != rec.Profile {
+		t.Fatalf("stored handler = %#v, want %#v", stored, rec)
+	}
+
+	code, out, errOut = runCmd(t, env.vars, "app", "handler", "register", "vite", "--from", filepath.Join(template, "missing"), "--json")
+	assertCmd(t, code, out, errOut, 1, "", "app handler vite denied register: handler-source-invalid\n")
+}
+
+func TestAppHandlerRegisterRestrictedProfileDeniedBeforeNetwork(t *testing.T) {
+	t.Parallel()
+	env := newEnv(t)
+	template := t.TempDir()
+	write(t, filepath.Join(template, "bundle.json"), `{"name":"template"}`, 0o600)
+	store := participantStore(t, "nats://127.0.0.1:1", "http://127.0.0.1:8429", "demo", "alice", testCreds(t))
+	mustRun(t, env.vars, "profile", "import", "local", "--store", store, "--name", "alice")
+	mustRun(t, env.vars, "profile", "use", "alice")
+
+	code, out, errOut := runCmd(t, env.vars, "app", "handler", "register", "vite", "--from", template, "--json")
+	assertCmd(t, code, out, errOut, 1, "", "app handler vite denied register: denied-scope\n")
+}
+
+func TestAppCreateFrontend(t *testing.T) {
+	t.Parallel()
+	srv := natsserver.New(&natsserver.Options{Host: "127.0.0.1", Port: -1, JetStream: true, StoreDir: t.TempDir(), NoLog: true, NoSigs: true})
+	go srv.Start()
+	if !srv.ReadyForConnections(5 * time.Second) {
+		t.Fatal("nats server did not become ready")
+	}
+	t.Cleanup(srv.Shutdown)
+
+	nc, err := nats.Connect(srv.ClientURL(), nats.NoReconnect())
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(nc.Close)
+	js, err := nc.JetStream()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := js.CreateKeyValue(&nats.KeyValueConfig{Bucket: itemBucket}); err != nil {
+		t.Fatal(err)
+	}
+
+	env := newEnv(t)
+	template := t.TempDir()
+	write(t, filepath.Join(template, "bundle.json"), `{"name":"template"}`, 0o600)
+
+	code, out, errOut := runCmd(t, env.vars, "app", "create", "frontend", "options-site", "--handler", "vite", "--json")
+	assertCmd(t, code, out, errOut, 1, "", "app options-site denied create: profile-not-found\n")
+
+	store := localStore(t, srv.ClientURL(), "http://127.0.0.1:8429", testCreds(t))
+	mustRun(t, env.vars, "profile", "import", "local", "--store", store, "--name", "local")
+	mustRun(t, env.vars, "profile", "use", "local")
+
+	code, out, errOut = runCmd(t, env.vars, "app", "create", "frontend", "options-site", "--handler", "vite", "--json")
+	assertCmd(t, code, out, errOut, 1, "", "app options-site denied create: handler-not-found\n")
+
+	mustRun(t, env.vars, "app", "handler", "register", "vite", "--from", template)
+	code, out, errOut = runCmd(t, env.vars, "app", "create", "frontend", "options-site", "--handler", "vite", "--json")
+	assertJSONCmd(t, code, errOut)
+	var item itemView
+	if err := json.Unmarshal([]byte(out), &item); err != nil {
+		t.Fatalf("app create json: %v\n%s", err, out)
+	}
+	if item.Key != "apps.options-site.state.frontend" || item.Status != "resolved" {
+		t.Fatalf("created item = %#v", item)
+	}
+	var val frontendAppValue
+	if err := json.Unmarshal(item.Value, &val); err != nil {
+		t.Fatalf("frontend value: %v\n%s", err, item.Value)
+	}
+	if val.Kind != "tinkabot.frontendApp.v1" || val.Name != "options-site" || val.Handler != "vite" || val.StateKey != item.Key || val.ResultKey != "artifacts.options-site.results.plan" || val.GeneratedPath != "/artifacts/bundle/template/index.html" {
+		t.Fatalf("frontend value = %#v", val)
+	}
+	if strings.Contains(out, "SECRET-CREDS") || strings.Contains(out, "tb_items") || strings.Contains(out, "$KV") {
+		t.Fatalf("app create leaked authority: %q", out)
+	}
+
+	code, out, errOut = runCmd(t, env.vars, "app", "create", "frontend", "options-site", "--handler", "vite")
+	assertCmd(t, code, out, errOut, 1, "", "app options-site denied create: duplicate-app\n")
+}
+
+func TestAppCreateFrontendRestrictedProfileDeniedBeforeNetwork(t *testing.T) {
+	t.Parallel()
+	env := newEnv(t)
+	template := t.TempDir()
+	write(t, filepath.Join(template, "bundle.json"), `{"name":"template"}`, 0o600)
+	store := participantStore(t, "nats://127.0.0.1:1", "http://127.0.0.1:8429", "demo", "alice", testCreds(t))
+	mustRun(t, env.vars, "profile", "import", "local", "--store", store, "--name", "alice")
+	mustRun(t, env.vars, "profile", "use", "alice")
+
+	code, out, errOut := runCmd(t, env.vars, "app", "create", "frontend", "options-site", "--handler", "vite", "--json")
+	assertCmd(t, code, out, errOut, 1, "", "app options-site denied create: denied-scope\n")
 }
 
 func TestWatchCommandDenials(t *testing.T) {
