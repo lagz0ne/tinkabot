@@ -94,8 +94,6 @@ GREEN evidence:
 - `bun run typecheck` -> SDK and orchestrator typecheck passed.
 - `bun run build` -> SDK CJS, ESM, and declaration bundles emitted.
 - `bun run pack:dry` -> `tinkabot-0.1.0.tgz`, 6 files.
-- `bun run validate:layers` -> `Layer validation passed: docs/matched-abstraction`.
-- `bun run test:layers` -> `Ran 10 tests ... OK`.
 - `bun run orchestrate:codex -- --dry-run --allow-dirty` -> next topic `activation-source-router`.
 - `git diff --check` -> clean.
 - Focused placeholder scan over this task doc, `substrate/go/embednats`, and `tasks/todo.md` -> no matches.
@@ -104,7 +102,6 @@ Review evidence:
 
 - Subagent layer/security review found an unrestricted internal probe user and missing router-safe client boundary. Fixed by generating a random probe credential, limiting probe permissions to JetStream readiness subjects plus reply inboxes, adding a probe denial test, and adding `Runtime.Connect` as the adapter-owned client boundary.
 - Subagent traced-test review found under-owned WebSocket runtime setup mapping, auth-load branches, and stop panic wrapping. Fixed with runtime WebSocket start mapping, auth missing/expired/mismatch/malformed tests, and `Stop` panic recovery for drain, shutdown, and wait paths.
-- Post-review `go test ./embednats -count=1 -v`, `go test ./... -count=1`, `bun run schema:parity`, `bun run test`, `bun run typecheck`, `bun run build`, `bun run pack:dry`, `bun run validate:layers`, `bun run test:layers`, `bun run orchestrate:codex -- --dry-run --allow-dirty`, and `git diff --check` passed.
 
 ## Wrap-Up Announcement
 

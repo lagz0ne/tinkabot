@@ -1,0 +1,12 @@
+{
+  "$schema": "https://anthropic.com/claude-code/plugin.schema.json",
+  "name": "matched-abstraction",
+  "version": "1.0.1",
+  "description": "Layered abstraction discipline for Approach and Plan artifacts, with harnesses for Codex and Claude comparison.",
+  "author": {
+    "name": "Matched Abstraction Maintainers"
+  },
+  "skills": [
+    "./skills/matched-abstraction"
+  ]
+}

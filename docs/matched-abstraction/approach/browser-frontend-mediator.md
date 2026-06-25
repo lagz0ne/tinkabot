@@ -2,7 +2,6 @@
 layer: approach
 topic: browser-frontend-mediator
 references:
-  - ./charter.md
   - ./nats-script-runtime.md
   - ./browser-isolation.md
 ---

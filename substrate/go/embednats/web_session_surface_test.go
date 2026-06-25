@@ -106,6 +106,9 @@ func TestWebSessionSurface(t *testing.T) {
 		if viewer.DeliverSubject == "" || !strings.HasPrefix(viewer.DeliverSubject, "tb.session."+sid+".deliver.") {
 			t.Fatalf("ViewerObserves: viewer must get its own deliver subject under the session, got %q", viewer.DeliverSubject)
 		}
+		if viewer.StateSubject == "" || !strings.HasPrefix(viewer.StateSubject, "tb.app.browser.state.") || strings.Contains(viewer.StateSubject, sid) {
+			t.Fatalf("ViewerObserves: viewer must get its own opaque state prefix, got %q", viewer.StateSubject)
+		}
 		if strings.Contains(viewer.JWT, "SUAA") || strings.Contains(viewer.JWT, "-----BEGIN") {
 			t.Fatal("ViewerObserves: viewer artifact must be a bare bearer JWT, never a creds file with a seed")
 		}
@@ -175,6 +178,10 @@ func TestWebSessionSurface(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
+		viewerA2, err := MintViewerCredential(rt, sidA, 10*time.Minute)
+		if err != nil {
+			t.Fatal(err)
+		}
 
 		nc, err := connectViewer(t, rt, viewerA.JWT)
 		if err != nil {
@@ -211,6 +218,14 @@ func TestWebSessionSurface(t *testing.T) {
 		})
 		deny("subscribe on session B's out subject", func() error {
 			_, err := nc.Subscribe("tb.session."+sidB+".out", func(*nats.Msg) {})
+			return err
+		})
+		deny("subscribe on session B's state branch", func() error {
+			_, err := nc.Subscribe(viewerB.StateSubject+".probe", func(*nats.Msg) {})
+			return err
+		})
+		deny("subscribe on another viewer's same-session state branch", func() error {
+			_, err := nc.Subscribe(viewerA2.StateSubject+".probe", func(*nats.Msg) {})
 			return err
 		})
 		deny("publish on own session's steering subject", func() error {
@@ -326,6 +341,8 @@ func TestWebSessionSurface(t *testing.T) {
 			t.Fatal(err)
 		}
 		_, err = MintViewerCredential(rtOp, "", 10*time.Minute)
+		assertAdapter(t, err, ViewerMintFailed)
+		_, err = MintViewerCredential(rtOp, "bad.session", 10*time.Minute)
 		assertAdapter(t, err, ViewerMintFailed)
 	})
 

@@ -82,8 +82,6 @@ GREEN:
 - `bun test packages/sdk/tests/endgame-contract/command-acceptance.test.ts` -> `9 pass`, `0 fail`, `53 expect() calls`.
 - `bun run schema:parity` -> endgame contract tests `17 pass`, `0 fail`, `135 expect() calls`; Go contract package `ok`.
 - `bunx @typescript/native-preview --noEmit --ignoreConfig --target ES2022 --module ESNext --moduleResolution Bundler --types bun-types --skipLibCheck --strict src/endgame-contract/index.ts src/endgame-contract/command-acceptance.ts tests/endgame-contract/command-acceptance.test.ts tests/endgame-contract/contract-authority.test.ts tests/endgame-contract/managed-auth-subjects.test.ts` from `packages/sdk` -> exit `0`.
-- `bun run validate:layers` -> `Layer validation passed: docs/matched-abstraction`.
-- `bun run test:layers` -> `Ran 10 tests ... OK`.
 
 Named negative-case evidence (re-executed 2026-06-10 during the release-spine evidence audit):
 

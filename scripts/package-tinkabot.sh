@@ -30,6 +30,7 @@ ldflags="-X main.version=$version -X main.commit=$commit -X main.builtAt=$built_
 rm -rf "$out"
 mkdir -p "$out/libexec/tinkabot"
 
+(cd "$root/apps/frontend" && bun run build >/dev/null)
 (cd "$root/substrate/go" && go build -ldflags "$ldflags" -o "$out/tinkabot" ./cmd/tinkabot)
 (cd "$root/substrate/go" && go build -ldflags "$ldflags" -o "$out/tinkalet" ./cmd/tinkalet)
 (cd "$root/tools/natscli" && go build -o "$out/libexec/tinkabot/nats" github.com/nats-io/natscli/nats)

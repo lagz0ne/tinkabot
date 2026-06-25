@@ -1,0 +1,4 @@
+fact: c3-102
+claim: "TypeScript SDK owns the package source, tests, build config, and generated package output."
+code:
+  - packages/sdk/**

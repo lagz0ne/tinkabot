@@ -140,6 +140,12 @@ func TestProfileUseAndTriggerDenials(t *testing.T) {
 
 	code, out, errOut = runCmd(t, env.vars, "trigger", "bundle.clock.tick")
 	assertCmd(t, code, out, errOut, 1, "", "profile default denied bundle.clock.tick: profile-not-found\n")
+
+	store := participantStore(t, "nats://127.0.0.1:1", "http://127.0.0.1:8429", "demo", "alice", testCreds(t))
+	mustRun(t, env.vars, "profile", "import", "local", "--store", store, "--name", "alice")
+	mustRun(t, env.vars, "profile", "use", "alice")
+	code, out, errOut = runCmd(t, env.vars, "trigger", "bundle.clock.tick", "--request-id", "restricted-trigger")
+	assertCmd(t, code, out, errOut, 1, "", "profile alice denied bundle.clock.tick: denied-scope\n")
 }
 
 func TestItemCommandDenials(t *testing.T) {
@@ -153,6 +159,29 @@ func TestItemCommandDenials(t *testing.T) {
 	assertCmd(t, code, out, errOut, 1, "", "item deploy/1 denied create: profile-not-found\n")
 }
 
+func TestActionCommandDenials(t *testing.T) {
+	t.Parallel()
+	env := newEnv(t)
+
+	code, out, errOut := runCmd(t, env.vars, "action", "submit", "move-1", "--state", "apps.demo.state.board", "--base-revision", "1", "--value", "{")
+	assertCmd(t, code, out, errOut, 1, "", "action move-1 denied submit: malformed-value\n")
+
+	code, out, errOut = runCmd(t, env.vars, "action", "submit", "move-1", "--state", "apps.demo.state.board", "--base-revision", "1", "--value", `{"cell":"a1"}`)
+	assertCmd(t, code, out, errOut, 1, "", "action move-1 denied submit: profile-not-found\n")
+
+	code, out, errOut = runCmd(t, env.vars, "action", "apply", "apps.demo.participants.alice.actions.move-1", "--value", "{")
+	assertCmd(t, code, out, errOut, 1, "", "action apps.demo.participants.alice.actions.move-1 denied apply: malformed-value\n")
+
+	code, out, errOut = runCmd(t, env.vars, "action", "apply", "apps.demo.participants.alice.actions.move-1", "--value", `{"turn":"bob"}`)
+	assertCmd(t, code, out, errOut, 1, "", "action apps.demo.participants.alice.actions.move-1 denied apply: profile-not-found\n")
+
+	code, out, errOut = runCmd(t, env.vars, "action", "reject", "apps.demo.participants.alice.actions.move-1", "--reason", "wrong-turn")
+	assertCmd(t, code, out, errOut, 1, "", "action apps.demo.participants.alice.actions.move-1 denied reject: profile-not-found\n")
+
+	code, out, errOut = runCmd(t, env.vars, "action", "reject", "apps.demo.participants.alice.actions.move-1", "--reason", "BadReason")
+	assertCmd(t, code, out, errOut, 2, "", "usage: tinkalet <command> [options]\n")
+}
+
 func TestWatchCommandDenials(t *testing.T) {
 	t.Parallel()
 	env := newEnv(t)
@@ -162,6 +191,36 @@ func TestWatchCommandDenials(t *testing.T) {
 
 	code, out, errOut = runCmd(t, env.vars, "watch", "item", "deploy/1", "--cursor", "deploy1")
 	assertCmd(t, code, out, errOut, 1, "", "watch deploy/1 denied item: profile-not-found\n")
+}
+
+func TestParticipantWatchScopeDenialPrecedesNetwork(t *testing.T) {
+	t.Parallel()
+	env := newEnv(t)
+	store := participantStore(t, "nats://127.0.0.1:1", "http://127.0.0.1:8429", "demo", "alice", testCreds(t))
+
+	mustRun(t, env.vars, "profile", "import", "local", "--store", store, "--name", "alice")
+	mustRun(t, env.vars, "profile", "use", "alice")
+
+	code, out, errOut := runCmd(t, env.vars, "watch", "prefix", "apps.demo.participants.bob.actions", "--timeout", "1ms")
+	assertCmd(t, code, out, errOut, 1, "", "watch apps.demo.participants.bob.actions denied prefix: denied-scope\n")
+
+	code, out, errOut = runCmd(t, env.vars, "watch", "item", "apps.demo.state.>", "--timeout", "1ms")
+	assertCmd(t, code, out, errOut, 2, "", "usage: tinkalet <command> [options]\n")
+}
+
+func TestParticipantWatchFiltersDenyMalformedTargets(t *testing.T) {
+	t.Parallel()
+	prof := Profile{Name: "alice", Trust: "app-participant", AppID: "demo", ParticipantID: "alice"}
+
+	for _, req := range []watchReq{
+		{Scope: "item", Target: "apps.demo.state.>"},
+		{Scope: "prefix", Target: "apps.demo.state.>"},
+	} {
+		filters, reason := participantWatchFilters(req, prof)
+		if len(filters) != 0 || reason != "denied-scope" {
+			t.Fatalf("participant filters for %#v = %#v/%q, want nil/denied-scope", req, filters, reason)
+		}
+	}
 }
 
 func TestReactionCommandDenials(t *testing.T) {
@@ -196,7 +255,7 @@ func TestTriggerProfileOverrideDoesNotChangeDefault(t *testing.T) {
 	mustRun(t, env.vars, "profile", "import", "local", "--store", other, "--name", "other")
 	mustRun(t, env.vars, "profile", "use", "local")
 
-	code, out, errOut := runCmd(t, env.vars, "trigger", "bundle.clock.nope", "--profile", "other", "--json")
+	code, out, errOut := runCmd(t, env.vars, "trigger", "bundle.clock.nope.extra", "--profile", "other", "--json")
 	if code != 1 {
 		t.Fatalf("exit = %d, stdout = %q, stderr = %q", code, out, errOut)
 	}
@@ -207,7 +266,7 @@ func TestTriggerProfileOverrideDoesNotChangeDefault(t *testing.T) {
 	if err := json.Unmarshal([]byte(out), &got); err != nil {
 		t.Fatalf("trigger json: %v\n%s", err, out)
 	}
-	if got.Profile != "other" || got.Intent != "bundle.clock.nope" || got.Status != "denied" || got.Reason != "unknown-trigger" {
+	if got.Profile != "other" || got.Intent != "bundle.clock.nope.extra" || got.Status != "denied" || got.Reason != "unknown-trigger" {
 		t.Fatalf("trigger json = %#v", got)
 	}
 	if got.Diagnostics.Server != "nats://127.0.0.1:4230" || got.Diagnostics.Shell != "http://127.0.0.1:8430" {
@@ -251,6 +310,51 @@ func TestTriggerMalformedResponse(t *testing.T) {
 
 	code, out, errOut := runCmd(t, env.vars, "trigger", "bundle.clock.tick", "--request-id", "req-malformed")
 	assertCmd(t, code, out, errOut, 1, "", "profile local denied bundle.clock.tick: malformed-response\n")
+}
+
+func TestTriggerIntentGrammarDenials(t *testing.T) {
+	t.Parallel()
+	env := newEnv(t)
+	store := localStore(t, "nats://127.0.0.1:4229", "http://127.0.0.1:8429", "SECRET-CREDS")
+	mustRun(t, env.vars, "profile", "import", "local", "--store", store, "--name", "local")
+	mustRun(t, env.vars, "profile", "use", "local")
+
+	for _, intent := range []string{"bundle.Builder.source", "bundle.builder.src_one", "bundle.builder.*"} {
+		code, out, errOut := runCmd(t, env.vars, "trigger", intent)
+		assertCmd(t, code, out, errOut, 1, "", "profile local denied "+intent+": unknown-trigger\n")
+	}
+}
+
+func TestTriggerGenericBundleIntent(t *testing.T) {
+	t.Parallel()
+	srv := natsserver.New(&natsserver.Options{Host: "127.0.0.1", Port: -1, NoLog: true, NoSigs: true})
+	go srv.Start()
+	if !srv.ReadyForConnections(5 * time.Second) {
+		t.Fatal("nats server did not become ready")
+	}
+	t.Cleanup(srv.Shutdown)
+
+	nc, err := nats.Connect(srv.ClientURL(), nats.NoReconnect())
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(nc.Close)
+	if _, err := nc.Subscribe("tb.bundle.builder.source", func(m *nats.Msg) {
+		_ = m.Respond([]byte("accepted"))
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if err := nc.Flush(); err != nil {
+		t.Fatal(err)
+	}
+
+	env := newEnv(t)
+	store := localStore(t, srv.ClientURL(), "http://127.0.0.1:8429", testCreds(t))
+	mustRun(t, env.vars, "profile", "import", "local", "--store", store, "--name", "local")
+	mustRun(t, env.vars, "profile", "use", "local")
+
+	code, out, errOut := runCmd(t, env.vars, "trigger", "bundle.builder.source", "--request-id", "req-builder")
+	assertCmd(t, code, out, errOut, 0, "profile local accepted bundle.builder.source\n", "")
 }
 
 func runCmd(t *testing.T, env []string, args ...string) (int, string, string) {
@@ -328,6 +432,30 @@ func localStore(t *testing.T, server, shell, creds string) string {
 		"role":       "caller",
 		"trust":      "local-owner",
 		"source":     "local-store:" + mustAbs(t, dir),
+	}
+	body, err := json.Marshal(desc)
+	if err != nil {
+		t.Fatal(err)
+	}
+	write(t, filepath.Join(dir, "local-profile.json"), string(body), 0o600)
+	return dir
+}
+
+func participantStore(t *testing.T, server, shell, appID, participantID, creds string) string {
+	t.Helper()
+	dir := t.TempDir()
+	write(t, filepath.Join(dir, "participant.creds"), creds, 0o600)
+	desc := map[string]string{
+		"kind":          "tinkabot.localProfile.v1",
+		"server":        server,
+		"shell":         shell,
+		"credential":    "participant.creds",
+		"role":          "participant",
+		"trust":         "app-participant",
+		"source":        "local-store:" + mustAbs(t, dir),
+		"status":        "active",
+		"appId":         appID,
+		"participantId": participantID,
 	}
 	body, err := json.Marshal(desc)
 	if err != nil {

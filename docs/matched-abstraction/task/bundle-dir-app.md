@@ -65,7 +65,7 @@ BundleRejected denials): unknown field, missing trigger, wrong kind, missing
 bundle.json. Denial oracles are typed-error asserts via `assertKind`, never
 exit-code.
 
-Full battery 2026-06-12: test, typecheck, build, validate:layers,
+Full battery 2026-06-12: test, typecheck, build
 release:evidence, gate:fakes, gate:parallel, gate:coverage, gate:scenarios,
 gate:manual, `go test ./... -count=1` (9/9 packages), `git diff --check` —
 all PASS.

@@ -55,8 +55,6 @@ export const verify = [
   "bun run test",
   "bun run build",
   "bun run pack:dry",
-  "bun run validate:layers",
-  "bun run test:layers",
   "git diff --check",
 ];
 

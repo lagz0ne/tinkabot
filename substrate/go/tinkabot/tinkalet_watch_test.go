@@ -2,6 +2,7 @@ package tinkabot
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -133,16 +134,80 @@ func TestTinkaletDaemonWatchCursorRestartCatchesRetainedEvents(t *testing.T) {
 	}
 }
 
+func TestTinkaletScopedWatcherProfile(t *testing.T) {
+	t.Parallel()
+	store := t.TempDir()
+	app, err := boot(t, cfgFor(store))
+	if err != nil {
+		t.Fatal(err)
+	}
+	owner, watcher := tinkaletEnv(t), tinkaletEnv(t)
+	mustTinkalet(t, owner, "profile", "import", "local", "--store", store, "--name", "owner")
+	mustTinkalet(t, owner, "profile", "use", "owner")
+
+	key := "artifacts.artifact-browser.results.choice"
+	prof, err := app.AdmitWatcher("llm", "item", key)
+	if err != nil {
+		t.Fatal(err)
+	}
+	mustTinkalet(t, watcher, "profile", "import", "local", "--store", prof.StoreDir, "--name", "llm")
+	mustTinkalet(t, watcher, "profile", "use", "llm")
+
+	code, out, errOut := runTinkalet(watcher, "item", "get", key, "--json")
+	if code != 1 || out != "" || errOut != "item "+key+" denied get: denied-scope\n" {
+		t.Fatalf("scoped watcher direct get exit/stdout/stderr = %d/%q/%q", code, out, errOut)
+	}
+	code, out, errOut = runTinkalet(watcher, "watch", "prefix", "artifacts.artifact-browser.results", "--timeout", "10ms", "--json")
+	if code != 1 || out != "" || errOut != "watch artifacts.artifact-browser.results denied prefix: denied-scope\n" {
+		t.Fatalf("scoped watcher broad watch exit/stdout/stderr = %d/%q/%q", code, out, errOut)
+	}
+
+	done := make(chan string, 1)
+	go func() {
+		code, out, errOut := runTinkalet(watcher, "watch", "item", key, "--cursor", "llm-result", "--limit", "1", "--timeout", "5s", "--json")
+		if code != 0 || errOut != "" {
+			done <- fmt.Sprintf("watch failed %d stdout=%q stderr=%q", code, out, errOut)
+			return
+		}
+		done <- out
+	}()
+	time.Sleep(150 * time.Millisecond)
+	mustTinkalet(t, owner, "item", "create", key, "--value", `{"choice":"diagram-a"}`)
+
+	select {
+	case got := <-done:
+		events, err := parseWatchEvents(got)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(events) != 1 || events[0].Key != key || string(events[0].Value) != `{"choice":"diagram-a"}` {
+			t.Fatalf("scoped watcher event drift: %s", got)
+		}
+		assertWatchPrivate(t, got, app)
+	case <-time.After(6 * time.Second):
+		t.Fatal("scoped watcher did not observe result")
+	}
+
+	if err := app.RevokeWatcher(prof); err != nil {
+		t.Fatal(err)
+	}
+	code, out, errOut = runTinkalet(watcher, "watch", "item", key, "--limit", "1", "--timeout", "10ms", "--json")
+	if code != 1 || out != "" || errOut != "watch "+key+" denied item: revoked-credentials\n" {
+		t.Fatalf("revoked watcher exit/stdout/stderr = %d/%q/%q", code, out, errOut)
+	}
+}
+
 type watchRun struct {
 	out    string
 	events []watchEvent
 }
 
 type watchEvent struct {
-	Key      string `json:"key"`
-	Status   string `json:"status"`
-	Revision uint64 `json:"revision"`
-	Source   string `json:"source"`
+	Key      string          `json:"key"`
+	Status   string          `json:"status"`
+	Value    json.RawMessage `json:"value"`
+	Revision uint64          `json:"revision"`
+	Source   string          `json:"source"`
 }
 
 func importWatchOnly(t *testing.T, app *App, env []string, name string) {

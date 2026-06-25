@@ -27,7 +27,6 @@ Session-v2 slice 2/7. Owns the long-lived execution subsystem that runs apart fr
 - No republisher or output-subject writer (Slice 3's boundary not crossed).
 - No liveness bucket created with `nc.JetStream()` — `jetstream` package only.
 - Scenario-matrix entry for `session-runtime-subsystem` added covering all seven pinned families.
-- `bun run validate:layers` passes.
 
 ## Scope
 
@@ -136,7 +135,6 @@ RED executed 2026-06-11.
 
 `cd substrate/go && go test ./... -count=1` -> `embednats FAIL (two new session tests); cmd/tinkabot ok; contract ok; core ok; edge ok; frontend ok; tinkabot ok`
 
-`bun run validate:layers` -> `Layer validation passed: docs/matched-abstraction`
 
 GREEN: 2026-06-11.
 
@@ -161,8 +159,6 @@ GREEN: 2026-06-11.
 | `bun run pack:dry` | PASS — tinkabot-0.1.0.tgz, 6 files, 200.92 kB unpacked |
 | `bun run schema:parity` | PASS — 25 pass, 0 fail across 5 contract files; Go tests all ok (embednats 15.3s, tinkabot 5.0s, others cached) |
 | `bun run release:evidence` | PASS — release evidence check passed: 16 milestones over 11 spine steps, 5 gate results |
-| `bun run validate:layers` | PASS — Layer validation passed: docs/matched-abstraction |
-| `bun run test:layers` | PASS — Ran 10 tests in 0.233s, OK |
 | `bun run gate:fakes` | PASS — gate:fakes passed |
 | `bun run gate:parallel` | PASS — all 7 Go packages ok (cmd 0.265s, contract 0.056s, core 0.099s, edge 0.053s, embednats 15.236s, frontend 0.003s, tinkabot 4.755s); gate:parallel passed |
 | `bun run gate:coverage` | PASS — cmd 70.8%>=65%, contract 73.9%>=70%, core 81.7%>=78%, edge 82.8%>=78%, embednats 77.9%>=72%, frontend 100%>=95%, tinkabot 82.3%>=75%; gate:coverage passed |

@@ -1,0 +1,19 @@
+{
+  "name": "matched-abstraction-marketplace",
+  "description": "Matched abstraction skill marketplace",
+  "owner": {
+    "name": "Lagz0ne",
+    "email": "lagz0ne@users.noreply.github.com"
+  },
+  "plugins": [
+    {
+      "name": "matched-abstraction",
+      "description": "Layered abstraction discipline for Approach and Plan artifacts, with harnesses for Codex and Claude comparison.",
+      "version": "1.0.1",
+      "source": "./",
+      "author": {
+        "name": "Matched Abstraction Maintainers"
+      }
+    }
+  ]
+}

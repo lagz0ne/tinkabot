@@ -98,7 +98,6 @@ GREEN evidence (all from `substrate/go` unless noted; final post-remediation sta
 - `bun run gate:fakes` -> exit 0: `gate:fakes passed` (mismatch test uses the in-package construction hook on the real nats-server; no fake type added).
 - `bun run gate:coverage` -> exit 0: `contract 73.9%>=70%`, `core 81.7%>=78%`, `edge 82.8%>=78%`, `embednats 78.4%>=72%`, `frontend 100%>=95%`, `gate:coverage passed`.
 - `bun run gate:scenarios` -> exit 0: `gate:scenarios passed`.
-- `bun run validate:layers` -> exit 0: `Layer validation passed: docs/matched-abstraction`.
 
 ## Wrap-Up Verification (2026-06-10, full battery from repo root; Go from `substrate/go`)
 
@@ -110,8 +109,6 @@ GREEN evidence (all from `substrate/go` unless noted; final post-remediation sta
 - `bun run schema:parity` -> PASS: contract tests pass; Go `contract`, `core`, `edge`, `embednats`, `frontend` all ok.
 - `go test ./... -count=1` -> PASS uncached: `contract 0.051s`, `core 0.093s`, `edge 0.054s`, `embednats 4.537s`, `frontend 0.004s`.
 - `bun run release:evidence` -> PASS: `release evidence check passed: 16 milestones over 11 spine steps`.
-- `bun run validate:layers` -> PASS: `Layer validation passed: docs/matched-abstraction`.
-- `bun run test:layers` -> PASS: `Ran 10 tests ... OK` (0.557s).
 - `bun run gate:fakes` / `gate:parallel` / `gate:coverage` / `gate:scenarios` -> all PASS (parallel gate ran the full shuffled Go suite, all 5 packages ok; coverage floors met on all five layers).
 - `git diff --check` -> PASS: no whitespace or conflict-marker errors.
 

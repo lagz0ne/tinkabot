@@ -2,7 +2,6 @@
 layer: approach
 topic: nats-script-runtime
 references:
-  - ./charter.md
   - ./platform-structure.md
 ---
 

@@ -52,7 +52,6 @@ Additional:
   internal credential rather than `addSessionUser`).
 - `go test ./embednats -run 'TestTrustedWrapperAuthority' -count=1` is the
   only failing gate on the RED tree; all pre-existing tests stay green.
-- `bun run validate:layers` passes.
 
 ## Scope
 
@@ -192,7 +191,6 @@ The RED stubs (`MintTrustedWrapper`, `ApplySteerAfterRevoke`) were removed from 
 
 `cd substrate/go && go test ./... -count=1` -> `ok all 7 packages`
 
-`bun run validate:layers` -> `Layer validation passed: docs/matched-abstraction`
 
 ## Outside-In Proof Matrix
 
@@ -230,8 +228,6 @@ Executed 2026-06-11. All commands passed.
 | `bun run pack:dry` | PASS — tinkabot-0.1.0.tgz: 6 files, 200.92KB unpacked |
 | `bun run schema:parity` | PASS — 25 pass, 0 fail across 5 contract files; Go tests ok for all 7 packages |
 | `bun run release:evidence` | PASS — 16 milestones over 11 spine steps, 5 gate results |
-| `bun run validate:layers` | PASS — Layer validation passed: docs/matched-abstraction |
-| `bun run test:layers` | PASS — 10 tests in 0.167s OK |
 | `bun run gate:fakes` | PASS — gate:fakes passed |
 | `bun run gate:parallel` | PASS — all 7 Go packages ok; gate:parallel passed |
 | `bun run gate:coverage` | PASS — all layers meet thresholds: cmd 70.8%≥65%, contract 73.9%≥70%, core 81.7%≥78%, edge 82.8%≥78%, embednats 78.2%≥72%, frontend 100%≥95%, tinkabot 82.3%≥75% |

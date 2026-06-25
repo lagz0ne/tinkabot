@@ -72,8 +72,6 @@ Do not introduce live transport, servers, UI rendering, or runtime execution in 
 Task prep evidence:
 
 - `curl -s -X POST https://diashort.apps.quickable.co/render ...` -> `https://diashort.apps.quickable.co/d/8e1c7e86`
-- `bun run validate:layers` -> `Layer validation passed: docs/matched-abstraction`
-- `bun run test:layers` -> `Ran 10 tests ... OK`
 
 RED:
 
@@ -89,8 +87,6 @@ GREEN:
 - `bun run test` -> `52 pass`, `0 fail`, `334 expect() calls`.
 - `bun run build` -> SDK ESM, CommonJS, and declarations emitted.
 - `bun run pack:dry` -> `tinkabot-0.1.0.tgz`, 6 files, unpacked size `179.68KB`.
-- `bun run validate:layers` -> `Layer validation passed: docs/matched-abstraction`.
-- `bun run test:layers` -> `Ran 10 tests ... OK`.
 - no-slop scan over substrate-edge docs, fixtures, and code -> only intentional handoff vocabulary.
 
 Named negative-case evidence (re-executed 2026-06-10 during the release-spine evidence audit):

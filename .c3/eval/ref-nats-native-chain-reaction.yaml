@@ -1,0 +1,14 @@
+fact: ref-nats-native-chain-reaction
+claim: "NATS Native Chain Reaction is grounded in activation, materialization, bundle transform, and example code."
+code:
+  - substrate/go/core/**
+  - substrate/go/embednats/source_router.go
+  - substrate/go/embednats/source_router_test.go
+  - substrate/go/embednats/filter_loop.go
+  - substrate/go/embednats/filter_loop_test.go
+  - substrate/go/embednats/script_materializer.go
+  - substrate/go/embednats/script_materializer_test.go
+  - substrate/go/tinkabot/bundle.go
+  - substrate/go/tinkabot/bundle_test.go
+  - examples/**
+  - docs/matched-abstraction/task/bundle-transform.md

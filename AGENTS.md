@@ -8,6 +8,7 @@ This file is the shared source of truth for this workspace. `CLAUDE.md` is a sym
 - For non-trivial work, announce a RED-GREEN-TDD plan before editing.
 - Update `tasks/todo.md` as work progresses: current goal, debts, blockers, next steps.
 - If a `.c3/` directory exists, use the `c3` skill before architecture, code-change, or exploration work.
+- Use `matched-abstraction` before architecture, planning, implementation strategy, task handoff, or layer-doc work. The canonical project copy lives under `.agents/skills/matched-abstraction`; `.claude/skills/matched-abstraction` is a compatibility symlink.
 - Before presenting non-trivial concepts, architecture options, product direction, or implementation strategy, use `triage-three` more often as a decision-support pass. Make the user's decision easier by stress-testing the idea first, narrowing weak branches, surfacing tradeoffs, and presenting a recommended path with evidence.
 - Keep `triage-three` lightweight for focused concepts and deeper for high-stakes architecture/security/release decisions. Skip it for obvious fixes, status reports, direct command execution, or when the user asks to move immediately without analysis.
 - When writing or refactoring code, use the `be-lazy` skill: prefer short clear names, compiler-backed inference, direct code, and less ceremony. Keep explicit contracts at public APIs, schemas, storage, auth/security boundaries, error contracts, and places where inference hides intent.

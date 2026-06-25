@@ -106,7 +106,6 @@ JSON output is the schedule record. Human output is one line:
 - `go test ./tinkabot -run TestTinkaletSchedules -count=1` passes.
 - `go test ./cmd/tinkalet ./tinkalet -count=1` passes.
 - `go test ./... -count=1` passes from `substrate/go`.
-- `bun run gate:scenarios`, `bun run validate:layers`, and
   `bun run release:evidence` stay green.
 
 ## RED Artifact

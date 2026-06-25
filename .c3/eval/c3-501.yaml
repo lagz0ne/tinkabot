@@ -1,0 +1,13 @@
+fact: c3-501
+claim: "Release Gates and Packaging owns package scripts, release evidence, root tests, and workspace config."
+code:
+  - --
+  - .gitignore
+  - package.json
+  - bun.lock
+  - scripts/**
+  - release/**
+  - tests/**
+  - tools/natscli/**
+  - tsconfig.orchestrator.json
+  - skills-lock.json

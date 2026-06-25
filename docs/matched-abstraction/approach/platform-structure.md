@@ -2,7 +2,6 @@
 layer: approach
 topic: platform-structure
 references:
-  - ./charter.md
   - ./nats-script-runtime.md
   - ./browser-frontend-mediator.md
 ---

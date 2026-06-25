@@ -18,7 +18,6 @@ Move the current TypeScript package out of root into SDK package ownership while
 - Root package metadata is workspace orchestration, not the published SDK package.
 - Existing TypeScript source, TypeScript tests, build config, and distribution output live under SDK package ownership.
 - Root no longer has `src`, `dist`, `tsconfig.json`, or `tsdown.config.ts`.
-- Root keeps Python layer-validator tests.
 - The current package name and public exports are preserved inside the SDK package.
 - Future frontend, Go substrate, and schema lanes exist with ownership notes but no fake implementation code.
 - Root commands still verify the moved SDK package.
@@ -53,8 +52,6 @@ The move creates workspace lanes and keeps behavior stable. The SDK package keep
 - `find packages/sdk -maxdepth 1 -type f -name "*.tgz" -print` -> no output.
 - `rg -n "node_modules/|dist/|coverage/|\\.tgz|\\.old_modules|__pycache__|\\.pytest_cache|\\.env|\\.DS_Store" .gitignore` -> matched ignore rules for generated workspace artifacts.
 - `git rev-parse --is-inside-work-tree` -> `fatal: not a git repository`; direct `git check-ignore` verification is not available in this workspace.
-- `bun run test:layers` -> `Ran 10 tests ... OK`.
-- `python3 -B .codex/skills/matched-abstraction-thinking/scripts/validate_layers.py docs/matched-abstraction` -> `Layer validation passed: docs/matched-abstraction`.
 
 ## Wrap-Up Announcement
 

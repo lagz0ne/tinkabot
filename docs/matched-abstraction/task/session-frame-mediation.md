@@ -51,7 +51,6 @@ snapshot-plus-tail so observers never replay unbounded history.
   failing gate on the RED tree; all pre-existing tests stay green.
 - Scenario-matrix entry for `session-frame-mediation` added covering all seven
   pinned families; `bun run gate:scenarios` passes.
-- `bun run validate:layers` passes.
 
 ## Scope
 
@@ -169,7 +168,6 @@ Updated `substrate/go/embednats/session_frame_mediation_test.go`:
 
 `bun run build` -> build complete
 
-`bun run validate:layers` -> Layer validation passed: docs/matched-abstraction
 
 `bun run gate:scenarios` -> gate:scenarios passed
 
@@ -196,8 +194,6 @@ Updated `substrate/go/embednats/session_frame_mediation_test.go`:
 | `bun run pack:dry` | PASS — tinkabot-0.1.0.tgz: 6 files, 200.92KB unpacked |
 | `bun run schema:parity` | PASS — 25 pass, 0 fail, 249 expect() calls (contract tests); Go tests all ok including embednats [15.2s] |
 | `bun run release:evidence` | PASS — 16 milestones over 11 spine steps, 5 gate results |
-| `bun run validate:layers` | PASS — Layer validation passed: docs/matched-abstraction |
-| `bun run test:layers` | PASS — 10 tests in 0.182s, OK |
 | `bun run gate:fakes` | PASS — gate:fakes passed |
 | `bun run gate:parallel` | PASS — all 7 Go packages ok (embednats 15.3s); gate:parallel passed |
 | `bun run gate:coverage` | PASS — cmd 70.8%>=65%, contract 73.9%>=70%, core 81.7%>=78%, edge 82.8%>=78%, embednats 78.1%>=72%, frontend 100%>=95%, tinkabot 82.3%>=75%; gate:coverage passed |

@@ -1,0 +1,13 @@
+fact: rule-generated-code-no-raw-authority
+claim: "Generated browser content raw-authority denial is present in frontend isolation code."
+code:
+  - apps/frontend/src/isolation.ts
+pipeline:
+  - gather: { file: apps/frontend/src/isolation.ts }
+  - eval:
+      contains_all:
+        - "\"nats\""
+        - "\"permission\""
+        - "\"subject\""
+        - "\"token\""
+        - "denyRaw"

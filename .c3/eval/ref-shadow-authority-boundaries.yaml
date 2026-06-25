@@ -1,0 +1,13 @@
+fact: ref-shadow-authority-boundaries
+claim: "Shadow Authority Boundaries is grounded in generated UI denial, bundle derived authority, Tinkalet profile authority, and runtime credentials."
+code:
+  - apps/frontend/src/isolation.ts
+  - apps/frontend/tests/isolation.test.ts
+  - substrate/go/tinkabot/bundle.go
+  - substrate/go/tinkabot/tinkabot.go
+  - substrate/go/tinkalet/tinkalet.go
+  - substrate/go/tinkabot/tinkalet_denial_test.go
+  - substrate/go/tinkabot/app_action_test.go
+  - substrate/go/tinkabot/participant_authority_test.go
+  - docs/matched-abstraction/approach/endgame-app.md
+  - docs/matched-abstraction/approach/tinkalet-edge.md

@@ -83,6 +83,25 @@ iframe {
   background: white;
 }
 
+.chess-shell {
+  min-height: 100vh;
+  padding: 0;
+}
+
+.app-shell {
+  min-height: 100vh;
+  padding: 0;
+}
+
+.chess-shell iframe,
+.app-shell iframe {
+  display: block;
+  width: 100%;
+  min-height: 100vh;
+  border: 0;
+  border-radius: 0;
+}
+
 @media (max-width: 760px) {
   .shell {
     grid-template-columns: 1fr;

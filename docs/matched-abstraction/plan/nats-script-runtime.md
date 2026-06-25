@@ -6,7 +6,6 @@ references:
   - ../approach/platform-structure.md
   - ./script-nats-cli-proof.md
   - ./platform-structure.md
-  - ./orchestration.md
 ---
 
 # NATS Script Runtime Plan

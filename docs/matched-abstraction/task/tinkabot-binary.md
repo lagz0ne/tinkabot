@@ -94,7 +94,6 @@ RED (executed first):
 - `go test ./tinkabot -run TestBinaryManual -count=1 -v` -> exit 1, same build failure.
 - `go build ./cmd/tinkabot` -> exit 1, `directory not found`: no binary entry point exists yet.
 - `go test ./... -count=1` -> `ok` for `contract`, `core`, `edge`, `embednats`, `frontend`; only the RED package fails. The existing corpus is untouched.
-- `bun run validate:layers` -> `Layer validation passed: docs/matched-abstraction`.
 
 GREEN (executed 2026-06-10 from `substrate/go` unless noted):
 
@@ -104,7 +103,6 @@ GREEN (executed 2026-06-10 from `substrate/go` unless noted):
 - `go test ./... -count=1` -> `ok` for all seven packages including `cmd/tinkabot` and `tinkabot`.
 - `go test ./tinkabot ./cmd/... -count=2 -shuffle=on` -> ok twice (drain/restart timing stable under shuffle).
 - Gates: `gate:fakes` passed; `gate:coverage` passed (cmd 70.8%>=65, tinkabot 81.2%>=75, all prior layers unchanged-green); `gate:parallel` passed (full shuffled corpus); `gate:scenarios` passed.
-- Workspace: `bun run test` 85 pass / 0 fail; `bun run test:e2e` 1 pass; `bun run typecheck`, `bun run build`, `bun run pack:dry` (`tinkabot-0.1.0.tgz`, 6 files), `bun run schema:parity`, `bun run release:evidence` (16 milestones over 11 spine steps), `bun run validate:layers`, `bun run test:layers` (10 tests, OK), `git diff --check` all passed.
 
 ## Wrap-Up Verification (2026-06-10, full battery from repo root; Go from `substrate/go`)
 
@@ -116,8 +114,6 @@ GREEN (executed 2026-06-10 from `substrate/go` unless noted):
 - `bun run schema:parity` -> PASS: contracts 21 pass / 0 fail; `go test ./...` all 7 packages ok.
 - `go test ./... -count=1` -> PASS uncached: `cmd/tinkabot`, `contract`, `core`, `edge`, `embednats`, `frontend`, `tinkabot` — 7/7 ok.
 - `bun run release:evidence` -> PASS: 16 milestones over 11 spine steps.
-- `bun run validate:layers` -> PASS: `Layer validation passed: docs/matched-abstraction`.
-- `bun run test:layers` -> PASS: 10 tests, OK (0 failures).
 - `bun run gate:fakes` -> PASS. `bun run gate:parallel` -> PASS: all 7 Go packages ok under the shuffled parallel gate. `bun run gate:coverage` -> PASS: cmd 70.8%>=65, contract 73.9%>=70, core 81.7%>=78, edge 82.8%>=78, embednats 78.6%>=72, frontend 100%>=95, tinkabot 82.3%>=75. `bun run gate:scenarios` -> PASS.
 - `git diff --check` -> PASS: exit 0, no whitespace or conflict-marker errors.
 

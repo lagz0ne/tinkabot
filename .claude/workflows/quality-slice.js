@@ -95,7 +95,7 @@ if (dryRun) return { dryRun: true, contract }
 phase('RED')
 const red = await agent(
   `Execute the RED step for slice "${topic}". Contract: ${JSON.stringify(contract)}.
-Write the failing artifact described in redDefinition (failing tests or failing checker — for doc/evidence slices the checker IS the test). Do NOT implement the solution. Run the targeted commands and capture concrete failure output. ok=true means the artifact exists, runs, and FAILS for the contracted reason (not a syntax error). Follow matched-abstraction Task-layer discipline: also draft docs/matched-abstraction/task/${topic}.md with frontmatter (layer: task, topic: ${topic}, status: active, references to the owning plan/approach docs), brief, acceptance contract, and the executed RED citation with real command + failure output. Run bun run validate:layers to keep the doc valid. ${rules}`,
+Write the failing artifact described in redDefinition (failing tests or failing checker — for doc/evidence slices the checker IS the test). Do NOT implement the solution. Run the targeted commands and capture concrete failure output. ok=true means the artifact exists, runs, and FAILS for the contracted reason (not a syntax error). Follow matched-abstraction Task-layer discipline: also draft docs/matched-abstraction/task/${topic}.md with frontmatter (layer: task, topic: ${topic}, status: active, references to the owning plan/approach docs), brief, acceptance contract, and the executed RED citation with real command + failure output. Review the task against the dedicated matched-abstraction skill before continuing. ${rules}`,
   { model: 'sonnet', label: `red:${topic}`, phase: 'RED', schema: EVIDENCE },
 )
 if (!red?.ok) return { failed: 'RED', contract, red }
@@ -180,7 +180,7 @@ const wrapup = await agent(
   `Wrap up slice "${topic}" in /home/lagz0ne/dev/tinkabot.
 1. Finish docs/matched-abstraction/task/${topic}.md: status: complete, verification-evidence section citing each command with its concrete result (RED: ${JSON.stringify(red.commands)}; GREEN: ${JSON.stringify(green.commands)}; full: ${JSON.stringify(verify.commands)}), gate results (${JSON.stringify(verdicts.map((v) => ({ gate: v.gate, pass: v.pass })))}), and a DECLARATIVE wrap-up announcement (state what IS complete — never "when complete...").
 2. Update tasks/todo.md: mark the milestone DONE, add only evidence that changes the current handoff, set the next resume point.
-3. Run bun run validate:layers and bun run test:layers; both must pass.
+3. Review the final task doc against the dedicated matched-abstraction skill.
 Do not commit. Return summary of what changed. ${rules}`,
   { model: 'sonnet', label: `wrapup:${topic}`, phase: 'Wrap-up', schema: EVIDENCE },
 )

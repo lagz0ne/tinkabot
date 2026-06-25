@@ -58,7 +58,6 @@ equivalents (`TestAgentWrapperMediated`, `TestAgentWrapperLocalE2E`).
 - `go run ./apps/wrapper/cmd/run` builds and validates its arguments.
 - Manual section "Agent wrapper (local proof only)" in `docs/manual/v1.md`
   records the pairs and names the manual-runner coupling.
-- `bun run validate:layers` and the five standing gates pass with the new
   `apps` layer staged.
 
 ## Drift Resolution (2026-06-12)
@@ -152,14 +151,12 @@ on a wrong oracle (single-frame contains instead of joined transcript); the
 frame dump showed the steered response present as split deltas, and the
 oracle was fixed to the joined-transcript form.
 
-`bun run validate:layers` -> `Layer validation passed` with the amended
 Approach/Plan/task docs.
 
 Full battery 2026-06-12 (slice files staged): `bun run test`, `test:e2e`,
 `typecheck`, `build`, `pack:dry`, `schema:parity`, `release:evidence`,
-`test:layers`, `gate:fakes`, `gate:parallel`, `gate:coverage`,
-`gate:scenarios`, `gate:manual`, `go test ./... -count=1`, `git diff --check`
--> all PASS.
+`gate:fakes`, `gate:parallel`, `gate:coverage`, `gate:scenarios`,
+`gate:manual`, `go test ./... -count=1`, `git diff --check` -> all PASS.
 
 `coverage-thresholds.json` gains `"apps": 40`. The floor reflects in-package
 coverage (pure decode/frame/steer/pump logic plus cmd/run arg paths);

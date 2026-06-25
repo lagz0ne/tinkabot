@@ -644,8 +644,8 @@ func (r *Runtime) Revoke(account, userPub string) error {
 	if acc == nil {
 		return fail(RevocationFailed, "Revoke", "unknown account", map[string]string{"account": account}, nil)
 	}
-	if !acc.minted[userPub] {
-		return fail(RevocationFailed, "Revoke", "credential was not minted here", map[string]string{"account": account, "user": userPub}, nil)
+	if !nkeys.IsValidPublicUserKey(userPub) {
+		return fail(RevocationFailed, "Revoke", "credential user is invalid", map[string]string{"account": account, "user": userPub}, nil)
 	}
 	acc.claims.Revoke(userPub)
 	if err := acc.saveRevocations(); err != nil {

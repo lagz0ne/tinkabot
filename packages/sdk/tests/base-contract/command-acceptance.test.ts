@@ -258,6 +258,27 @@ describe("CommandAcceptance", () => {
     }
   });
 
+  test("T-CMD-PARTICIPANT-CONTEXT preserves trusted-shell app and participant context", async () => {
+    const intent = await browserCommand({
+      command: "participant_action",
+      commandId: "cmd-participant-001",
+      payload: {
+        actionId: "browser-1",
+        stateKey: "apps.demo.state.round",
+        baseRevision: 7,
+        value: { answer: "blue" },
+      },
+      context: {
+        appId: "demo",
+        participantId: "alice",
+      },
+    });
+
+    expect(intent.context.appId).toBe("demo");
+    expect(intent.context.participantId).toBe("alice");
+    expect(parseContract(intent).kind).toBe("browser.command_intent");
+  });
+
   test("T-CMD-CONTRACT rejects raw-authority intent before status materialization", async () => {
     const store = createMemoryCommandAcceptanceStore();
     const acceptance = createAcceptance({ store });
@@ -322,8 +343,16 @@ function createAcceptance(
   });
 }
 
-async function browserCommand(): Promise<BrowserCommand> {
-  return parseBrowserCommand(await readJson("fixtures/valid/browser-command.json"));
+async function browserCommand(overrides: Record<string, any> = {}): Promise<BrowserCommand> {
+  const base = await readJson("fixtures/valid/browser-command.json");
+  return parseBrowserCommand({
+    ...base,
+    ...overrides,
+    context: {
+      ...base.context,
+      ...(overrides.context ?? {}),
+    },
+  });
 }
 
 function parseBrowserCommand(input: unknown): BrowserCommand {

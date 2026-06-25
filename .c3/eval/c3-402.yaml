@@ -1,0 +1,9 @@
+fact: c3-402
+claim: "Browser Observation owns trusted shell session observation and viewer stream behavior."
+code:
+  - apps/frontend/src/observe.ts
+  - apps/frontend/tests/observe.test.ts
+  - substrate/go/tinkabot/web_session.go
+  - substrate/go/tinkabot/web_session_surface_test.go
+  - substrate/go/embednats/web_session_surface.go
+  - substrate/go/embednats/web_session_surface_test.go

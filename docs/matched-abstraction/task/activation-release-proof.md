@@ -89,8 +89,6 @@ Final verification:
 - `bun run test:e2e` -> `1 pass`, `0 fail`, `16 expect() calls`.
 - `bun run build` -> frontend and SDK builds passed.
 - `bun run pack:dry` -> `tinkabot-0.1.0.tgz`, 6 files, `188.70KB`.
-- `bun run validate:layers` -> `Layer validation passed: docs/matched-abstraction`.
-- `bun run test:layers` -> `Ran 10 tests ... OK`.
 - `git diff --check` -> passed.
 - Focused no-slop scan over release proof symbols, placeholder evidence, overclaiming phrases, direct-only paths, and memory-store fallback found only expected RED evidence text and existing peer inside-out tests.
 

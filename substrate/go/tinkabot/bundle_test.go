@@ -47,7 +47,7 @@ func TestBundle(t *testing.T) {
 		if csp := hdr.Get("Content-Security-Policy"); !strings.Contains(csp, "sandbox") {
 			t.Fatalf("artifact served without sandbox policy: %q", csp)
 		}
-		if !strings.Contains(string(body), "tinkabot clock") {
+		if !strings.Contains(string(body), "tinkabot sequence") {
 			t.Fatalf("artifact body drift: %s", body)
 		}
 

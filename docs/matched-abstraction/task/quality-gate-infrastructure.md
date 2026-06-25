@@ -79,7 +79,6 @@ Gate results on the migrated corpus:
 - `bun run gate:scenarios` -> exit 0, `gate:scenarios passed`.
 - `go test ./... -count=1 -shuffle=on` (from `substrate/go`) -> all 5 packages `ok`, repeated across 4 independent shuffled runs (2 direct, 2 via gate:parallel), different shuffle seeds each.
 - `go test ./embednats -count=1` -> `ok` 4.57s.
-- `bun run typecheck:orchestrator` -> exit 0; `bun run validate:layers` -> passed; `bun run test:layers` -> 10 tests OK.
 
 Injected-violation detection proof (executed, then reverted):
 
@@ -97,8 +96,6 @@ Full verification suite (slice closeout, all executed 2026-06-10):
 - `bun run pack:dry` -> `tinkabot-0.1.0.tgz`, 6 files, unpacked 194.45KB.
 - `bun run orchestrate:codex -- --dry-run --allow-dirty` -> `Endgame already DONE; verification passed.` (exit 0).
 - `bun run release:evidence` -> `release evidence check passed: 16 milestones over 11 spine steps`.
-- `bun run validate:layers` -> `Layer validation passed: docs/matched-abstraction`.
-- `bun run test:layers` -> `Ran 10 tests` in 0.602s, `OK`.
 - `git diff --check` -> clean; no whitespace or conflict-marker issues (exit 0, empty output).
 
 Gate results:

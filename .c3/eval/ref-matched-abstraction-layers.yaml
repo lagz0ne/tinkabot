@@ -1,0 +1,7 @@
+fact: ref-matched-abstraction-layers
+claim: "Matched Abstraction Layers is grounded in repo layer docs and installed matched-abstraction skill."
+code:
+  - docs/matched-abstraction/**
+  - .agents/skills/matched-abstraction/**
+  - .claude/skills/matched-abstraction/**
+  - AGENTS.md

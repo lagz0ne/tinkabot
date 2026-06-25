@@ -42,6 +42,10 @@ type Profile struct {
 	Role               string `json:"role"`
 	Trust              string `json:"trust"`
 	Source             string `json:"source"`
+	AppID              string `json:"appId,omitempty"`
+	ParticipantID      string `json:"participantId,omitempty"`
+	WatchScope         string `json:"watchScope,omitempty"`
+	WatchTarget        string `json:"watchTarget,omitempty"`
 	CredentialRef      string `json:"credentialRef"`
 	CredentialRedacted bool   `json:"credentialRedacted"`
 }
@@ -58,18 +62,27 @@ type listProfile struct {
 	Role               string `json:"role"`
 	Trust              string `json:"trust"`
 	Source             string `json:"source"`
+	AppID              string `json:"appId,omitempty"`
+	ParticipantID      string `json:"participantId,omitempty"`
+	WatchScope         string `json:"watchScope,omitempty"`
+	WatchTarget        string `json:"watchTarget,omitempty"`
 	CredentialRef      string `json:"credentialRef"`
 	CredentialRedacted bool   `json:"credentialRedacted"`
 }
 
 type descriptor struct {
-	Kind       string `json:"kind"`
-	Server     string `json:"server"`
-	Shell      string `json:"shell"`
-	Credential string `json:"credential"`
-	Role       string `json:"role"`
-	Trust      string `json:"trust"`
-	Source     string `json:"source"`
+	Kind          string `json:"kind"`
+	Server        string `json:"server"`
+	Shell         string `json:"shell"`
+	Credential    string `json:"credential"`
+	Role          string `json:"role"`
+	Trust         string `json:"trust"`
+	Source        string `json:"source"`
+	Status        string `json:"status"`
+	AppID         string `json:"appId"`
+	ParticipantID string `json:"participantId"`
+	WatchScope    string `json:"watchScope"`
+	WatchTarget   string `json:"watchTarget"`
 }
 
 func Run(cfg Config) int {
@@ -110,6 +123,8 @@ func (c cli) run(args []string) int {
 		return c.trigger(args[1:])
 	case "item":
 		return c.item(args[1:])
+	case "action":
+		return c.action(args[1:])
 	case "schedule":
 		return c.schedule(args[1:])
 	case "reaction":
@@ -141,6 +156,9 @@ commands:
   item get <key> [--json]
   item resolve <key> [--value <json>] [--revision <n>] [--json]
   item wait <key> --for resolved [--timeout <duration>] [--json]
+  action submit <action-id> --state <item-key> --base-revision <n> [--value <json>] [--json]
+  action apply <action-key> --value <json> [--json]
+  action reject <action-key> --reason <reason-token> [--json]
   schedule set <name> --every <duration> --write <item-key> [--value <json>] [--json]
   schedule off <name> [--json]
   watch item <key> [--cursor <name>] [--limit <n>] [--timeout <duration>] [--json]
@@ -225,7 +243,11 @@ func (c cli) importLocal(store, name string) int {
 		return c.denyProfile(name, "profile import", reason)
 	}
 	dataDir := c.dataDir()
-	dst := filepath.Join(dataDir, "profiles", name, "caller.creds")
+	credName := filepath.Base(cred)
+	if credName == "." || credName == string(filepath.Separator) {
+		return c.denyProfile(name, "profile import", "import-source-invalid")
+	}
+	dst := filepath.Join(dataDir, "profiles", name, credName)
 	body, err := os.ReadFile(cred)
 	if err != nil {
 		return c.denyProfile(name, "profile import", "import-source-invalid")
@@ -233,7 +255,7 @@ func (c cli) importLocal(store, name string) int {
 	if err := write0600(dst, body); err != nil {
 		return c.denyProfile(name, "profile import", "import-source-invalid")
 	}
-	prof.CredentialRef = filepath.ToSlash(filepath.Join("profiles", name, "caller.creds"))
+	prof.CredentialRef = filepath.ToSlash(filepath.Join("profiles", name, credName))
 	prof.CredentialRedacted = true
 	profiles, err := c.loadProfiles()
 	if err != nil {
@@ -263,10 +285,23 @@ func (c cli) profileFromStore(store, name string) (Profile, string, string) {
 	if err := json.Unmarshal(body, &desc); err != nil {
 		return Profile{}, "", "import-source-invalid"
 	}
-	if desc.Kind != "tinkabot.localProfile.v1" || desc.Trust != "local-owner" || desc.Source != "local-store:"+store {
+	if desc.Kind != "tinkabot.localProfile.v1" || desc.Source != "local-store:"+store {
 		return Profile{}, "", "import-source-invalid"
 	}
-	if desc.Role != "caller" && desc.Role != "edge" {
+	switch desc.Trust {
+	case "local-owner":
+		if desc.Role != "caller" && desc.Role != "edge" {
+			return Profile{}, "", "import-source-invalid"
+		}
+	case "app-participant":
+		if desc.Role != "participant" || desc.Status == "revoked" || !validSubjectToken(desc.AppID) || !validSubjectToken(desc.ParticipantID) {
+			return Profile{}, "", "import-source-invalid"
+		}
+	case "item-watcher":
+		if desc.Role != "watcher" || desc.Status == "revoked" || !validWatcherScope(desc.WatchScope, desc.WatchTarget) {
+			return Profile{}, "", "import-source-invalid"
+		}
+	default:
 		return Profile{}, "", "import-source-invalid"
 	}
 	if !validURL(desc.Server, "nats") || (desc.Shell != "" && !validURL(desc.Shell, "http", "https")) {
@@ -280,12 +315,16 @@ func (c cli) profileFromStore(store, name string) (Profile, string, string) {
 		return Profile{}, "", "import-source-invalid"
 	}
 	return Profile{
-		Name:   name,
-		Server: desc.Server,
-		Shell:  desc.Shell,
-		Role:   desc.Role,
-		Trust:  desc.Trust,
-		Source: desc.Source,
+		Name:          name,
+		Server:        desc.Server,
+		Shell:         desc.Shell,
+		Role:          desc.Role,
+		Trust:         desc.Trust,
+		Source:        desc.Source,
+		AppID:         desc.AppID,
+		ParticipantID: desc.ParticipantID,
+		WatchScope:    desc.WatchScope,
+		WatchTarget:   desc.WatchTarget,
 	}, cred, ""
 }
 
@@ -341,6 +380,10 @@ func (c cli) list(jsonOut bool) int {
 				Role:               prof.Role,
 				Trust:              prof.Trust,
 				Source:             prof.Source,
+				AppID:              prof.AppID,
+				ParticipantID:      prof.ParticipantID,
+				WatchScope:         prof.WatchScope,
+				WatchTarget:        prof.WatchTarget,
 				CredentialRef:      prof.CredentialRef,
 				CredentialRedacted: prof.CredentialRedacted,
 			})
@@ -393,7 +436,7 @@ func (c cli) trigger(args []string) int {
 	if prof == nil {
 		return c.denyTrigger(profile, intent, "profile-not-found", reqID, jsonOut, nil)
 	}
-	if intent != "bundle.clock.tick" {
+	if subjectFor(intent) == "" {
 		return c.denyTrigger(profile, intent, "unknown-trigger", reqID, jsonOut, prof)
 	}
 	creds := filepath.Join(c.dataDir(), filepath.FromSlash(prof.CredentialRef))
@@ -402,6 +445,12 @@ func (c cli) trigger(args []string) int {
 	}
 	if c.deniedNeighbor(*prof) {
 		return c.denyTrigger(profile, intent, "denied-neighbor", reqID, jsonOut, prof)
+	}
+	if c.revokedProfile(*prof) {
+		return c.denyTrigger(profile, intent, "revoked-credentials", reqID, jsonOut, prof)
+	}
+	if restrictedProfile(*prof) {
+		return c.denyTrigger(profile, intent, "denied-scope", reqID, jsonOut, prof)
 	}
 	return c.triggerLive(*prof, intent, reqID, jsonOut, creds)
 }
@@ -467,6 +516,59 @@ type itemView struct {
 	CreatedAt  string          `json:"createdAt"`
 	UpdatedAt  string          `json:"updatedAt"`
 	Provenance itemProvenance  `json:"provenance"`
+}
+
+type actionSubmitReq struct {
+	ActionID     string
+	StateKey     string
+	BaseRevision uint64
+	ValueRaw     string
+	JSON         bool
+}
+
+type actionApplyReq struct {
+	ActionKey string
+	ValueRaw  string
+	JSON      bool
+}
+
+type actionRejectReq struct {
+	ActionKey string
+	Reason    string
+	JSON      bool
+}
+
+type actionWireReq struct {
+	ActionID     string          `json:"actionId"`
+	StateKey     string          `json:"stateKey"`
+	BaseRevision uint64          `json:"baseRevision"`
+	Value        json.RawMessage `json:"value"`
+}
+
+type actionWireResp struct {
+	Status string    `json:"status"`
+	Reason string    `json:"reason,omitempty"`
+	Item   *itemView `json:"item,omitempty"`
+}
+
+type appActionStored struct {
+	Kind          string          `json:"kind"`
+	AppID         string          `json:"appId"`
+	ParticipantID string          `json:"participantId"`
+	ActionID      string          `json:"actionId"`
+	StateKey      string          `json:"stateKey"`
+	BaseRevision  uint64          `json:"baseRevision"`
+	Payload       json.RawMessage `json:"payload"`
+}
+
+type actionReceiptStored struct {
+	Kind           string `json:"kind"`
+	ActionKey      string `json:"actionKey"`
+	StateKey       string `json:"stateKey"`
+	ActionRevision uint64 `json:"actionRevision"`
+	StateRevision  uint64 `json:"stateRevision"`
+	Outcome        string `json:"outcome,omitempty"`
+	Reason         string `json:"reason,omitempty"`
 }
 
 type scheduleRecord struct {
@@ -724,6 +826,12 @@ func (c cli) scheduleKV() (*Profile, nats.KeyValue, *nats.Conn, string) {
 	if c.deniedNeighbor(*prof) {
 		return prof, nil, nil, "denied-neighbor"
 	}
+	if c.revokedProfile(*prof) {
+		return prof, nil, nil, "revoked-credentials"
+	}
+	if restrictedProfile(*prof) {
+		return prof, nil, nil, "denied-scope"
+	}
 	nc, err := nats.Connect(prof.Server, nats.UserCredentials(creds), nats.NoReconnect(), nats.Timeout(2*time.Second), nats.ErrorHandler(func(*nats.Conn, *nats.Subscription, error) {}))
 	if err != nil {
 		return prof, nil, nil, authReason(err, *prof)
@@ -754,6 +862,9 @@ func scheduleReason(err error, prof Profile) string {
 	case strings.Contains(msg, "authorization") || strings.Contains(msg, "authentication") || strings.Contains(msg, "permission"):
 		return authReason(err, prof)
 	default:
+		if restrictedProfile(prof) {
+			return "denied-scope"
+		}
 		return "connection-failed"
 	}
 }
@@ -818,6 +929,42 @@ func (c cli) item(args []string) int {
 	}
 }
 
+func (c cli) action(args []string) int {
+	if len(args) == 0 {
+		return c.usage()
+	}
+	switch args[0] {
+	case "submit":
+		req, ok := parseActionSubmit(args[1:])
+		if !ok || !validSubjectToken(req.ActionID) || !validItemKey(req.StateKey) || req.BaseRevision == 0 {
+			return c.usage()
+		}
+		val, valid := jsonValue(req.ValueRaw)
+		if !valid {
+			return c.denyAction(req.ActionID, "submit", "malformed-value")
+		}
+		return c.actionSubmit(req, val)
+	case "apply":
+		req, ok := parseActionApply(args[1:])
+		if !ok || !validItemKey(req.ActionKey) {
+			return c.usage()
+		}
+		val, valid := jsonValue(req.ValueRaw)
+		if !valid {
+			return c.denyAction(req.ActionKey, "apply", "malformed-value")
+		}
+		return c.actionApply(req, val)
+	case "reject":
+		req, ok := parseActionReject(args[1:])
+		if !ok || !validItemKey(req.ActionKey) || !validSubjectToken(req.Reason) {
+			return c.usage()
+		}
+		return c.actionReject(req)
+	default:
+		return c.usage()
+	}
+}
+
 func (c cli) reaction(args []string) int {
 	if len(args) == 0 {
 		return c.usage()
@@ -876,6 +1023,15 @@ func (c cli) reactionAdd(rec reactionRecord) int {
 	prof := find(profiles, name)
 	if prof == nil {
 		return c.denyReaction(rec.Name, "add", "profile-not-found")
+	}
+	if c.deniedNeighbor(*prof) {
+		return c.denyReaction(rec.Name, "add", "denied-neighbor")
+	}
+	if c.revokedProfile(*prof) {
+		return c.denyReaction(rec.Name, "add", "revoked-credentials")
+	}
+	if restrictedProfile(*prof) {
+		return c.denyReaction(rec.Name, "add", "denied-scope")
 	}
 	rec.Kind = "tinkalet.reaction.v1"
 	rec.Profile = prof.Name
@@ -945,6 +1101,9 @@ func (c cli) runReaction(rec reactionRecord, timeout time.Duration, jsonOut bool
 		return c.denyReaction(rec.Name, "run", reason)
 	}
 	defer nc.Close()
+	if restrictedProfile(*prof) {
+		return c.denyReaction(rec.Name, "run", "denied-scope")
+	}
 	req := watchReq{Scope: rec.Watch.Scope, Target: rec.Watch.Target, Cursor: "reaction-" + rec.Name, Limit: 1, Timeout: timeout}
 	cur, reason := c.loadCursor(req, *prof)
 	if reason != "" {
@@ -1163,19 +1322,36 @@ func parseWatch(args []string, daemon bool) (watchReq, bool) {
 }
 
 func (c cli) itemWatch(req watchReq) int {
-	prof, kv, nc, reason := c.itemKV()
+	prof, reason := c.profilePolicy()
 	if reason != "" {
 		return c.denyWatch(req, reason)
 	}
-	defer nc.Close()
+	filters, reason := watcherWatchFilters(req, *prof)
+	if filters == nil && reason == "" {
+		filters, reason = participantWatchFilters(req, *prof)
+	}
+	if reason != "" {
+		return c.denyWatch(req, reason)
+	}
 	cur, reason := c.loadCursor(req, *prof)
 	if reason != "" {
 		return c.denyWatch(req, reason)
 	}
+	kv, nc, reason := c.itemKVForProfile(prof)
+	if reason != "" {
+		return c.denyWatch(req, reason)
+	}
+	defer nc.Close()
 	if reason := validateCursor(kv, cur); reason != "" {
 		return c.denyWatch(req, reason)
 	}
-	w, err := kv.WatchAll(nats.IncludeHistory(), nats.IgnoreDeletes())
+	var w nats.KeyWatcher
+	var err error
+	if filters == nil {
+		w, err = kv.WatchAll(nats.IncludeHistory(), nats.IgnoreDeletes())
+	} else {
+		w, err = kv.WatchFiltered(filters, nats.IncludeHistory(), nats.IgnoreDeletes())
+	}
 	if err != nil {
 		return c.denyWatch(req, itemReason(err, *prof))
 	}
@@ -1330,6 +1506,75 @@ func watchMatches(req watchReq, key string) bool {
 	}
 }
 
+func participantWatchFilters(req watchReq, prof Profile) ([]string, string) {
+	if prof.Trust != "app-participant" {
+		return nil, ""
+	}
+	if !validSubjectToken(prof.AppID) || !validSubjectToken(prof.ParticipantID) {
+		return nil, "profile-not-participant"
+	}
+	state := "apps." + prof.AppID + ".state"
+	actions := "apps." + prof.AppID + ".participants." + prof.ParticipantID + ".actions"
+	switch req.Scope {
+	case "item":
+		if !validItemKey(req.Target) {
+			return nil, "denied-scope"
+		}
+		if strings.HasPrefix(req.Target, state+".") || strings.HasPrefix(req.Target, actions+".") {
+			return []string{req.Target}, ""
+		}
+	case "prefix":
+		if !validItemPrefix(req.Target) {
+			return nil, "denied-scope"
+		}
+		switch strings.TrimSuffix(req.Target, ".") {
+		case state:
+			return []string{state + ".>"}, ""
+		case actions:
+			return []string{actions + ".>"}, ""
+		}
+	}
+	return nil, "denied-scope"
+}
+
+func watcherWatchFilters(req watchReq, prof Profile) ([]string, string) {
+	if prof.Trust != "item-watcher" {
+		return nil, ""
+	}
+	if !validWatcherScope(prof.WatchScope, prof.WatchTarget) {
+		return nil, "denied-scope"
+	}
+	if prof.WatchScope == "item" {
+		if req.Scope == "item" && req.Target == prof.WatchTarget {
+			return []string{req.Target}, ""
+		}
+		return nil, "denied-scope"
+	}
+	prefix := strings.TrimSuffix(prof.WatchTarget, ".")
+	switch req.Scope {
+	case "item":
+		if req.Target == prefix || strings.HasPrefix(req.Target, prefix+".") {
+			return []string{req.Target}, ""
+		}
+	case "prefix":
+		if strings.TrimSuffix(req.Target, ".") == prefix {
+			return []string{prefix + ".>"}, ""
+		}
+	}
+	return nil, "denied-scope"
+}
+
+func validWatcherScope(scope, target string) bool {
+	switch scope {
+	case "item":
+		return validItemKey(target)
+	case "prefix":
+		return validItemPrefix(target)
+	default:
+		return false
+	}
+}
+
 func (c cli) okWatch(ev watchEvent, jsonOut bool) {
 	if jsonOut {
 		_ = json.NewEncoder(c.out).Encode(ev)
@@ -1470,7 +1715,101 @@ func parseItemWait(args []string) (string, string, time.Duration, bool, bool) {
 	return key, want, timeout, jsonOut, key != "" && want != "" && timeout > 0
 }
 
+func parseActionSubmit(args []string) (actionSubmitReq, bool) {
+	var req actionSubmitReq
+	if len(args) == 0 {
+		return req, false
+	}
+	req.ActionID = args[0]
+	for i := 1; i < len(args); i++ {
+		arg := args[i]
+		switch {
+		case arg == "--json":
+			req.JSON = true
+		case arg == "--state" && i+1 < len(args):
+			i++
+			req.StateKey = args[i]
+		case strings.HasPrefix(arg, "--state="):
+			req.StateKey = strings.TrimPrefix(arg, "--state=")
+		case arg == "--base-revision" && i+1 < len(args):
+			i++
+			rev, err := strconv.ParseUint(args[i], 10, 64)
+			if err != nil {
+				return actionSubmitReq{}, false
+			}
+			req.BaseRevision = rev
+		case strings.HasPrefix(arg, "--base-revision="):
+			rev, err := strconv.ParseUint(strings.TrimPrefix(arg, "--base-revision="), 10, 64)
+			if err != nil {
+				return actionSubmitReq{}, false
+			}
+			req.BaseRevision = rev
+		case arg == "--value" && i+1 < len(args):
+			i++
+			req.ValueRaw = args[i]
+		case strings.HasPrefix(arg, "--value="):
+			req.ValueRaw = strings.TrimPrefix(arg, "--value=")
+		case strings.HasPrefix(arg, "-"):
+			return actionSubmitReq{}, false
+		default:
+			return actionSubmitReq{}, false
+		}
+	}
+	return req, req.ActionID != "" && req.StateKey != "" && req.BaseRevision > 0
+}
+
+func parseActionApply(args []string) (actionApplyReq, bool) {
+	var req actionApplyReq
+	if len(args) == 0 {
+		return req, false
+	}
+	req.ActionKey = args[0]
+	for i := 1; i < len(args); i++ {
+		arg := args[i]
+		switch {
+		case arg == "--json":
+			req.JSON = true
+		case arg == "--value" && i+1 < len(args):
+			i++
+			req.ValueRaw = args[i]
+		case strings.HasPrefix(arg, "--value="):
+			req.ValueRaw = strings.TrimPrefix(arg, "--value=")
+		default:
+			return actionApplyReq{}, false
+		}
+	}
+	return req, req.ActionKey != "" && req.ValueRaw != ""
+}
+
+func parseActionReject(args []string) (actionRejectReq, bool) {
+	var req actionRejectReq
+	if len(args) == 0 {
+		return req, false
+	}
+	req.ActionKey = args[0]
+	for i := 1; i < len(args); i++ {
+		arg := args[i]
+		switch {
+		case arg == "--json":
+			req.JSON = true
+		case arg == "--reason" && i+1 < len(args):
+			i++
+			req.Reason = args[i]
+		case strings.HasPrefix(arg, "--reason="):
+			req.Reason = strings.TrimPrefix(arg, "--reason=")
+		default:
+			return actionRejectReq{}, false
+		}
+	}
+	return req, req.ActionKey != "" && req.Reason != ""
+}
+
 func (c cli) itemCreate(key, status string, value json.RawMessage, jsonOut bool) int {
+	if prof, reason := c.profilePolicy(); reason != "" {
+		return c.denyItem(key, "create", reason)
+	} else if restrictedProfile(*prof) {
+		return c.denyItem(key, "create", "denied-scope")
+	}
 	prof, kv, nc, reason := c.itemKV()
 	if reason != "" {
 		return c.denyItem(key, "create", reason)
@@ -1504,13 +1843,162 @@ func (c cli) itemCreate(key, status string, value json.RawMessage, jsonOut bool)
 	return c.okItem(viewItem(rec, rev), jsonOut)
 }
 
+func (c cli) actionSubmit(req actionSubmitReq, value json.RawMessage) int {
+	prof, nc, reason := c.profileConnFor(c.defaultProfile())
+	if reason != "" {
+		return c.denyAction(req.ActionID, "submit", reason)
+	}
+	defer nc.Close()
+	if prof.Trust == "item-watcher" {
+		return c.denyAction(req.ActionID, "submit", "denied-scope")
+	}
+	if prof.Trust != "app-participant" || !validSubjectToken(prof.AppID) || !validSubjectToken(prof.ParticipantID) {
+		return c.denyAction(req.ActionID, "submit", "profile-not-participant")
+	}
+	body, err := json.Marshal(actionWireReq{
+		ActionID:     req.ActionID,
+		StateKey:     req.StateKey,
+		BaseRevision: req.BaseRevision,
+		Value:        value,
+	})
+	if err != nil {
+		return c.denyAction(req.ActionID, "submit", "malformed-value")
+	}
+	reply, err := nc.Request(actionSubject(*prof), body, 5*time.Second)
+	if err != nil {
+		return c.denyAction(req.ActionID, "submit", authReason(err, *prof))
+	}
+	var resp actionWireResp
+	if err := json.Unmarshal(reply.Data, &resp); err != nil {
+		return c.denyAction(req.ActionID, "submit", "malformed-response")
+	}
+	if resp.Status != "accepted" {
+		reason := resp.Reason
+		if reason == "" {
+			reason = "action-denied"
+		}
+		return c.denyAction(req.ActionID, "submit", reason)
+	}
+	if resp.Item == nil {
+		return c.denyAction(req.ActionID, "submit", "malformed-response")
+	}
+	return c.okAction(req.ActionID, *resp.Item, req.JSON)
+}
+
+func (c cli) actionApply(req actionApplyReq, value json.RawMessage) int {
+	if prof, reason := c.profilePolicy(); reason != "" {
+		return c.denyAction(req.ActionKey, "apply", reason)
+	} else if restrictedProfile(*prof) {
+		return c.denyAction(req.ActionKey, "apply", "denied-scope")
+	}
+	prof, kv, nc, reason := c.itemKV()
+	if reason != "" {
+		return c.denyAction(req.ActionKey, "apply", reason)
+	}
+	defer nc.Close()
+
+	receiptKey := req.ActionKey + ".receipt"
+	if _, reason := readItemAs(kv, receiptKey, *prof); reason == "" {
+		return c.denyAction(req.ActionKey, "apply", "duplicate-action")
+	} else if reason != "item-not-found" {
+		return c.denyAction(req.ActionKey, "apply", reason)
+	}
+
+	action, reason := readItemAs(kv, req.ActionKey, *prof)
+	if reason != "" {
+		return c.denyAction(req.ActionKey, "apply", reason)
+	}
+	if action.Status != "pending" {
+		return c.denyAction(req.ActionKey, "apply", "duplicate-action")
+	}
+	var act appActionStored
+	if err := json.Unmarshal(action.Value, &act); err != nil || !validAppAction(act, req.ActionKey) {
+		return c.denyAction(req.ActionKey, "apply", "malformed-action")
+	}
+	state, reason := readItemAs(kv, act.StateKey, *prof)
+	if reason != "" {
+		return c.denyAction(req.ActionKey, "apply", reason)
+	}
+	if state.Revision != act.BaseRevision {
+		return c.denyAction(req.ActionKey, "apply", "stale-revision")
+	}
+	receipt, reason := createActionReceipt(kv, *prof, req.ActionKey, receiptKey, act.StateKey, action.Revision, 0, "pending", "applying", "")
+	if reason != "" {
+		return c.denyAction(req.ActionKey, "apply", reason)
+	}
+	stateRev, reason := updateActionState(kv, *prof, act, req.ActionKey, state, value)
+	if reason != "" {
+		if reason == "stale-revision" {
+			latest, latestReason := readItemAs(kv, act.StateKey, *prof)
+			if latestReason == "" {
+				_, _ = updateActionReceipt(kv, *prof, receipt, req.ActionKey, act.StateKey, action.Revision, latest.Revision, "denied", "rejected", "stale-revision")
+			}
+		}
+		return c.denyAction(req.ActionKey, "apply", reason)
+	}
+	receipt, reason = updateActionReceipt(kv, *prof, receipt, req.ActionKey, act.StateKey, action.Revision, stateRev, "resolved", "applied", "")
+	if reason != "" {
+		return c.denyAction(req.ActionKey, "apply", reason)
+	}
+	return c.okActionApply(req.ActionKey, receipt, req.JSON)
+}
+
+func (c cli) actionReject(req actionRejectReq) int {
+	if prof, reason := c.profilePolicy(); reason != "" {
+		return c.denyAction(req.ActionKey, "reject", reason)
+	} else if restrictedProfile(*prof) {
+		return c.denyAction(req.ActionKey, "reject", "denied-scope")
+	}
+	prof, kv, nc, reason := c.itemKV()
+	if reason != "" {
+		return c.denyAction(req.ActionKey, "reject", reason)
+	}
+	defer nc.Close()
+
+	receiptKey := req.ActionKey + ".receipt"
+	if _, reason := readItemAs(kv, receiptKey, *prof); reason == "" {
+		return c.denyAction(req.ActionKey, "reject", "duplicate-action")
+	} else if reason != "item-not-found" {
+		return c.denyAction(req.ActionKey, "reject", reason)
+	}
+
+	action, reason := readItemAs(kv, req.ActionKey, *prof)
+	if reason != "" {
+		return c.denyAction(req.ActionKey, "reject", reason)
+	}
+	if action.Status != "pending" {
+		return c.denyAction(req.ActionKey, "reject", "duplicate-action")
+	}
+	var act appActionStored
+	if err := json.Unmarshal(action.Value, &act); err != nil || !validAppAction(act, req.ActionKey) {
+		return c.denyAction(req.ActionKey, "reject", "malformed-action")
+	}
+	state, reason := readItemAs(kv, act.StateKey, *prof)
+	if reason != "" {
+		return c.denyAction(req.ActionKey, "reject", reason)
+	}
+	if state.Revision != act.BaseRevision {
+		return c.denyAction(req.ActionKey, "reject", "stale-revision")
+	}
+	receipt, reason := createActionReceipt(kv, *prof, req.ActionKey, receiptKey, act.StateKey, action.Revision, state.Revision, "denied", "rejected", req.Reason)
+	if reason != "" {
+		return c.denyAction(req.ActionKey, "reject", reason)
+	}
+	return c.okActionReject(req.ActionKey, receipt, req.JSON)
+}
+
 func (c cli) itemGet(key string, jsonOut bool) int {
-	_, kv, nc, reason := c.itemKV()
+	if prof, reason := c.profilePolicy(); reason != "" {
+		return c.denyItem(key, "get", reason)
+	} else if prof.Trust == "item-watcher" {
+		return c.denyItem(key, "get", "denied-scope")
+	}
+	prof, kv, nc, reason := c.itemKV()
 	if reason != "" {
 		return c.denyItem(key, "get", reason)
 	}
 	defer nc.Close()
-	item, reason := readItem(kv, key)
+	item, reason := readItemAs(kv, key, *prof)
 	if reason != "" {
 		return c.denyItem(key, "get", reason)
 	}
@@ -1518,12 +2006,17 @@ func (c cli) itemGet(key string, jsonOut bool) int {
 }
 
 func (c cli) itemResolve(key string, value json.RawMessage, rev uint64, revSet, jsonOut bool) int {
+	if prof, reason := c.profilePolicy(); reason != "" {
+		return c.denyItem(key, "resolve", reason)
+	} else if restrictedProfile(*prof) {
+		return c.denyItem(key, "resolve", "denied-scope")
+	}
 	prof, kv, nc, reason := c.itemKV()
 	if reason != "" {
 		return c.denyItem(key, "resolve", reason)
 	}
 	defer nc.Close()
-	current, reason := readItem(kv, key)
+	current, reason := readItemAs(kv, key, *prof)
 	if reason != "" {
 		return c.denyItem(key, "resolve", reason)
 	}
@@ -1555,14 +2048,19 @@ func (c cli) itemResolve(key string, value json.RawMessage, rev uint64, revSet, 
 }
 
 func (c cli) itemWait(key, want string, timeout time.Duration, jsonOut bool) int {
-	_, kv, nc, reason := c.itemKV()
+	if prof, reason := c.profilePolicy(); reason != "" {
+		return c.denyItem(key, "wait", reason)
+	} else if prof.Trust == "item-watcher" {
+		return c.denyItem(key, "wait", "denied-scope")
+	}
+	prof, kv, nc, reason := c.itemKV()
 	if reason != "" {
 		return c.denyItem(key, "wait", reason)
 	}
 	defer nc.Close()
 	deadline := time.Now().Add(timeout)
 	for {
-		item, reason := readItem(kv, key)
+		item, reason := readItemAs(kv, key, *prof)
 		if reason != "" {
 			return c.denyItem(key, "wait", reason)
 		}
@@ -1585,48 +2083,231 @@ func (c cli) itemKV() (*Profile, nats.KeyValue, *nats.Conn, string) {
 }
 
 func (c cli) itemKVFor(name string) (*Profile, nats.KeyValue, *nats.Conn, string) {
-	profiles, _ := c.loadProfiles()
-	prof := find(profiles, name)
-	if prof == nil {
-		return nil, nil, nil, "profile-not-found"
+	prof, nc, reason := c.profileConnFor(name)
+	if reason != "" {
+		return prof, nil, nil, reason
 	}
-	creds := filepath.Join(c.dataDir(), filepath.FromSlash(prof.CredentialRef))
-	if _, err := os.Stat(creds); err != nil {
-		return prof, nil, nil, "stale-credentials"
-	}
-	if c.deniedNeighbor(*prof) {
-		return prof, nil, nil, "denied-neighbor"
-	}
-	nc, err := nats.Connect(prof.Server, nats.UserCredentials(creds), nats.NoReconnect(), nats.Timeout(2*time.Second), nats.ErrorHandler(func(*nats.Conn, *nats.Subscription, error) {}))
-	if err != nil {
-		return prof, nil, nil, authReason(err, *prof)
-	}
-	js, err := nc.JetStream()
-	if err != nil {
-		nc.Close()
-		return prof, nil, nil, "connection-failed"
-	}
-	kv, err := js.KeyValue(itemBucket)
-	if err != nil {
-		nc.Close()
-		return prof, nil, nil, itemReason(err, *prof)
+	kv, nc, reason := c.itemKVForConn(prof, nc)
+	if reason != "" {
+		return prof, nil, nil, reason
 	}
 	return prof, kv, nc, ""
 }
 
+func (c cli) itemKVForProfile(prof *Profile) (nats.KeyValue, *nats.Conn, string) {
+	nc, reason := c.connectProfile(prof)
+	if reason != "" {
+		return nil, nil, reason
+	}
+	return c.itemKVForConn(prof, nc)
+}
+
+func (c cli) itemKVForConn(prof *Profile, nc *nats.Conn) (nats.KeyValue, *nats.Conn, string) {
+	js, err := nc.JetStream()
+	if err != nil {
+		nc.Close()
+		return nil, nil, "connection-failed"
+	}
+	kv, err := js.KeyValue(itemBucket)
+	if err != nil {
+		nc.Close()
+		return nil, nil, itemReason(err, *prof)
+	}
+	return kv, nc, ""
+}
+
+func (c cli) profilePolicy() (*Profile, string) {
+	name := c.defaultProfile()
+	if name == "" {
+		return nil, "profile-not-found"
+	}
+	profiles, _ := c.loadProfiles()
+	prof := find(profiles, name)
+	if prof == nil {
+		return nil, "profile-not-found"
+	}
+	if c.deniedNeighbor(*prof) {
+		return prof, "denied-neighbor"
+	}
+	if c.revokedProfile(*prof) {
+		return prof, "revoked-credentials"
+	}
+	return prof, ""
+}
+
+func (c cli) profileConnFor(name string) (*Profile, *nats.Conn, string) {
+	if name == "" {
+		return nil, nil, "profile-not-found"
+	}
+	profiles, _ := c.loadProfiles()
+	prof := find(profiles, name)
+	if prof == nil {
+		return nil, nil, "profile-not-found"
+	}
+	nc, reason := c.connectProfile(prof)
+	if reason != "" {
+		return prof, nil, reason
+	}
+	return prof, nc, ""
+}
+
+func (c cli) connectProfile(prof *Profile) (*nats.Conn, string) {
+	if prof == nil {
+		return nil, "profile-not-found"
+	}
+	creds := filepath.Join(c.dataDir(), filepath.FromSlash(prof.CredentialRef))
+	if _, err := os.Stat(creds); err != nil {
+		return nil, "stale-credentials"
+	}
+	if c.deniedNeighbor(*prof) {
+		return nil, "denied-neighbor"
+	}
+	if c.revokedProfile(*prof) {
+		return nil, "revoked-credentials"
+	}
+	nc, err := nats.Connect(prof.Server, nats.UserCredentials(creds), nats.NoReconnect(), nats.Timeout(2*time.Second), nats.ErrorHandler(func(*nats.Conn, *nats.Subscription, error) {}))
+	if err != nil {
+		return nil, authReason(err, *prof)
+	}
+	return nc, ""
+}
+
 func readItem(kv nats.KeyValue, key string) (itemView, string) {
+	return readItemAs(kv, key, Profile{})
+}
+
+func readItemAs(kv nats.KeyValue, key string, prof Profile) (itemView, string) {
 	entry, err := kv.Get(key)
 	if err != nil {
 		if errors.Is(err, nats.ErrKeyNotFound) {
 			return itemView{}, "item-not-found"
 		}
-		return itemView{}, itemReason(err, Profile{})
+		return itemView{}, itemReason(err, prof)
 	}
 	var rec itemStored
 	if err := json.Unmarshal(entry.Value(), &rec); err != nil || rec.Kind != "tinkabot.item.v1" || rec.Key != key {
 		return itemView{}, "malformed-item"
 	}
 	return viewItem(rec, entry.Revision()), ""
+}
+
+func actionKey(act appActionStored) string {
+	return "apps." + act.AppID + ".participants." + act.ParticipantID + ".actions." + act.ActionID
+}
+
+func validAppAction(act appActionStored, key string) bool {
+	return act.Kind == "tinkabot.appAction.v1" &&
+		validSubjectToken(act.AppID) &&
+		validSubjectToken(act.ParticipantID) &&
+		validSubjectToken(act.ActionID) &&
+		validItemKey(act.StateKey) &&
+		strings.HasPrefix(act.StateKey, "apps."+act.AppID+".state.") &&
+		act.BaseRevision != 0 &&
+		actionKey(act) == key
+}
+
+func updateActionState(kv nats.KeyValue, prof Profile, act appActionStored, actionKey string, state itemView, value json.RawMessage) (uint64, string) {
+	now := time.Now().UTC().Format(time.RFC3339)
+	rec := itemStored{
+		Kind:      "tinkabot.item.v1",
+		Key:       act.StateKey,
+		Status:    "resolved",
+		Value:     value,
+		CreatedAt: state.CreatedAt,
+		UpdatedAt: now,
+		Provenance: itemProvenance{
+			Profile: prof.Name,
+			Source:  "app-action:" + actionKey,
+			Writer:  "tinkalet-action-reducer",
+		},
+	}
+	body, err := json.Marshal(rec)
+	if err != nil {
+		return 0, "malformed-value"
+	}
+	rev, err := kv.Update(act.StateKey, body, act.BaseRevision)
+	if err != nil {
+		return 0, itemReason(err, prof)
+	}
+	return rev, ""
+}
+
+func createActionReceipt(kv nats.KeyValue, prof Profile, actionKey, receiptKey, stateKey string, actionRev, stateRev uint64, status, outcome, reason string) (itemView, string) {
+	val, err := json.Marshal(actionReceiptStored{
+		Kind:           "tinkabot.appActionReceipt.v1",
+		ActionKey:      actionKey,
+		StateKey:       stateKey,
+		ActionRevision: actionRev,
+		StateRevision:  stateRev,
+		Outcome:        outcome,
+		Reason:         reason,
+	})
+	if err != nil {
+		return itemView{}, "malformed-value"
+	}
+	now := time.Now().UTC().Format(time.RFC3339)
+	rec := itemStored{
+		Kind:      "tinkabot.item.v1",
+		Key:       receiptKey,
+		Status:    status,
+		Value:     val,
+		CreatedAt: now,
+		UpdatedAt: now,
+		Provenance: itemProvenance{
+			Profile: prof.Name,
+			Source:  "app-action:" + actionKey,
+			Writer:  "tinkalet-action-reducer",
+		},
+	}
+	body, err := json.Marshal(rec)
+	if err != nil {
+		return itemView{}, "malformed-value"
+	}
+	rev, err := kv.Create(receiptKey, body)
+	if err != nil {
+		if errors.Is(err, nats.ErrKeyExists) {
+			return itemView{}, "duplicate-action"
+		}
+		return itemView{}, itemReason(err, prof)
+	}
+	return viewItem(rec, rev), ""
+}
+
+func updateActionReceipt(kv nats.KeyValue, prof Profile, receipt itemView, actionKey, stateKey string, actionRev, stateRev uint64, status, outcome, reason string) (itemView, string) {
+	val, err := json.Marshal(actionReceiptStored{
+		Kind:           "tinkabot.appActionReceipt.v1",
+		ActionKey:      actionKey,
+		StateKey:       stateKey,
+		ActionRevision: actionRev,
+		StateRevision:  stateRev,
+		Outcome:        outcome,
+		Reason:         reason,
+	})
+	if err != nil {
+		return itemView{}, "malformed-value"
+	}
+	rec := itemStored{
+		Kind:      "tinkabot.item.v1",
+		Key:       receipt.Key,
+		Status:    status,
+		Value:     val,
+		CreatedAt: receipt.CreatedAt,
+		UpdatedAt: time.Now().UTC().Format(time.RFC3339),
+		Provenance: itemProvenance{
+			Profile: prof.Name,
+			Source:  "app-action:" + actionKey,
+			Writer:  "tinkalet-action-reducer",
+		},
+	}
+	body, err := json.Marshal(rec)
+	if err != nil {
+		return itemView{}, "malformed-value"
+	}
+	rev, err := kv.Update(receipt.Key, body, receipt.Revision)
+	if err != nil {
+		return itemView{}, itemReason(err, prof)
+	}
+	return viewItem(rec, rev), ""
 }
 
 func viewItem(rec itemStored, rev uint64) itemView {
@@ -1658,6 +2339,9 @@ func itemReason(err error, prof Profile) string {
 	case strings.Contains(msg, "authorization") || strings.Contains(msg, "authentication") || strings.Contains(msg, "permission"):
 		return authReason(err, prof)
 	default:
+		if restrictedProfile(prof) {
+			return "denied-scope"
+		}
 		return "connection-failed"
 	}
 }
@@ -1677,6 +2361,42 @@ func (c cli) okItem(item itemView, jsonOut bool) int {
 
 func (c cli) denyItem(key, action, reason string) int {
 	fmt.Fprintf(c.errOut, "item %s denied %s: %s\n", key, action, reason)
+	return 1
+}
+
+func actionSubject(prof Profile) string {
+	return "tb.app." + prof.AppID + ".participants." + prof.ParticipantID + ".action"
+}
+
+func (c cli) okAction(actionID string, item itemView, jsonOut bool) int {
+	if jsonOut {
+		_ = json.NewEncoder(c.out).Encode(item)
+		return 0
+	}
+	fmt.Fprintf(c.out, "action %s submitted rev %d\n", actionID, item.Revision)
+	return 0
+}
+
+func (c cli) okActionApply(actionKey string, item itemView, jsonOut bool) int {
+	if jsonOut {
+		_ = json.NewEncoder(c.out).Encode(item)
+		return 0
+	}
+	fmt.Fprintf(c.out, "action %s applied rev %d\n", actionKey, item.Revision)
+	return 0
+}
+
+func (c cli) okActionReject(actionKey string, item itemView, jsonOut bool) int {
+	if jsonOut {
+		_ = json.NewEncoder(c.out).Encode(item)
+		return 0
+	}
+	fmt.Fprintf(c.out, "action %s rejected rev %d\n", actionKey, item.Revision)
+	return 0
+}
+
+func (c cli) denyAction(actionID, action, reason string) int {
+	fmt.Fprintf(c.errOut, "action %s denied %s: %s\n", actionID, action, reason)
 	return 1
 }
 
@@ -1737,6 +2457,22 @@ func (c cli) deniedNeighbor(prof Profile) bool {
 	return desc.Server != "" && desc.Server != prof.Server
 }
 
+func (c cli) revokedProfile(prof Profile) bool {
+	if prof.Trust != "app-participant" && prof.Trust != "item-watcher" {
+		return false
+	}
+	const prefix = "local-store:"
+	if !strings.HasPrefix(prof.Source, prefix) {
+		return false
+	}
+	body, err := os.ReadFile(filepath.Join(strings.TrimPrefix(prof.Source, prefix), "local-profile.json"))
+	if err != nil {
+		return false
+	}
+	var desc descriptor
+	return json.Unmarshal(body, &desc) == nil && desc.Status == "revoked"
+}
+
 func authReason(err error, prof Profile) string {
 	if err == nil {
 		return ""
@@ -1746,6 +2482,9 @@ func authReason(err error, prof Profile) string {
 	case strings.Contains(msg, "revoked"):
 		return "revoked-credentials"
 	case strings.Contains(msg, "authorization") || strings.Contains(msg, "authentication"):
+		if restrictedProfile(prof) {
+			return "denied-scope"
+		}
 		if strings.HasPrefix(prof.Source, "local-store:") {
 			return "revoked-credentials"
 		}
@@ -1755,13 +2494,32 @@ func authReason(err error, prof Profile) string {
 	}
 }
 
+func restrictedProfile(prof Profile) bool {
+	return prof.Trust == "app-participant" || prof.Trust == "item-watcher"
+}
+
 func subjectFor(intent string) string {
-	switch intent {
-	case "bundle.clock.tick":
-		return "tb.bundle.clock.tick"
-	default:
+	parts := strings.Split(intent, ".")
+	if len(parts) != 3 || parts[0] != "bundle" || !validSubjectToken(parts[1]) || !validSubjectToken(parts[2]) {
 		return ""
 	}
+	return "tb.bundle." + parts[1] + "." + parts[2]
+}
+
+func validSubjectToken(s string) bool {
+	if s == "" {
+		return false
+	}
+	for _, r := range s {
+		switch {
+		case r >= 'a' && r <= 'z':
+		case r >= '0' && r <= '9':
+		case r == '-':
+		default:
+			return false
+		}
+	}
+	return true
 }
 
 func (c cli) okTrigger(prof Profile, intent, status, reqID string, jsonOut bool) int {

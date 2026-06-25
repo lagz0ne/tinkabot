@@ -1,0 +1,12 @@
+fact: c3-201
+claim: "Daemon Assembly owns the tinkabot binary entry and core server startup/manual proof surfaces."
+code:
+  - substrate/go/cmd/tinkabot/**
+  - substrate/go/tinkabot/tinkabot.go
+  - substrate/go/tinkabot/binary_test.go
+  - substrate/go/tinkabot/local_profile_test.go
+  - substrate/go/tinkabot/manual_test.go
+  - substrate/go/tinkabot/serving_ttl_test.go
+  - substrate/go/tinkabot/bwrap_test.go
+  - substrate/go/tinkabot/tinkalet_denial_test.go
+  - substrate/go/tinkabot/participant_authority_test.go

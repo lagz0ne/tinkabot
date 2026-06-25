@@ -1,0 +1,30 @@
+fact: c3-302
+claim: "Tinkalet Reactions and Coordination owns item, app-action, watch, schedule, and reaction behavior proofs."
+code:
+  - substrate/go/tinkabot/tinkalet_item_test.go
+  - substrate/go/tinkabot/app_action_test.go
+  - substrate/go/tinkabot/multitenant_isolation_test.go
+  - substrate/go/tinkabot/tinkalet_watch_test.go
+  - substrate/go/tinkabot/tinkalet_reaction_test.go
+  - substrate/go/tinkabot/tinkalet_schedule_test.go
+  - substrate/go/tinkabot/tinkalet_trigger_test.go
+  - docs/matched-abstraction/task/tinkalet-item-records.md
+  - docs/matched-abstraction/task/app-action-revision-contract.md
+  - docs/matched-abstraction/task/app-action-reducer-contract.md
+  - docs/matched-abstraction/task/turn-based-reference.md
+  - docs/matched-abstraction/task/realtime-participant-watch.md
+  - docs/matched-abstraction/task/realtime-participant-action-gap.md
+  - docs/matched-abstraction/task/realtime-participant-sustained-rate.md
+  - docs/matched-abstraction/task/realtime-participant-reconnect-restart.md
+  - docs/matched-abstraction/task/realtime-participant-terminal-result.md
+  - docs/matched-abstraction/task/realtime-participant-reference-demo.md
+  - docs/matched-abstraction/task/browser-participant-action-bridge.md
+  - docs/matched-abstraction/task/realtime-browser-participant-ui.md
+  - docs/matched-abstraction/task/scoped-multiplayer-mission-assembly.md
+  - docs/matched-abstraction/task/visual-decision-loop.md
+  - docs/matched-abstraction/task/multitenant-two-app-scope.md
+  - docs/matched-abstraction/task/multitenant-concurrency-reference-demo.md
+  - docs/matched-abstraction/task/tinkalet-watch-cursors.md
+  - docs/matched-abstraction/task/tinkalet-local-reactions.md
+  - docs/matched-abstraction/task/tinkalet-schedules.md
+  - docs/matched-abstraction/task/tinkalet-release-docs-and-proof.md

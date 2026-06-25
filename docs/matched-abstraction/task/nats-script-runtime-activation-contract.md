@@ -41,7 +41,6 @@ Add the bounded activation contract needed before reactive NATS triggers: metada
 - Intent validation rejects missing source identity, invalid dedupe key, invalid hop state, and exceeded hop limit.
 - Typed errors identify activation failures without collapsing into substrate or execution errors.
 - Existing T01-T09 tests remain green.
-- Layer validation remains green.
 
 ## RED Artifact
 
@@ -80,8 +79,6 @@ This slice stayed contract-only. It did not expand `RuntimeSubstrate`, create li
 - `bun run typecheck` -> `bunx @typescript/native-preview --noEmit`.
 - `bun run build` -> emitted ESM, CommonJS, and declaration artifacts.
 - `bun pm pack --dry-run` -> `Total files: 5`.
-- `python3 -B .codex/skills/matched-abstraction-thinking/scripts/validate_layers.py docs/matched-abstraction` -> `Layer validation passed: docs/matched-abstraction`.
-- `python3 -B -m unittest tests/test_validate_layers.py` -> `Ran 10 tests ... OK`.
 
 ## Wrap-Up Announcement
 

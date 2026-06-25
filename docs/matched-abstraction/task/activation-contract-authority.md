@@ -105,8 +105,6 @@ Task prep evidence:
 - `curl -s -X POST https://diashort.apps.quickable.co/render ...` -> `https://diashort.apps.quickable.co/d/32dc325b`.
 - `sed -n '250,330p' schemas/endgame/v1/contract.schema.json` -> `activation.intent.source` currently accepts only `request_reply` and `command_acceptance`.
 - `sed -n '1,260p' docs/matched-abstraction/plan/go-substrate.md` -> showed `activation-source-router` as the direct next slice before this activation foundation lift.
-- `bun run validate:layers` -> `Layer validation passed: docs/matched-abstraction`.
-- `bun run test:layers` -> `Ran 10 tests ... OK`.
 - Activation reinforcement subagents -> all returned `BLOCKING: yes` before doc hardening; confirmed contract-policy ownership blur, missing owner-layer fixture matrix, source principal/lease underspecification, wildcard sibling-denial gap, Object Store watcher cursor risk, and schedule fencing gap.
 - Activation reinforcement arbiter -> `BLOCKING: no`; confirmed blocker classes resolved with no remaining patch needed.
 
@@ -127,7 +125,6 @@ GREEN evidence:
 - `bun run typecheck` -> SDK and orchestrator typecheck passed.
 - `bun run build` -> SDK CJS, ESM, and declaration bundles emitted.
 - `bun run pack:dry` -> `tinkabot-0.1.0.tgz`, 6 files.
-- `bun run validate:layers`, `bun run test:layers`, and `git diff --check` passed.
 
 ## Wrap-Up Announcement
 

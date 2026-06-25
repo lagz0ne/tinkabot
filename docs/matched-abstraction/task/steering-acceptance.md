@@ -63,7 +63,6 @@ Fixes go into `KVLedgerStore.Source` (direct keyed read) and
   gate on the RED tree; all pre-existing tests stay green.
 - Scenario-matrix entry for `steering-acceptance` added covering all seven
   pinned families; `bun run gate:scenarios` passes.
-- `bun run validate:layers` passes.
 
 ## Scope
 
@@ -249,8 +248,6 @@ Full battery (2026-06-12) — all 16 commands green:
 - `bun run pack:dry` — 200.92 KB
 - `bun run schema:parity` — clean
 - `bun run release:evidence` — 16 milestones / 11 spine steps / 5 gate results
-- `bun run validate:layers` — pass
-- `bun run test:layers` — 10 OK
 - `bun run gate:fakes` — pass
 - `bun run gate:parallel` — pass
 - `bun run gate:coverage` — pass

@@ -73,8 +73,6 @@ Task prep evidence:
 
 - `triage-three browser isolation model` -> `3 pusher angles converged on opaque sandbox plus trusted shell mediation; 3 challenger passes confirmed; arbiter score 34`.
 - `curl -s -X POST https://diashort.apps.quickable.co/render ...` -> `https://diashort.apps.quickable.co/d/2a2abd49`.
-- `bun run validate:layers` -> `Layer validation passed: docs/matched-abstraction`.
-- `bun run test:layers` -> `Ran 10 tests ... OK`.
 - `git diff --check` -> `clean`.
 
 RED/GREEN:
@@ -92,8 +90,6 @@ RED/GREEN:
 - `bun run schema:parity` -> endgame contract tests `21 pass`, Go packages `contract`, `core`, `edge`, `embednats`, and `frontend` passed.
 - `bun run test:e2e` -> `1 pass`, `0 fail`, `16 expect() calls`.
 - `bun run pack:dry` -> SDK package dry-run includes `6 files`, unpacked size `188.70KB`.
-- `bun run validate:layers` -> `Layer validation passed: docs/matched-abstraction`.
-- `bun run test:layers` -> `Ran 10 tests ... OK`.
 - `git diff --check` -> `clean`.
 
 ## Wrap-Up Announcement

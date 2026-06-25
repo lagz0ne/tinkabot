@@ -1,0 +1,8 @@
+fact: c3-502
+claim: "Documentation and Evidence owns README, manual, matched-abstraction docs, and task handoff state."
+code:
+  - LICENSE
+  - README.md
+  - docs/**
+  - tasks/**
+  - AGENTS.md

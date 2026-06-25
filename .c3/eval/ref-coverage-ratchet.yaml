@@ -1,0 +1,9 @@
+fact: ref-coverage-ratchet
+claim: "Coverage Ratchet is grounded in C3 eval bindings, the OKR artifact, release gates, and independent review workflow."
+code:
+  - .c3/**/*.md
+  - .c3/eval/**
+  - tasks/c3-line-coverage-okr.md
+  - scripts/gate-coverage.ts
+  - scripts/release-evidence.ts
+  - AGENTS.md

@@ -61,8 +61,6 @@ Implementation order for the next Task pass:
 
 ## Verification Evidence
 
-- `python3 -B .codex/skills/matched-abstraction-thinking/scripts/validate_layers.py docs/matched-abstraction` -> `Layer validation passed: docs/matched-abstraction`.
-- `python3 -B -m unittest tests/test_validate_layers.py` -> `Ran 10 tests ... OK`.
 - `find . -type d -name __pycache__ -print` -> no matches.
 
 ## Wrap-Up Announcement

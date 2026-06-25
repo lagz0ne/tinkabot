@@ -14,6 +14,9 @@ coverage/
 # Codex orchestration runs
 .codex-runs/
 
+# C3 local runtime cache
+.c3/c3.db
+
 # Python test artifacts
 __pycache__/
 .pytest_cache/

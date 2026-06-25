@@ -238,6 +238,8 @@
         "artifactId": { "$ref": "#/$defs/text" },
         "artifactRevision": { "$ref": "#/$defs/text" },
         "frameId": { "$ref": "#/$defs/text" },
+        "appId": { "$ref": "#/$defs/text" },
+        "participantId": { "$ref": "#/$defs/text" },
         "chain": { "$ref": "#/$defs/chain" }
       }
     },

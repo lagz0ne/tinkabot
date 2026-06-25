@@ -25,8 +25,10 @@ Open:
 http://127.0.0.1:8419/artifacts/bundle/clock/index.html
 ```
 
-The page is emitted by the boot run of `scripts/tick.sh` and polls the derived
-view every two seconds.
+The page is emitted by the boot run of `scripts/tick.sh`. It renders the
+Tinkabot sequence with Mermaid from a CDN inside the generated bundle UI, then
+samples the derived view with a one-in-flight browser fetch loop so it can show
+the sync limit when the bundle cadence is retuned.
 
 ## Poke The Backend
 
@@ -49,8 +51,8 @@ TINKALET_DATA_DIR=/tmp/tinkalet-data \
 # -> profile local accepted bundle.clock.tick
 ```
 
-The page picks up the new renderedAt/unix within 2s. Product item schedules use
-Tinkalet:
+The page picks up the new `renderedAt`/`unix`/`ms`/`seq` fields as soon as the
+browser fetch loop sees the derived view. Product item schedules use Tinkalet:
 
 ```bash
 TINKALET_CONFIG_DIR=/tmp/tinkalet-config \
@@ -58,8 +60,10 @@ TINKALET_DATA_DIR=/tmp/tinkalet-data \
   ./tinkalet schedule set clockitem --every 1s --write examples/clock/tick --value '{"kind":"clock"}'
 ```
 
-The bundle's manifest cadence can still be overridden through NATS config
-settings, using plain caller authority on the config bucket:
+The bundle's manifest cadence can still be inspected or overridden through
+the low-level NATS config bucket when debugging as the owner/operator. This
+is not the normal user, LLM, or transform integration path; app-facing work
+should go through Tinkalet profiles and commands.
 
 ```bash
 NATS=./libexec/tinkabot/nats # release package root
@@ -70,6 +74,11 @@ CLIENT_URL=nats://127.0.0.1:4222 # replace with the printed "nats" URL
   --creds /tmp/tb-clock/caller.creds \
   --timeout 2s \
   kv put config_bucket bundle.clock.tick.every off
+
+"$NATS" --no-context --server "$CLIENT_URL" \
+  --creds /tmp/tb-clock/caller.creds \
+  --timeout 2s \
+  kv put config_bucket bundle.clock.tick.every 100ms
 
 "$NATS" --no-context --server "$CLIENT_URL" \
   --creds /tmp/tb-clock/caller.creds \

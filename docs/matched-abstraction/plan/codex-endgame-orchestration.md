@@ -58,8 +58,6 @@ Release-shaped proof for the orchestrator is the normal repo verification spine 
 
 - `bun run test`
 - `bun run typecheck`
-- `bun run validate:layers`
-- `bun run test:layers`
 
 ## Escalation
 

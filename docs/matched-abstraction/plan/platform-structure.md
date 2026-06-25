@@ -5,7 +5,6 @@ references:
   - ../approach/platform-structure.md
   - ../approach/nats-script-runtime.md
   - ../approach/browser-frontend-mediator.md
-  - ./orchestration.md
 ---
 
 # Platform Structure Plan

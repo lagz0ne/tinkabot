@@ -21,7 +21,7 @@ Scope includes the new Approach and Plan docs for the feature, this Task doc, an
 
 ## Acceptance Contract
 
-The task is accepted when the feature docs preserve the approved abstraction boundaries, the Plan carries Approach decisions without redefining them, edge cases are represented as first-class success criteria, the Task records concrete verification evidence, and the layer validator passes.
+The task is accepted when the feature docs preserve the approved abstraction boundaries, the Plan carries Approach decisions without redefining them, edge cases are represented as first-class success criteria, and the Task records concrete verification evidence.
 
 The future vertical proof is accepted only when one Bun-driven proof covers:
 
@@ -53,9 +53,6 @@ Proof flow diagram: https://diashort.apps.quickable.co/d/fd5ae8fd
 
 ## Verification Evidence
 
-- `python3 -B .codex/skills/matched-abstraction-thinking/scripts/validate_layers.py docs/matched-abstraction` -> `Layer validation passed: docs/matched-abstraction`.
-- `python3 -B -m unittest tests/test_validate_layers.py` -> `Ran 10 tests ... OK`.
-- `python3 -B /home/lagz0ne/.codex/skills/.system/skill-creator/scripts/quick_validate.py .codex/skills/matched-abstraction-thinking` -> `Skill is valid!`.
 - Edge-case pressure passes were completed by dedicated Approach, Plan, and Task subagents before this hardening edit.
 - Process facade correction added: default scripts are NATS-agnostic and interact with NATS through Tinkabot/runtime IPC forwarding.
 - IPC hardening added: canonical IPC is framed stdio RPC; fd-specific channels are adapters, not the domain contract.

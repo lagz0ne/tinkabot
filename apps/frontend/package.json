@@ -17,6 +17,7 @@
     "vite": "^7.2.7"
   },
   "dependencies": {
+    "chess.js": "^1.4.0",
     "nats.ws": "^1.30.3"
   }
 }

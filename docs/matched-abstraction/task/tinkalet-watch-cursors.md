@@ -94,7 +94,6 @@ event: `item <key> <status> rev <n>`.
 - `go test ./tinkalet -run TestWatchCommandDenials -count=1` passes.
 - `go test ./tinkabot -run TestTinkaletWatchCursors -count=1` passes.
 - `go test ./... -count=1` passes from `substrate/go`.
-- `bun run gate:scenarios`, `bun run validate:layers`, and
   `bun run release:evidence` stay green.
 
 ## RED Artifact

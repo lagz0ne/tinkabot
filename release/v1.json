@@ -815,7 +815,10 @@
       "verbatim": [
         "./tinkalet profile import local --store \"$STORE\" --name local",
         "./tinkalet profile use local",
-        "./tinkalet trigger bundle.clock.tick --request-id req-clock-1"
+        "./tinkalet trigger bundle.clock.tick --request-id req-clock-1",
+        "./tinkalet schedule set packagetick --every 200ms --write package/schedule/tick --value '{\"kind\":\"package-schedule\"}'",
+        "./tinkalet item get package/schedule/tick --json",
+        "./tinkalet schedule off packagetick"
       ]
     }
   ]

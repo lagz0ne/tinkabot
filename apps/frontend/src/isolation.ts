@@ -14,6 +14,8 @@ export interface Lease {
   artifactId: string;
   artifactRevision: string;
   schemaRevision: string;
+  appId?: string;
+  participantId?: string;
   chain: Chain;
   commands: readonly string[];
   sessions: readonly string[];
@@ -28,6 +30,8 @@ export interface ContentIntent {
   frameId: string;
   artifactRevision: string;
   schemaRevision: string;
+  appId?: string;
+  participantId?: string;
   sessionId?: string;
   payload?: unknown;
 }
@@ -45,6 +49,8 @@ export interface BrowserCommandIntent {
     artifactId: string;
     artifactRevision: string;
     frameId: string;
+    appId?: string;
+    participantId?: string;
     chain: Chain;
   };
 }
@@ -73,19 +79,26 @@ export const sandbox = "allow-scripts";
 const raw = new Set([
   "allow",
   "allowresponses",
+  "bearer",
+  "cred",
   "credential",
   "credentials",
   "deny",
   "headers",
+  "jwt",
   "nats",
+  "nkey",
   "permission",
   "permissions",
   "publish",
   "reply",
   "replysubject",
+  "secret",
+  "seed",
   "subject",
   "subjects",
   "subscribe",
+  "password",
   "token",
   "tokens",
 ]);
@@ -111,7 +124,7 @@ export function checkSandbox(value: string) {
 export function makeLease(input: Omit<Lease, "nonce"> & { nonce?: string }): Lease {
   return {
     ...input,
-    nonce: input.nonce ?? crypto.randomUUID(),
+    nonce: input.nonce ?? nonce(),
   };
 }
 
@@ -166,6 +179,18 @@ export function accept(lease: Lease, source: unknown, expectedSource: unknown, m
       sessionId: intent.sessionId,
     });
   }
+  if (lease.appId !== undefined && intent.appId !== lease.appId) {
+    throw err("FrameScopeEscape", "App is not in frame lease scope", {
+      expected: lease.appId,
+      actual: intent.appId,
+    });
+  }
+  if (lease.participantId !== undefined && intent.participantId !== lease.participantId) {
+    throw err("FrameScopeEscape", "Participant is not in frame lease scope", {
+      expected: lease.participantId,
+      actual: intent.participantId,
+    });
+  }
 
   const out: BrowserCommandIntent = {
     kind: "browser.command_intent",
@@ -180,6 +205,8 @@ export function accept(lease: Lease, source: unknown, expectedSource: unknown, m
       artifactId: lease.artifactId,
       artifactRevision: lease.artifactRevision,
       frameId: lease.frameId,
+      appId: lease.appId,
+      participantId: lease.participantId,
       chain: lease.chain,
     },
   };
@@ -250,9 +277,19 @@ function err(kind: ErrKind, message: string, details: Record<string, unknown> = 
   return new FrameError(kind, message, details);
 }
 
+function nonce() {
+  if (typeof crypto.randomUUID === "function") return crypto.randomUUID();
+  const bytes = new Uint8Array(16);
+  crypto.getRandomValues(bytes);
+  bytes[6] = (bytes[6] & 0x0f) | 0x40;
+  bytes[8] = (bytes[8] & 0x3f) | 0x80;
+  const hex = [...bytes].map((b) => b.toString(16).padStart(2, "0")).join("");
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
+}
+
 function checkRawKey(key: string, path: string[]) {
   const name = key.toLowerCase().replace(/[-_]/g, "");
-  if (!raw.has(name)) return;
+  if (![...raw].some((word) => name.includes(word))) return;
   throw err("FrameCapabilityDenied", "Generated content cannot send raw authority", {
     path: path.join("."),
   });

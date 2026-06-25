@@ -104,8 +104,6 @@ Full verification suite (release-shaped closeout, all executed):
 - `bun run typecheck` -> frontend, SDK, and orchestrator all clean via `bunx @typescript/native-preview --noEmit`.
 - `bun run build` -> Vite frontend build ok (6 modules); SDK tsdown emits CJS and ESM dist with `.d.cts`/`.d.mts`.
 - `bun run pack:dry` -> `tinkabot-0.1.0.tgz`, 6 files, unpacked 194.54KB; the file count is a measured output, cited as the command per the Execution Notes.
-- `bun run validate:layers` -> `Layer validation passed: docs/matched-abstraction`.
-- `bun run test:layers` -> `Ran 10 tests ... OK`.
 - no-slop scan over browser isolation docs, frontend shell proof, gateway policy, service-worker setup, schemas, SDK validation, and Go validation -> clean: no slop vocabulary, emoji, narrating comments, or placeholder markers; the working tree matched `main`, so no diff-introduced slop.
 - `git diff --check` -> clean; no whitespace or conflict-marker issues.
 

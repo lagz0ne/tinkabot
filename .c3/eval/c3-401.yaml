@@ -1,0 +1,6 @@
+fact: c3-401
+claim: "Trusted Frontend Shell owns frontend isolation, shell source, tests, and embedded assets."
+code:
+  - apps/frontend/**
+  - substrate/go/edge/**
+  - substrate/go/frontend/**

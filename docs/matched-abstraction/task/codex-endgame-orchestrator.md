@@ -68,8 +68,6 @@ Add a root script that manages Codex instances in a bounded loop until the Endga
 - `bun run typecheck` -> SDK typecheck plus orchestrator typecheck passed.
 - `bun run build` -> SDK ESM, CommonJS, and declarations emitted.
 - `bun run pack:dry` -> `Total files: 6`, unpacked size `139.91KB`.
-- `bun run validate:layers` -> `Layer validation passed: docs/matched-abstraction`.
-- `bun run test:layers` -> `Ran 10 tests ... OK`.
 - `git diff --check` -> clean.
 
 ## Wrap-Up Announcement

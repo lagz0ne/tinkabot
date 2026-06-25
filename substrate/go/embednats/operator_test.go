@@ -391,6 +391,51 @@ func TestOperatorRevocationDisconnectsLive(t *testing.T) {
 	assertLeaseDenial(t, err, creds.Lease)
 }
 
+func TestOperatorRevocationAfterRestart(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	var creds UserCreds
+
+	t.Run("mint", func(t *testing.T) {
+		cfg := operatorCfg(t, Loopback())
+		cfg.StoreDir = dir
+		rt, err := start(t, cfg)
+		if err != nil {
+			t.Fatal(err)
+		}
+		creds = mint(t, rt, AppAccount, principal("principal.app.restarted", appPerms("tb.app.restart")))
+		nc := connect(t, rt, creds)
+		nc.Close()
+	})
+
+	t.Run("restart-revoke", func(t *testing.T) {
+		cfg := operatorCfg(t, Loopback())
+		cfg.StoreDir = dir
+		restarted, err := start(t, cfg)
+		if err != nil {
+			t.Fatal(err)
+		}
+		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+		defer cancel()
+		again, err := restarted.ConnectCreds(ctx, creds.File)
+		if err != nil {
+			t.Fatalf("persisted root-signed user did not reconnect after restart: %v", err)
+		}
+		again.Close()
+
+		if err := restarted.Revoke(AppAccount, creds.UserPub); err != nil {
+			t.Fatal(err)
+		}
+		denied, err := restarted.ConnectCreds(ctx, creds.File)
+		if err == nil {
+			denied.Close()
+			t.Fatal("revoked persisted user reconnected after restart")
+		}
+		assertAdapter(t, err, ClientConnectFailed)
+		assertLeaseDenial(t, err, creds.Lease)
+	})
+}
+
 func TestOperatorKeyMaterialFailureTyped(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()

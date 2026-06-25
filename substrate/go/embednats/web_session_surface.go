@@ -21,6 +21,7 @@ const ViewerMintFailed Kind = "ViewerMintFailed"
 type ViewerCred struct {
 	JWT            string
 	DeliverSubject string
+	StateSubject   string
 	UserPub        string
 	Lease          core.Capability
 }
@@ -28,7 +29,8 @@ type ViewerCred struct {
 // MintViewerCredential issues the web viewer grant for one session in
 // TB_APP: bearer-mode, short-TTL, loopback-source-pinned, leaf-scoped to
 //   - subscribe on the viewer's own deliver subject (fed by a substrate-bound
-//     consumer via BindViewerDeliver) plus _INBOX.> for request replies,
+//     consumer via BindViewerDeliver), the viewer's own browser-state prefix,
+//     plus _INBOX.> for request replies,
 //   - publish on tb.app.browser.command (command acceptance) only.
 //
 // No JetStream API authority, no session-subtree wildcard, and never the
@@ -38,7 +40,7 @@ func MintViewerCredential(rt *Runtime, sessionID string, ttl time.Duration) (Vie
 	if rt == nil || rt.op == nil {
 		return ViewerCred{}, fail(ViewerMintFailed, "MintViewerCredential", "operator mode is not enabled", nil, nil)
 	}
-	if sessionID == "" {
+	if !validSubjectToken(sessionID) {
 		return ViewerCred{}, fail(ViewerMintFailed, "MintViewerCredential", "sessionID is required", nil, nil)
 	}
 	nonce, err := secret()
@@ -46,6 +48,11 @@ func MintViewerCredential(rt *Runtime, sessionID string, ttl time.Duration) (Vie
 		return ViewerCred{}, fail(ViewerMintFailed, "MintViewerCredential", "deliver nonce could not be generated", nil, err)
 	}
 	deliver := "tb.session." + sessionID + ".deliver." + nonce
+	stateNonce, err := secret()
+	if err != nil {
+		return ViewerCred{}, fail(ViewerMintFailed, "MintViewerCredential", "state nonce could not be generated", nil, err)
+	}
+	state := "tb.app.browser.state." + stateNonce
 	leaseID, err := secret()
 	if err != nil {
 		return ViewerCred{}, fail(ViewerMintFailed, "MintViewerCredential", "lease id could not be generated", nil, err)
@@ -64,7 +71,7 @@ func MintViewerCredential(rt *Runtime, sessionID string, ttl time.Duration) (Vie
 		},
 		Permissions: core.Permissions{
 			Publish:   core.PermList{Allow: []string{"tb.app.browser.command"}},
-			Subscribe: core.PermList{Allow: []string{deliver, "_INBOX.>"}},
+			Subscribe: core.PermList{Allow: []string{deliver, state + ".>", "_INBOX.>"}},
 		},
 	}, ttl)
 	if err != nil {
@@ -94,7 +101,24 @@ func MintViewerCredential(rt *Runtime, sessionID string, ttl time.Duration) (Vie
 	if err != nil {
 		return ViewerCred{}, fail(ViewerMintFailed, "MintViewerCredential", "bearer JWT could not be signed", nil, err)
 	}
-	return ViewerCred{JWT: bearer, DeliverSubject: deliver, UserPub: creds.UserPub, Lease: creds.Lease}, nil
+	return ViewerCred{JWT: bearer, DeliverSubject: deliver, StateSubject: state, UserPub: creds.UserPub, Lease: creds.Lease}, nil
+}
+
+func validSubjectToken(s string) bool {
+	if s == "" {
+		return false
+	}
+	for _, r := range s {
+		switch {
+		case r >= 'a' && r <= 'z':
+		case r >= 'A' && r <= 'Z':
+		case r >= '0' && r <= '9':
+		case r == '-' || r == '_':
+		default:
+			return false
+		}
+	}
+	return true
 }
 
 // BindViewerDeliver creates the substrate-bound push consumer that feeds the

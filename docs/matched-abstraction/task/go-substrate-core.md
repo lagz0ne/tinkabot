@@ -105,8 +105,6 @@ Implementation evidence:
 - `go test ./...` from `substrate/go` -> `ok` for `contract`, `core`, and `edge`.
 - `bun run schema:parity` -> endgame contract tests `21 pass`, `0 fail`, `152 expect() calls`; Go `contract`, `core`, and `edge` packages `ok`.
 - `bun run typecheck` -> SDK plus orchestrator typecheck passed.
-- `bun run validate:layers` -> `Layer validation passed: docs/matched-abstraction`.
-- `bun run test:layers` -> `Ran 10 tests ... OK`.
 - `bun run test` -> `52 pass`, `0 fail`, `334 expect() calls`.
 - `bun run build` -> SDK ESM, CommonJS, and declarations emitted.
 - `bun run pack:dry` -> `tinkabot-0.1.0.tgz`, 6 files.

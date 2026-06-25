@@ -100,7 +100,6 @@ tinkalet daemon react <name> --once [--timeout <duration>] [--json]
 - `go test ./tinkalet -run TestReactionCommandDenials -count=1` passes.
 - `go test ./tinkabot -run TestTinkaletLocalReaction -count=1` passes.
 - `go test ./... -count=1` passes from `substrate/go`.
-- `bun run gate:scenarios`, `bun run validate:layers`, and
   `bun run release:evidence` stay green.
 
 ## RED Artifact

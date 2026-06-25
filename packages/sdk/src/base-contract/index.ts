@@ -149,6 +149,8 @@ const browserCtx = z.strictObject({
   artifactId: text,
   artifactRevision: text,
   frameId: text,
+  appId: text.optional(),
+  participantId: text.optional(),
   chain,
 });
 

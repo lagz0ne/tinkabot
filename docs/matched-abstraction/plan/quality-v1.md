@@ -80,7 +80,7 @@ Per-slice contracts:
 
 ## Verification Strategy
 
-Existing commands remain authoritative: `bun run test`, `bun run test:e2e`, `bun run typecheck`, `bun run build`, `bun run pack:dry`, `bun run schema:parity`, `go test ./... -count=1` from `substrate/go`, `bun run release:evidence`, `bun run validate:layers`, and `bun run test:layers`.
+Existing commands remain authoritative: `bun run test`, `bun run test:e2e`, `bun run typecheck`, `bun run build`, `bun run pack:dry`, `bun run schema:parity`, `go test ./... -count=1` from `substrate/go`, and `bun run release:evidence`.
 
 This program introduces stable operation names now; their implementations belong to the owning slices:
 
@@ -107,7 +107,7 @@ RED artifact: gate operations failing on the current corpus — `gate:fakes` rep
 
 GREEN boundary: one harness factory that every embednats test uses to obtain an isolated embedded server and stores; the full Go suite green under shuffled parallel execution; an explicit fakes allowlist with per-entry justification and the real-NATS proof that validates each fake; per-layer coverage measurement emitting numbers per substrate layer; and a scenario matrix declaring the pinned case families per outside-in surface with completeness checked. Injected violations — an un-allowlisted fake, a deliberately shared server — must fail their gates to prove the gates detect, not just report.
 
-Verification boundary: `bun run gate:parallel`, `bun run gate:fakes`, `bun run gate:coverage`, `bun run gate:scenarios`, `go test ./... -count=1` from `substrate/go`, `bun run test`, `bun run typecheck`, `bun run validate:layers`, `bun run test:layers`, and the `be-lazy` reviewer pass over the slice diff.
+Verification boundary: `bun run gate:parallel`, `bun run gate:fakes`, `bun run gate:coverage`, `bun run gate:scenarios`, `go test ./... -count=1` from `substrate/go`, `bun run test`, `bun run typecheck`, and the `be-lazy` reviewer pass over the slice diff.
 
 Non-goals: no exposure API change, no auth backend change, no binary work, no manual edits, no release-evidence extension. Test behavior must remain unchanged through the refactor; the slice proves the same assertions under new discipline.
 

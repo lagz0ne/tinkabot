@@ -106,8 +106,6 @@ Final verification:
 - `bun run test:e2e` -> `1 pass`, `0 fail`, `16 expect() calls`.
 - `bun run build` -> frontend Vite build and SDK tsdown build passed.
 - `bun run pack:dry` -> produced `tinkabot-0.1.0.tgz` dry-run package.
-- `bun run validate:layers` -> `Layer validation passed: docs/matched-abstraction`.
-- `bun run test:layers` -> `Ran 10 tests ... OK`.
 
 ## Wrap-Up
 

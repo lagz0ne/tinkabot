@@ -30,8 +30,6 @@ The task persists the user-approved reset only. It does not choose a Go framewor
 
 ## Verification Evidence
 
-- `python3 -B .codex/skills/matched-abstraction-thinking/scripts/validate_layers.py docs/matched-abstraction` -> `Layer validation passed: docs/matched-abstraction`.
-- `python3 -B -m unittest tests/test_validate_layers.py` -> `Ran 10 tests ... OK`.
 - `rg -n "Bun owns|Bun runtime substrate|Bun-managed|@lagz0ne/nats-embedded|embedded JetStream|Bun may own|v1 uses" docs/matched-abstraction tasks/todo.md` -> remaining matches are explicitly marked as existing evidence, superseded evidence, historical proof material, or not current authority.
 - `rg -n "UNRESOLVED|FIXME|XXX" docs/matched-abstraction/approach/platform-structure.md docs/matched-abstraction/plan/platform-structure.md` -> no matches.
 - `find . -type d -name __pycache__ -print` -> no output.

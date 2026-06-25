@@ -66,7 +66,6 @@ RED phase executed 2026-06-10 (GREEN evidence under the Capability Proof Matrix;
 - `go test ./embednats -count=1` -> exit 1, same build failure.
 - `go test ./core ./embednats -count=1` -> exit 1 with `ok ... /core 0.074s`; only embednats fails, and only to build.
 - `bun run gate:parallel` -> exit 1: one finding, the shuffled-suite build failure; no `serialized-execution` or seam findings against the new tests.
-- `bun run validate:layers` -> exit 0: `Layer validation passed: docs/matched-abstraction`.
 
 ## Execution Notes (GREEN)
 
@@ -104,7 +103,6 @@ GREEN evidence (all from 2026-06-10):
 - `go test ./... -count=1` -> contract, core, edge, embednats, frontend all ok.
 - Flake/race: `go test ./embednats -run TestOperator -count=5` -> ok; `CGO_ENABLED=1 go test ./embednats -run TestOperator -race -count=2` -> ok.
 - Gates: `bun run gate:parallel` -> passed (shuffled full suite green, zero findings); `gate:fakes` -> passed (no new fakes); `gate:coverage` -> embednats 78.4% >= 72%, frontend 100% >= 95%; `gate:scenarios` -> passed.
-- `bun run validate:layers` -> `Layer validation passed: docs/matched-abstraction`; `git diff --check` -> clean.
 
 ## Wrap-Up Verification (2026-06-10, full battery from repo root; Go from `substrate/go`)
 
@@ -116,8 +114,6 @@ GREEN evidence (all from 2026-06-10):
 - `bun run schema:parity` -> PASS: contracts 21 pass / 0 fail; `go test ./...` ok for contract, core, edge, embednats, frontend.
 - `go test ./... -count=1` -> PASS uncached: `contract 0.051s`, `core 0.077s`, `edge 0.043s`, `embednats 4.450s`, `frontend 0.004s`.
 - `bun run release:evidence` -> PASS: 16 milestones over 11 spine steps.
-- `bun run validate:layers` -> PASS: `Layer validation passed: docs/matched-abstraction`.
-- `bun run test:layers` -> PASS: 10 tests, OK (0.381s).
 - `bun run gate:fakes` -> PASS. `bun run gate:parallel` -> PASS: all 5 Go packages ok with `-count=1` under the shuffled parallel gate. `bun run gate:coverage` -> PASS: contract 73.9%>=70, core 81.7%>=78, edge 82.8%>=78, embednats 78.5%>=72, frontend 100%>=95. `bun run gate:scenarios` -> PASS.
 - `git diff --check` -> PASS: no whitespace or conflict-marker errors.
 

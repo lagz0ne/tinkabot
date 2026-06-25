@@ -8,6 +8,7 @@
     "apps/frontend": {
       "name": "@tinkabot/frontend",
       "dependencies": {
+        "chess.js": "^1.4.0",
         "nats.ws": "^1.30.3",
       },
       "devDependencies": {
@@ -20,7 +21,7 @@
     },
     "packages/sdk": {
       "name": "tinkabot",
-      "version": "0.1.0",
+      "version": "0.1.1",
       "dependencies": {
         "@lagz0ne/nats-embedded": "file:../../../nats-embedded/packages/nats-embedded",
         "@lagz0ne/nats-embedded-linux-x64": "file:../../../nats-embedded/packages/linux-x64",
@@ -244,6 +245,8 @@
     "bun-types": ["bun-types@1.3.14", "", { "dependencies": { "@types/node": "*" } }, "sha512-4N0ig0fEomHt5R0KCFWjovxow98rIoRwKolrYdCcknNwMekCXRnWEUvgu5soYV8QXtVsrUD8B95MBOZGPvr6KQ=="],
 
     "cac": ["cac@7.0.0", "", {}, "sha512-tixWYgm5ZoOD+3g6UTea91eow5z6AAHaho3g0V9CNSNb45gM8SmflpAc+GRd1InC4AqN/07Unrgp56Y94N9hJQ=="],
+
+    "chess.js": ["chess.js@1.4.0", "", {}, "sha512-BBJgrrtKQOzFLonR0l+k64A98NLemPwNsCskwb+29bRwobUa4iTm51E1kwGPbWXAcfdDa18nad6vpPPKPWarqw=="],
 
     "defu": ["defu@6.1.7", "", {}, "sha512-7z22QmUWiQ/2d0KkdYmANbRUVABpZ9SNYyH5vx6PZ+nE5bcC0l7uFvEfHlyld/HcGBFTL536ClDt3DEcSlEJAQ=="],
 

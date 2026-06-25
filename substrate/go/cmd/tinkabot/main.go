@@ -11,6 +11,7 @@ import (
 	"io"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
@@ -23,6 +24,65 @@ var (
 	commit  = ""
 	builtAt = ""
 )
+
+type participantSpec struct {
+	appID string
+	id    string
+}
+
+type participantFlags []participantSpec
+
+func (p *participantFlags) String() string {
+	if p == nil {
+		return ""
+	}
+	vals := make([]string, 0, len(*p))
+	for _, spec := range *p {
+		vals = append(vals, spec.appID+":"+spec.id)
+	}
+	return strings.Join(vals, ",")
+}
+
+func (p *participantFlags) Set(raw string) error {
+	appID, id, ok := strings.Cut(raw, ":")
+	if !ok || appID == "" || id == "" {
+		return fmt.Errorf("participant must be <app>:<id>")
+	}
+	*p = append(*p, participantSpec{appID: appID, id: id})
+	return nil
+}
+
+type watcherSpec struct {
+	name   string
+	scope  string
+	target string
+}
+
+type watcherFlags []watcherSpec
+
+func (w *watcherFlags) String() string {
+	if w == nil {
+		return ""
+	}
+	vals := make([]string, 0, len(*w))
+	for _, spec := range *w {
+		vals = append(vals, spec.name+":"+spec.scope+":"+spec.target)
+	}
+	return strings.Join(vals, ",")
+}
+
+func (w *watcherFlags) Set(raw string) error {
+	name, rest, ok := strings.Cut(raw, ":")
+	if !ok || name == "" {
+		return fmt.Errorf("watcher must be <name>:<item|prefix>:<target>")
+	}
+	scope, target, ok := strings.Cut(rest, ":")
+	if !ok || scope == "" || target == "" {
+		return fmt.Errorf("watcher must be <name>:<item|prefix>:<target>")
+	}
+	*w = append(*w, watcherSpec{name: name, scope: scope, target: target})
+	return nil
+}
 
 func main() {
 	sig := make(chan os.Signal, 1)
@@ -41,6 +101,10 @@ func run(args []string, out io.Writer, sig <-chan os.Signal) error {
 	shell := fs.String("shell", "127.0.0.1:8419", "loopback address for the embedded shell")
 	bundle := fs.String("bundle", "", "bundle directory served as an ephemeral app for this run")
 	bundleSandbox := fs.String("bundle-sandbox", "", `bundle sandbox tier: "" (default, bwrap, fail-closed) or "none" (trusted, UNSANDBOXED — explicit opt-in)`)
+	var participants participantFlags
+	fs.Var(&participants, "participant", "admit participant profile as <app>:<id>; repeat for multiple users")
+	var watchers watcherFlags
+	fs.Var(&watchers, "watcher", "admit watcher profile as <name>:<item|prefix>:<target>; repeat for multiple watchers")
 	showVersion := fs.Bool("version", false, "print version and exit")
 	if err := fs.Parse(args); err != nil {
 		return err
@@ -63,11 +127,32 @@ func run(args []string, out io.Writer, sig <-chan os.Signal) error {
 	if err != nil {
 		return err
 	}
+	stopApp := func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+		_ = app.Stop(ctx)
+	}
 	p := app.Posture()
 	fmt.Fprintf(out, "nats   %s\n", p.NATS.ClientURL)
 	fmt.Fprintf(out, "shell  %s\n", p.Shell.URL)
 	for _, role := range []string{tinkabot.RoleCaller, tinkabot.RoleObserver, tinkabot.RoleAuthor} {
 		fmt.Fprintf(out, "creds  %s\n", app.CredsFile(role))
+	}
+	for _, spec := range participants {
+		prof, err := app.AdmitParticipant(spec.appID, spec.id)
+		if err != nil {
+			stopApp()
+			return err
+		}
+		fmt.Fprintf(out, "participant %s %s %s\n", prof.AppID, prof.ParticipantID, prof.StoreDir)
+	}
+	for _, spec := range watchers {
+		prof, err := app.AdmitWatcher(spec.name, spec.scope, spec.target)
+		if err != nil {
+			stopApp()
+			return err
+		}
+		fmt.Fprintf(out, "watcher %s %s %s %s\n", prof.Name, prof.Scope, prof.Target, prof.StoreDir)
 	}
 	<-sig
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)

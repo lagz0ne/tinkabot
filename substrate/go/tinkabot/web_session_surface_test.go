@@ -259,6 +259,14 @@ func TestWebSessionShell(t *testing.T) {
 		if res.StatusCode != http.StatusBadRequest {
 			t.Fatalf("MintEndpoint: malformed mint body must be 400, got %d", res.StatusCode)
 		}
+		res, err = mint(`{"sessionId":"bad.session"}`, true)
+		if err != nil {
+			t.Fatal(err)
+		}
+		res.Body.Close()
+		if res.StatusCode != http.StatusBadRequest {
+			t.Fatalf("MintEndpoint: subject-unsafe mint session id must be 400, got %d", res.StatusCode)
+		}
 
 		// Valid: a bearer JWT plus the viewer's own deliver subject.
 		res, err = mint(`{"sessionId":"`+sid+`"}`, true)
@@ -268,6 +276,7 @@ func TestWebSessionShell(t *testing.T) {
 		var grant struct {
 			JWT            string `json:"jwt"`
 			DeliverSubject string `json:"deliverSubject"`
+			StateSubject   string `json:"stateSubject"`
 		}
 		err = json.NewDecoder(res.Body).Decode(&grant)
 		res.Body.Close()
@@ -276,6 +285,9 @@ func TestWebSessionShell(t *testing.T) {
 		}
 		if grant.JWT == "" || !strings.HasPrefix(grant.DeliverSubject, "tb.session."+sid+".deliver.") {
 			t.Fatalf("MintEndpoint: grant must carry a bearer JWT and the session deliver subject, got %+v", grant)
+		}
+		if !strings.HasPrefix(grant.StateSubject, "tb.app.browser.state.") || strings.Contains(grant.StateSubject, sid) {
+			t.Fatalf("MintEndpoint: grant must carry an opaque viewer state prefix, got %+v", grant)
 		}
 
 		// The credential observes the mediated session: publish one frame

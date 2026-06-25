@@ -64,7 +64,7 @@ func (a *App) mintViewer(rw http.ResponseWriter, r *http.Request) {
 	var req struct {
 		SessionID string `json:"sessionId"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.SessionID == "" {
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || !validShellSessionID(req.SessionID) {
 		http.Error(rw, "malformed mint request", http.StatusBadRequest)
 		return
 	}
@@ -91,6 +91,7 @@ func (a *App) mintViewer(rw http.ResponseWriter, r *http.Request) {
 	_ = json.NewEncoder(rw).Encode(map[string]string{
 		"jwt":            viewer.JWT,
 		"deliverSubject": viewer.DeliverSubject,
+		"stateSubject":   viewer.StateSubject,
 		"wsTicket":       ticket,
 	})
 }
@@ -149,4 +150,21 @@ func (a *App) sessionWS(rw http.ResponseWriter, r *http.Request) {
 	_, _ = io.Copy(client, back)
 	_ = client.Close()
 	_ = back.Close()
+}
+
+func validShellSessionID(s string) bool {
+	if s == "" {
+		return false
+	}
+	for _, r := range s {
+		switch {
+		case r >= 'a' && r <= 'z':
+		case r >= 'A' && r <= 'Z':
+		case r >= '0' && r <= '9':
+		case r == '-' || r == '_':
+		default:
+			return false
+		}
+	}
+	return true
 }

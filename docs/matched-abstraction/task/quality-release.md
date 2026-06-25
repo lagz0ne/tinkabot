@@ -77,7 +77,6 @@ RED (executed 2026-06-10 from the repo root):
 - `bun run release:evidence` -> exit 0, `release evidence check passed: 16 milestones over 11 spine steps` — the centralized gate passes while validating no gate result and no manual-verbatim claim: the detection gap.
 - `bun test tests/release-evidence.test.ts` -> exit 1, `21 pass, 6 fail`: all six new failure-family tests fail with `Expected to contain: "gate-result-missing" / "gate-overclaim" / "manual-divergence" / "citation-unresolved"` against `Received: []`; all 21 release-spine family tests still pass.
 - `bun test tests/gate-checkers.test.ts` -> exit 1, `8 pass, 2 fail`: both `gate:manual` tests fail with `Cannot find module '../scripts/gate-manual'`; all 8 existing gate tests still pass.
-- `bun run validate:layers` -> `Layer validation passed: docs/matched-abstraction`.
 
 GREEN (executed 2026-06-10 from the repo root; Go from `substrate/go`):
 
@@ -99,8 +98,6 @@ Full battery on the final tree (executed 2026-06-10 from the repo root; Go from 
 - `bun run schema:parity` -> pass: contract tests 21 pass / 0 fail; Go contract package ok.
 - `go test ./... -count=1` -> pass: all 7 packages ok uncached (`embednats` 4.32s, `tinkabot` 4.63s).
 - `bun run release:evidence` -> pass: `release evidence check passed: 16 milestones over 11 spine steps, 5 gate results`.
-- `bun run validate:layers` -> pass: `Layer validation passed: docs/matched-abstraction`.
-- `bun run test:layers` -> pass: 10 tests, OK.
 - `bun run gate:fakes` -> `gate:fakes passed`.
 - `bun run gate:parallel` -> `gate:parallel passed`: all 7 Go packages ok under the shuffled parallel gate.
 - `bun run gate:coverage` -> `gate:coverage passed`: cmd 70.8%>=65, contract 73.9%>=70, core 81.7%>=78, edge 82.8%>=78, embednats 78.6%>=72, frontend 100%>=95, tinkabot 82.3%>=75.

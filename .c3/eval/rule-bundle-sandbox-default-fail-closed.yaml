@@ -1,0 +1,13 @@
+fact: rule-bundle-sandbox-default-fail-closed
+claim: "Bundle sandbox default fail-closed behavior is present in the bwrap sandbox implementation and tests."
+code:
+  - substrate/go/embednats/sandbox.go
+  - substrate/go/tinkabot/bundle_security_test.go
+pipeline:
+  - gather: { file: substrate/go/embednats/sandbox.go }
+  - eval:
+      contains_all:
+        - "func (s BwrapSandbox) Preflight() error"
+        - "return os.ErrNotExist"
+        - "--unshare-all"
+        - "TrustedSandbox"

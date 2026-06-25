@@ -1,0 +1,4 @@
+fact: c3-503
+claim: "Example Bundles owns runnable bundle examples and their docs."
+code:
+  - examples/**

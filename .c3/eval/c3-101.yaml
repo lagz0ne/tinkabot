@@ -1,0 +1,6 @@
+fact: c3-101
+claim: "Schema Registry owns the neutral base v1 schema and fixtures."
+code:
+  - schemas/README.md
+  - schemas/base/v1/**
+  - substrate/go/contract/**

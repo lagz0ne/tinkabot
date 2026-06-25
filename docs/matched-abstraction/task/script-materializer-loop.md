@@ -84,8 +84,6 @@ GREEN evidence:
 - `bun run build` -> frontend and SDK distribution build passed.
 - `bun run test:e2e` -> `1 pass`, `0 fail`, `16 expect() calls`.
 - `bun run pack:dry` -> `Total files: 6`, including `dist/index.cjs`, `dist/index.mjs`, `dist/index.d.cts`, and `dist/index.d.mts`.
-- `bun run validate:layers` -> `Layer validation passed: docs/matched-abstraction`.
-- `bun run test:layers` -> `Ran 10 tests ... OK`.
 - `git diff --check` -> passed.
 
 ## Wrap-Up

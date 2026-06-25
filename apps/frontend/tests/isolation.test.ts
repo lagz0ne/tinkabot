@@ -87,6 +87,103 @@ describe("frontend isolation", () => {
     expect(intent.kind).toBe("browser.command_intent");
   });
 
+  test("FrameScopeEscape: participant app intent must match leased app and participant", () => {
+    const lease = testLease({
+      appId: "demo",
+      participantId: "alice",
+      commands: ["participant_action", "participant_read"],
+    });
+    const src = {};
+
+    const intent = accept(
+      lease,
+      src,
+      src,
+      msg({ command: "participant_action", appId: "demo", participantId: "alice" }),
+    );
+    expect(intent.context.appId).toBe("demo");
+    expect(intent.context.participantId).toBe("alice");
+
+    expect(
+      capture(() =>
+        accept(
+          lease,
+          src,
+          src,
+          msg({ command: "participant_action", appId: "other", participantId: "alice" }),
+        ),
+      ).kind,
+    ).toBe("FrameScopeEscape");
+    expect(
+      capture(() =>
+        accept(
+          lease,
+          src,
+          src,
+          msg({ command: "participant_action", appId: "demo", participantId: "bob" }),
+        ),
+      ).kind,
+    ).toBe("FrameScopeEscape");
+
+    expect(
+      capture(() =>
+        accept(
+          lease,
+          src,
+          src,
+          msg({ command: "participant_read", appId: "other", participantId: "alice" }),
+        ),
+      ).kind,
+    ).toBe("FrameScopeEscape");
+  });
+
+  test("accepts visual item submit only through leased command without raw authority", () => {
+    const lease = testLease({
+      artifactId: "artifact-browser",
+      commands: ["item_submit"],
+      sessions: ["visual-001"],
+    });
+    const src = {};
+
+    const intent = accept(
+      lease,
+      src,
+      src,
+      msg({
+        command: "item_submit",
+        payload: {
+          key: "artifacts.artifact-browser.results.choice",
+          expectedRevision: 0,
+          value: { choice: "diagram-a" },
+        },
+      }),
+    );
+    expect(intent.command).toBe("item_submit");
+    expect(intent.context.artifactId).toBe("artifact-browser");
+    expect(intent.context.appId).toBeUndefined();
+
+    expect(
+      capture(() =>
+        accept(
+          lease,
+          src,
+          src,
+          msg({
+            command: "item_submit",
+            payload: {
+              key: "artifacts.artifact-browser.results.choice",
+              value: { natsSubject: "tb.internal.admin.delete" },
+            },
+          }),
+        ),
+      ).kind,
+    ).toBe("FrameCapabilityDenied");
+
+    expect(
+      capture(() => accept(lease, src, src, msg({ command: "select_artifact" }))).kind,
+    ).toBe("FrameCapabilityDenied");
+  });
+
   test("mayObserve: returns true iff sessionId is in lease.sessions", () => {
     const lease = testLease({ sessions: ["session-001", "session-002"] });
     expect(mayObserve(lease, "session-001")).toBe(true);
@@ -128,6 +225,24 @@ describe("frontend isolation", () => {
     );
     expect(set.kind).toBe("FrameCapabilityDenied");
     expect(set.details.path).toBe("payload.0.token");
+
+    const password = capture(() =>
+      denyRaw({
+        type: "content.intent",
+        payload: { password: "secret" },
+      }),
+    );
+    expect(password.kind).toBe("FrameCapabilityDenied");
+    expect(password.details.path).toBe("payload.password");
+
+    const composite = capture(() =>
+      denyRaw({
+        type: "content.intent",
+        payload: { natsSubject: "tb.internal.admin.delete" },
+      }),
+    );
+    expect(composite.kind).toBe("FrameCapabilityDenied");
+    expect(composite.details.path).toBe("payload.natsSubject");
   });
 });
 

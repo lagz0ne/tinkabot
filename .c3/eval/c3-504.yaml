@@ -1,0 +1,10 @@
+fact: c3-504
+claim: "Agent Workflow owns repo-local agent instructions, skills, Claude workflow, and Codex orchestration surfaces."
+code:
+  - AGENTS.md
+  - CLAUDE.md
+  - .agents/**
+  - .claude/**
+  - .codex/**
+  - scripts/codex-orchestrate.ts
+  - tasks/todo.md

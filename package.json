@@ -27,6 +27,16 @@
     "pack:dry": "cd packages/sdk && bun pm pack --dry-run",
     "pack:tinkabot": "bash scripts/package-tinkabot.sh",
     "release:package": "bash scripts/release-package.sh",
+    "demo:chain": "bash scripts/demo-chain-reaction.sh",
+    "demo:patch": "bash scripts/demo-live-patch.sh",
+    "demo:turn": "bash scripts/demo-turn-based.sh",
+    "demo:turn-browser": "bash scripts/demo-turn-browser.sh",
+    "demo:chess": "bash scripts/demo-chess.sh",
+    "demo:typerace": "bash scripts/demo-typerace-anon.sh",
+    "demo:realtime": "bash scripts/demo-realtime-participant.sh",
+    "demo:realtime-browser": "bash scripts/demo-realtime-browser.sh",
+    "demo:iso-concurrency": "bash scripts/demo-iso-concurrency.sh",
+    "demo:visual": "bash scripts/demo-visual-decision.sh",
     "smoke:tinkalet-package": "bash scripts/smoke-tinkalet-package.sh",
     "gate:tinkalet-package": "bash scripts/smoke-tinkalet-package.sh",
     "release:evidence": "bun scripts/release-evidence.ts",
@@ -34,8 +44,6 @@
     "gate:fakes": "bun scripts/gate-fakes.ts",
     "gate:coverage": "bun scripts/gate-coverage.ts",
     "gate:scenarios": "bun scripts/gate-scenarios.ts",
-    "gate:manual": "bun scripts/gate-manual.ts",
-    "test:layers": "node .claude/skills/matched-abstraction/scripts/validate-layers.mjs docs/matched-abstraction",
-    "validate:layers": "node .claude/skills/matched-abstraction/scripts/validate-layers.mjs docs/matched-abstraction"
+    "gate:manual": "bun scripts/gate-manual.ts"
   }
 }

@@ -1,0 +1,14 @@
+fact: c3-301
+claim: "Tinkalet CLI owns the profile-aware command implementation and command tests."
+code:
+  - substrate/go/cmd/tinkalet/**
+  - substrate/go/tinkalet/**
+  - docs/matched-abstraction/approach/tinkalet-edge.md
+  - docs/matched-abstraction/plan/tinkalet-edge.md
+  - docs/matched-abstraction/task/profile-trigger-tour.md
+  - docs/matched-abstraction/task/tinkalet-cli-profile.md
+  - docs/matched-abstraction/task/tinkalet-local-profile-source.md
+  - docs/matched-abstraction/task/tinkalet-trigger-live.md
+  - docs/matched-abstraction/task/tinkalet-package-tour.md
+  - docs/matched-abstraction/task/tinkalet-scenario-gate.md
+  - docs/matched-abstraction/task/tinkalet-authority-denials.md

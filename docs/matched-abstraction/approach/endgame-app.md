@@ -2,7 +2,6 @@
 layer: approach
 topic: endgame-app
 references:
-  - ./charter.md
   - ./platform-structure.md
   - ./nats-script-runtime.md
   - ./browser-frontend-mediator.md

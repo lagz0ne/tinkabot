@@ -1,6 +1,12 @@
 {
   "version": 1,
   "skills": {
+    "c3": {
+      "source": "lagz0ne/c3-skill",
+      "sourceType": "github",
+      "skillPath": "skills/c3/SKILL.md",
+      "computedHash": "da586244a4fc163cef5876991e42621667e57ee8515b352e925c5a7dea1922a4"
+    },
     "efficient-fable": {
       "source": "builderio/skills",
       "sourceType": "github",
@@ -11,7 +17,13 @@
       "source": "lagz0ne/matched-abstraction",
       "sourceType": "github",
       "skillPath": "SKILL.md",
-      "computedHash": "af4ee12b0fdfd156a5c79b82ec1a0d7ed4f5fdb8b893d201e1373e04508d1142"
+      "computedHash": "77fff130d7adfc44e8a83d002f31b1dfb0ff695bb8a70ffac5676074c65c4a5c"
+    },
+    "reverse-tornado-okr": {
+      "source": "lagz0ne/okra",
+      "sourceType": "github",
+      "skillPath": "skills/reverse-tornado-okr/SKILL.md",
+      "computedHash": "fed393ae4a8e613216b39a1c0876ad50e243aa15bcbc4436000a8b0c4d2eb669"
     },
     "visual-plan": {
       "source": "builderio/skills",

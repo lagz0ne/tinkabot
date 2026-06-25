@@ -52,8 +52,6 @@ Review kept NATS effects outside this slice. The permission resolver decides aut
 - `bun run typecheck` -> `bunx @typescript/native-preview --noEmit` completed successfully.
 - `bun run build` -> emitted ESM, CommonJS, and declaration artifacts.
 - `bun pm pack --dry-run` -> `Total files: 5`.
-- `python3 -B .codex/skills/matched-abstraction-thinking/scripts/validate_layers.py docs/matched-abstraction` -> `Layer validation passed: docs/matched-abstraction`.
-- `python3 -B -m unittest tests/test_validate_layers.py` -> `Ran 10 tests ... OK`.
 - `find . -type d -name __pycache__ -print` -> no matches.
 
 ## Wrap-Up Announcement

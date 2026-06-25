@@ -78,7 +78,14 @@ describe("CodexEndgameOrchestrator", () => {
     expect(round.worker.cwd).toBe(
       "/repo-round-001-3-command-acceptance-worker",
     );
-    expect(round.verify).toContain("bun run validate:layers");
+    expect(round.verify).toEqual([
+      "bun run schema:parity",
+      "bun run typecheck",
+      "bun run test",
+      "bun run build",
+      "bun run pack:dry",
+      "git diff --check",
+    ]);
     expect(round.verify).toContain("git diff --check");
   });
 });

@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { frameLine } from "../src/observe";
+import { decodeJson, frameLine } from "../src/observe";
 
 describe("observe panel frame rendering", () => {
   test("token frame renders its text", () => {
@@ -31,5 +31,11 @@ describe("observe panel frame rendering", () => {
   test("malformed frames are ignored", () => {
     expect(frameLine("{not json")).toBeNull();
     expect(frameLine(JSON.stringify({ frame: "token" }))).toBeNull();
+  });
+
+  test("command replies decode from NATS bytes", () => {
+    expect(decodeJson(new TextEncoder().encode(`{"status":"accepted"}`))).toEqual({
+      status: "accepted",
+    });
   });
 });

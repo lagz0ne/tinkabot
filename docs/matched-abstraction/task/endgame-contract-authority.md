@@ -101,10 +101,7 @@ GREEN:
 - Stale/revoked fixture result: `fixtures/valid/command-stale-revision.json` and `fixtures/valid/revoked-capability.json` are schema-valid policy-denial fixtures.
 - No-raw-authority fixture result: `fixtures/invalid/browser-command-raw-nats.json` is rejected by both targets.
 
-Layer validation:
 
-- `bun run validate:layers` -> `Layer validation passed: docs/matched-abstraction`.
-- `bun run test:layers`: `Ran 10 tests ... OK`.
 
 Review passes:
 

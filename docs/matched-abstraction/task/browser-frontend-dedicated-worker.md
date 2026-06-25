@@ -37,9 +37,6 @@ Keep the slice browser-runtime agnostic. Fake the worker scope and command trans
 - Typecheck: `bun run typecheck` -> `bunx @typescript/native-preview --noEmit`.
 - Build: `bun run build` -> emitted ESM, CommonJS, and declaration artifacts.
 - Pack dry-run: `bun pm pack --dry-run` -> `Total files: 5`.
-- Layer validation: `python3 -B .codex/skills/matched-abstraction-thinking/scripts/validate_layers.py docs/matched-abstraction` -> `Layer validation passed: docs/matched-abstraction`.
-- Layer unit tests: `python3 -B -m unittest tests/test_validate_layers.py` -> `Ran 10 tests ... OK`.
-- Layer validation initially failed because this Task doc had incomplete evidence and the Approach doc lacked `## Layer Contract`; both were corrected before final validation.
 - Cleanup check: `find . -type d -name __pycache__ -print` -> no output.
 
 ## Wrap-Up Announcement

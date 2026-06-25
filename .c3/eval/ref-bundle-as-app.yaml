@@ -1,0 +1,10 @@
+fact: ref-bundle-as-app
+claim: "Bundle As App is grounded in bundle docs, examples, loader, and package smoke."
+code:
+  - docs/matched-abstraction/approach/bundle-v1.md
+  - docs/matched-abstraction/plan/bundle-v1.md
+  - docs/matched-abstraction/task/bundle-*.md
+  - substrate/go/tinkabot/bundle.go
+  - substrate/go/tinkabot/bundle_test.go
+  - examples/**
+  - scripts/smoke-tinkalet-package.sh

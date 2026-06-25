@@ -77,9 +77,6 @@ RED (executed 2026-06-11, recorded verbatim):
 
 - Regression guard (must stay green, did): `cd substrate/go && go test ./core -run 'TestScriptRuntimeMaterializesMediatedEffects|TestScriptRuntimeAttributesFailures' -count=1` -> `ok github.com/lagz0ne/tinkabot/substrate/go/core 0.007s`.
 
-- Command: `bun run validate:layers`
-- Result: `Layer validation passed: docs/matched-abstraction` (`task/session-contract-authority.md` valid).
-
 GREEN (executed 2026-06-11, recorded verbatim):
 
 - Command: `bun test packages/sdk/tests/base-contract/session-contract-authority.test.ts`
@@ -95,7 +92,7 @@ GREEN (executed 2026-06-11, recorded verbatim):
 
 - `bun run typecheck` (via `@typescript/native-preview`): clean — frontend, sdk, orchestrator.
 
-- `bun run validate:layers && git diff --check` -> `Layer validation passed: docs/matched-abstraction`; `git diff --check` clean.
+- `git diff --check` -> clean.
 
 Full battery on the final tree (executed 2026-06-11 from the repo root; Go from `substrate/go`):
 
@@ -106,8 +103,6 @@ Full battery on the final tree (executed 2026-06-11 from the repo root; Go from 
 - `bun run pack:dry` -> PASS: `tinkabot-0.1.0.tgz`, 6 files, unpacked 200.92KB.
 - `bun run schema:parity` -> PASS: 25 contract tests across 5 files pass; `go test ./...` all 7 packages ok.
 - `bun run release:evidence` -> PASS: 16 milestones over 11 spine steps, 5 gate results.
-- `bun run validate:layers` -> PASS: `Layer validation passed: docs/matched-abstraction`.
-- `bun run test:layers` -> PASS: Ran 10 tests, OK (0.389s).
 - `bun run gate:fakes` -> PASS: `gate:fakes passed`.
 - `bun run gate:parallel` -> PASS: `gate:parallel passed`; all 7 Go packages ok under parallel run.
 - `bun run gate:coverage` -> PASS: all layers above thresholds — cmd 70.8%>=65, contract 73.9%>=70, core 81.7%>=78, edge 82.8%>=78, embednats 78.6%>=72, frontend 100%>=95, tinkabot 82.3%>=75.

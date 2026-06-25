@@ -111,8 +111,6 @@ Final verification:
 - `bun run typecheck` -> passed.
 - `bun run build` -> passed.
 - `bun run pack:dry` -> produced `tinkabot-0.1.0.tgz` dry-run package.
-- `bun run validate:layers` -> layer validation passed.
-- `bun run test:layers` -> `10` layer validation tests passed.
 - `git diff --check` -> clean.
 
 ## Wrap-Up Announcement

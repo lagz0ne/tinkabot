@@ -1,0 +1,14 @@
+fact: c3-204
+claim: "Session and Wrapper Runtime owns process wrapper and session observation runtime surfaces."
+code:
+  - substrate/go/apps/wrapper/**
+  - substrate/go/tinkabot/demo_session.go
+  - substrate/go/tinkabot/demo_session_test.go
+  - substrate/go/tinkabot/web_session.go
+  - substrate/go/tinkabot/web_session_surface_test.go
+  - substrate/go/embednats/session_*.go
+  - substrate/go/embednats/web_session_surface.go
+  - substrate/go/embednats/web_session_surface_test.go
+  - substrate/go/embednats/trusted_wrapper_authority_test.go
+  - substrate/go/embednats/agent_wrapper_proof_test.go
+  - substrate/go/embednats/browser_gateway_test.go

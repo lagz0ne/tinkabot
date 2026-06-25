@@ -1,0 +1,10 @@
+fact: c3-203
+claim: "Bundle Chain Runtime owns bundle loading, schedules, transforms, sandbox proof, and bundle runtime tests."
+code:
+  - substrate/go/tinkabot/bundle.go
+  - substrate/go/tinkabot/bundle_test.go
+  - substrate/go/tinkabot/bundle_security_test.go
+  - substrate/go/tinkabot/material_overwrite_test.go
+  - docs/matched-abstraction/approach/bundle-v1.md
+  - docs/matched-abstraction/plan/bundle-v1.md
+  - docs/matched-abstraction/task/bundle-*.md
